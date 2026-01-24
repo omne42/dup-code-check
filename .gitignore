@@ -1,0 +1,19 @@
+# Rust
+target/
+**/target/
+
+# Node
+node_modules/
+dist/
+*.node
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / tooling
+.DS_Store
+.github-agent-data/
+

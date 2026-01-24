@@ -1,0 +1,35 @@
+{
+  "name": "code-checker",
+  "version": "0.0.1",
+  "description": "Code checking toolkit (Rust core + Node.js CLI)",
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "bin": {
+    "code-checker": "bin/code-checker.js"
+  },
+  "files": [
+    "bin/",
+    "crates/",
+    "docs/",
+    "scripts/",
+    "Cargo.lock",
+    "Cargo.toml",
+    "index.d.ts",
+    "index.js",
+    "README.md"
+  ],
+  "scripts": {
+    "build:native": "node scripts/build-native.mjs",
+    "build": "node scripts/build-native.mjs",
+    "postinstall": "node scripts/build-native.mjs",
+    "check": "node scripts/smoke.mjs",
+    "test": "node scripts/smoke.mjs",
+    "cli": "node bin/code-checker.js"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.8.1"
+}

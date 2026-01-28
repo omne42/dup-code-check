@@ -19,3 +19,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
 - Avoid panics in `git check-ignore` integration; fall back when it fails.
 - Avoid leaking absolute paths in results when path prefix stripping fails.
+- NAPI now validates numeric scan options (rejects NaN / fractional / out-of-range values).

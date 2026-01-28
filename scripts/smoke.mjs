@@ -40,23 +40,58 @@ if (groups.length !== 1 || groups[0].files.length !== 3) {
       `Unexpected result: ${JSON.stringify(groupsWithBig, null, 2)}\n`
     );
     process.exitCode = 1;
-  } else {
-    const badCli = spawnSync(
-      process.execPath,
-      [path.join(repoRoot, 'bin', 'code-checker.js'), '--max-file-size', '1.5', repoA],
-      { encoding: 'utf8' }
-    );
-    if (badCli.status !== 2) {
-      process.stderr.write(
-        `Unexpected CLI exit code: ${badCli.status}\nstdout:\n${badCli.stdout}\nstderr:\n${badCli.stderr}\n`
-      );
-      process.exitCode = 1;
-    }
-  }
+	  } else {
+	    const badCli = spawnSync(
+	      process.execPath,
+	      [path.join(repoRoot, 'bin', 'code-checker.js'), '--max-file-size', '1.5', repoA],
+	      { encoding: 'utf8' }
+	    );
+	    if (badCli.status !== 2) {
+	      process.stderr.write(
+	        `Unexpected CLI exit code: ${badCli.status}\nstdout:\n${badCli.stdout}\nstderr:\n${badCli.stderr}\n`
+	      );
+	      process.exitCode = 1;
+	    }
 
-  const snippet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  fs.writeFileSync(path.join(repoA, 'spanA.txt'), `////\nP${snippet}Q\n`);
-  fs.writeFileSync(path.join(repoB, 'spanB.txt'), `####\nR${snippet}S\n`);
+	    function expectThrow(name, fn) {
+	      let threw = false;
+	      try {
+	        fn();
+	      } catch {
+	        threw = true;
+	      }
+	      if (!threw) {
+	        process.stderr.write(`Expected error: ${name}\n`);
+	        process.exitCode = 1;
+	      }
+	    }
+
+	    expectThrow('similarityThreshold NaN', () =>
+	      findDuplicateFiles([repoA], { similarityThreshold: Number.NaN })
+	    );
+	    expectThrow('minMatchLen 1.5', () =>
+	      findDuplicateFiles([repoA], { minMatchLen: 1.5 })
+	    );
+	    expectThrow('minMatchLen -1', () =>
+	      findDuplicateFiles([repoA], { minMatchLen: -1 })
+	    );
+	    expectThrow('minTokenLen 0', () =>
+	      findDuplicateFiles([repoA], { minTokenLen: 0 })
+	    );
+	    expectThrow('simhashMaxDistance 1.5', () =>
+	      findDuplicateFiles([repoA], { simhashMaxDistance: 1.5 })
+	    );
+	    expectThrow('simhashMaxDistance -1', () =>
+	      findDuplicateFiles([repoA], { simhashMaxDistance: -1 })
+	    );
+	    expectThrow('maxReportItems -1', () =>
+	      findDuplicateFiles([repoA], { maxReportItems: -1 })
+	    );
+	  }
+
+	  const snippet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+	  fs.writeFileSync(path.join(repoA, 'spanA.txt'), `////\nP${snippet}Q\n`);
+	  fs.writeFileSync(path.join(repoB, 'spanB.txt'), `####\nR${snippet}S\n`);
 
   const spans = findDuplicateCodeSpans([repoA, repoB], {
     crossRepoOnly: true,

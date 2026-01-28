@@ -7,11 +7,11 @@ use napi_derive::napi;
 pub struct ScanOptions {
     pub ignore_dirs: Option<Vec<String>>,
     pub max_file_size: Option<f64>,
-    pub min_match_len: Option<u32>,
-    pub min_token_len: Option<u32>,
+    pub min_match_len: Option<f64>,
+    pub min_token_len: Option<f64>,
     pub similarity_threshold: Option<f64>,
-    pub simhash_max_distance: Option<u32>,
-    pub max_report_items: Option<u32>,
+    pub simhash_max_distance: Option<f64>,
+    pub max_report_items: Option<f64>,
     pub respect_gitignore: Option<bool>,
     pub cross_repo_only: Option<bool>,
     pub follow_symlinks: Option<bool>,
@@ -250,6 +250,23 @@ fn to_core_options(options: Option<ScanOptions>) -> Result<code_checker_core::Sc
     let mut out = code_checker_core::ScanOptions::default();
 
     if let Some(options) = options {
+        fn parse_u32_in_range(name: &str, value: f64, min: u32, max: u32) -> Result<u32> {
+            if !value.is_finite() {
+                return Err(Error::from_reason(format!(
+                    "{name} must be a finite number"
+                )));
+            }
+            if value.fract() != 0.0 {
+                return Err(Error::from_reason(format!("{name} must be an integer")));
+            }
+            let min_f = min as f64;
+            let max_f = max as f64;
+            if !(min_f..=max_f).contains(&value) {
+                return Err(Error::from_reason(format!("{name} must be {min}..{max}")));
+            }
+            Ok(value as u32)
+        }
+
         if let Some(ignore_dirs) = options.ignore_dirs {
             out.ignore_dirs.extend(ignore_dirs);
         }
@@ -276,24 +293,35 @@ fn to_core_options(options: Option<ScanOptions>) -> Result<code_checker_core::Sc
             }
             out.max_file_size = Some(max_file_size as u64);
         }
-        out.min_match_len = options
-            .min_match_len
-            .map(|v| v as usize)
-            .unwrap_or(out.min_match_len);
-        out.min_token_len = options
-            .min_token_len
-            .map(|v| v as usize)
-            .unwrap_or(out.min_token_len);
-        out.similarity_threshold = options
-            .similarity_threshold
-            .unwrap_or(out.similarity_threshold);
-        out.simhash_max_distance = options
-            .simhash_max_distance
-            .unwrap_or(out.simhash_max_distance);
-        out.max_report_items = options
-            .max_report_items
-            .map(|v| v as usize)
-            .unwrap_or(out.max_report_items);
+        if let Some(min_match_len) = options.min_match_len {
+            out.min_match_len =
+                parse_u32_in_range("minMatchLen", min_match_len, 1, u32::MAX)? as usize;
+        }
+        if let Some(min_token_len) = options.min_token_len {
+            out.min_token_len =
+                parse_u32_in_range("minTokenLen", min_token_len, 1, u32::MAX)? as usize;
+        }
+        if let Some(similarity_threshold) = options.similarity_threshold {
+            if !similarity_threshold.is_finite() {
+                return Err(Error::from_reason(
+                    "similarityThreshold must be a finite number".to_string(),
+                ));
+            }
+            if !(0.0..=1.0).contains(&similarity_threshold) {
+                return Err(Error::from_reason(
+                    "similarityThreshold must be 0..1".to_string(),
+                ));
+            }
+            out.similarity_threshold = similarity_threshold;
+        }
+        if let Some(simhash_max_distance) = options.simhash_max_distance {
+            out.simhash_max_distance =
+                parse_u32_in_range("simhashMaxDistance", simhash_max_distance, 0, 64)?;
+        }
+        if let Some(max_report_items) = options.max_report_items {
+            out.max_report_items =
+                parse_u32_in_range("maxReportItems", max_report_items, 0, u32::MAX)? as usize;
+        }
         out.respect_gitignore = options.respect_gitignore.unwrap_or(out.respect_gitignore);
         out.cross_repo_only = options.cross_repo_only.unwrap_or(out.cross_repo_only);
         out.follow_symlinks = options.follow_symlinks.unwrap_or(out.follow_symlinks);

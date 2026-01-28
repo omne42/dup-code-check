@@ -29,6 +29,7 @@ function loadNativeBinding() {
 const native = loadNativeBinding();
 
 module.exports = {
-  findDuplicateFiles: native.findDuplicateFiles
+  findDuplicateFiles: native.findDuplicateFiles,
+  findDuplicateCodeSpans: native.findDuplicateCodeSpans,
+  generateDuplicationReport: native.generateDuplicationReport
 };
-

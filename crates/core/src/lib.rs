@@ -183,6 +183,7 @@ pub fn find_duplicate_files(
         let metadata = match fs::metadata(&repo_file.abs_path) {
             Ok(m) => m,
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
             Err(err) => return Err(err),
         };
         if let Some(max_file_size) = options.max_file_size
@@ -194,6 +195,7 @@ pub fn find_duplicate_files(
         let bytes = match fs::read(&repo_file.abs_path) {
             Ok(b) => b,
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
             Err(err) => return Err(err),
         };
         if bytes.contains(&0) {
@@ -295,6 +297,7 @@ pub fn find_duplicate_code_spans(
         let metadata = match fs::metadata(&repo_file.abs_path) {
             Ok(m) => m,
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
             Err(err) => return Err(err),
         };
         if let Some(max_file_size) = options.max_file_size
@@ -306,6 +309,7 @@ pub fn find_duplicate_code_spans(
         let bytes = match fs::read(&repo_file.abs_path) {
             Ok(b) => b,
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
             Err(err) => return Err(err),
         };
         if bytes.contains(&0) {
@@ -571,6 +575,7 @@ fn scan_text_files_for_report(
         let metadata = match fs::metadata(&repo_file.abs_path) {
             Ok(m) => m,
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
             Err(err) => return Err(err),
         };
         if let Some(max_file_size) = options.max_file_size
@@ -582,6 +587,7 @@ fn scan_text_files_for_report(
         let bytes = match fs::read(&repo_file.abs_path) {
             Ok(b) => b,
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
             Err(err) => return Err(err),
         };
         if bytes.contains(&0) {
@@ -1855,12 +1861,14 @@ fn collect_repo_files_via_walk(repo: &Repo, options: &ScanOptions) -> io::Result
             Ok(e) => e,
             Err(err) => {
                 if let Some(io_err) = err.io_error() {
-                    if io_err.kind() == io::ErrorKind::NotFound {
+                    if matches!(
+                        io_err.kind(),
+                        io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
+                    ) {
                         continue;
                     }
-                    return Err(io::Error::new(io_err.kind(), io_err.to_string()));
                 }
-                return Err(io::Error::other(err.to_string()));
+                continue;
             }
         };
 
@@ -1948,6 +1956,7 @@ fn try_collect_repo_files_via_git(
         let meta = match fs::symlink_metadata(&abs_path) {
             Ok(m) => m,
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
             Err(err) => return Err(err),
         };
 
@@ -2455,6 +2464,38 @@ mod tests {
             let groups_yes = find_duplicate_files(&[root], &options_yes)?;
             assert_eq!(groups_yes.len(), 1);
             assert_eq!(groups_yes[0].files.len(), 3);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn scanning_skips_permission_denied_files() -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let root = temp_dir("perm_denied");
+            fs::create_dir_all(&root)?;
+            fs::write(root.join("a.txt"), "a b\nc")?;
+            fs::write(root.join("b.txt"), "ab\tc")?;
+
+            let secret_path = root.join("secret.txt");
+            fs::write(&secret_path, "ab\tc")?;
+
+            let mut perms = fs::metadata(&secret_path)?.permissions();
+            perms.set_mode(0o000);
+            fs::set_permissions(&secret_path, perms)?;
+
+            let options = ScanOptions::default();
+            let groups = find_duplicate_files(&[root.clone()], &options)?;
+
+            let mut perms = fs::metadata(&secret_path)?.permissions();
+            perms.set_mode(0o644);
+            fs::set_permissions(&secret_path, perms)?;
+
+            assert_eq!(groups.len(), 1);
+            assert_eq!(groups[0].files.len(), 2);
         }
 
         Ok(())

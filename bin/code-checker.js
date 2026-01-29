@@ -290,31 +290,39 @@ function main() {
     return;
   }
 
-  const roots = parsed.roots.map((p) => path.resolve(p));
-  const { findDuplicateFiles, findDuplicateCodeSpans, generateDuplicationReport } =
-    getApi();
-  if (parsed.report) {
-    const report = generateDuplicationReport(roots, parsed.options);
-    if (parsed.json) {
-      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  try {
+    const roots = parsed.roots.map((p) => path.resolve(p));
+    const { findDuplicateFiles, findDuplicateCodeSpans, generateDuplicationReport } =
+      getApi();
+
+    if (parsed.report) {
+      const report = generateDuplicationReport(roots, parsed.options);
+      if (parsed.json) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+        return;
+      }
+      process.stdout.write(formatTextReport(report));
       return;
     }
-    process.stdout.write(formatTextReport(report));
-    return;
+
+    const groups = parsed.codeSpans
+      ? findDuplicateCodeSpans(roots, parsed.options)
+      : findDuplicateFiles(roots, parsed.options);
+
+    if (parsed.json) {
+      process.stdout.write(`${JSON.stringify(groups, null, 2)}\n`);
+      return;
+    }
+
+    process.stdout.write(
+      parsed.codeSpans ? formatTextCodeSpans(groups) : formatText(groups)
+    );
+  } catch (err) {
+    const message =
+      err && typeof err === 'object' && 'message' in err ? err.message : `${err}`;
+    process.stderr.write(`Error: ${message}\n`);
+    process.exitCode = 1;
   }
-
-  const groups = parsed.codeSpans
-    ? findDuplicateCodeSpans(roots, parsed.options)
-    : findDuplicateFiles(roots, parsed.options);
-
-  if (parsed.json) {
-    process.stdout.write(`${JSON.stringify(groups, null, 2)}\n`);
-    return;
-  }
-
-  process.stdout.write(
-    parsed.codeSpans ? formatTextCodeSpans(groups) : formatText(groups)
-  );
 }
 
 main();

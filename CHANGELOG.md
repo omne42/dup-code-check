@@ -26,3 +26,6 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scanning now skips `PermissionDenied` and walker traversal errors instead of aborting.
 - CLI now catches runtime scan failures and exits with code 1.
 - Remove unstable rustfmt config options to avoid warnings on stable toolchains.
+- `--max-report-items` now applies consistently across all report sections and prefers larger groups.
+- CLI now supports `--no-gitignore` to disable `.gitignore` filtering.
+- When path prefix stripping fails, output uses `<external:...>/name` to keep paths distinguishable without leaking absolute paths.

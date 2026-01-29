@@ -666,13 +666,8 @@ fn scan_text_files_for_report(
         }
     }
 
-    file_duplicates.sort_by(|a, b| {
-        (a.content_hash, a.normalized_len, a.files.len()).cmp(&(
-            b.content_hash,
-            b.normalized_len,
-            b.files.len(),
-        ))
-    });
+    sort_duplicate_groups_for_report(&mut file_duplicates);
+    file_duplicates.truncate(options.max_report_items);
 
     Ok((files, file_duplicates))
 }
@@ -945,6 +940,26 @@ fn preview_from_lines(text: &str, start_line: u32, end_line: u32, max_chars: usi
     out
 }
 
+fn sort_duplicate_groups_for_report(groups: &mut Vec<DuplicateGroup>) {
+    groups.sort_by(|a, b| {
+        b.files
+            .len()
+            .cmp(&a.files.len())
+            .then_with(|| b.normalized_len.cmp(&a.normalized_len))
+            .then_with(|| a.content_hash.cmp(&b.content_hash))
+    });
+}
+
+fn sort_span_groups_for_report(groups: &mut Vec<DuplicateSpanGroup>) {
+    groups.sort_by(|a, b| {
+        b.occurrences
+            .len()
+            .cmp(&a.occurrences.len())
+            .then_with(|| b.normalized_len.cmp(&a.normalized_len))
+            .then_with(|| a.content_hash.cmp(&b.content_hash))
+    });
+}
+
 fn detect_duplicate_code_spans(
     files: &[ScannedTextFile],
     options: &ScanOptions,
@@ -1079,7 +1094,10 @@ fn detect_duplicate_code_spans(
         }
     }
 
-    finalize_span_groups(groups, options)
+    let mut out = finalize_span_groups(groups, options);
+    sort_span_groups_for_report(&mut out);
+    out.truncate(options.max_report_items);
+    out
 }
 
 fn detect_duplicate_line_spans(
@@ -1237,7 +1255,10 @@ fn detect_duplicate_blocks(
         }
     }
 
-    finalize_span_groups(groups, options)
+    let mut out = finalize_span_groups(groups, options);
+    sort_span_groups_for_report(&mut out);
+    out.truncate(options.max_report_items);
+    out
 }
 
 fn detect_duplicate_ast_subtrees(
@@ -1355,7 +1376,10 @@ fn detect_duplicate_ast_subtrees(
         }
     }
 
-    finalize_span_groups(groups, options)
+    let mut out = finalize_span_groups(groups, options);
+    sort_span_groups_for_report(&mut out);
+    out.truncate(options.max_report_items);
+    out
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1369,6 +1393,9 @@ fn detect_duplicate_span_groups_with_len_filter(
     preview_from_occurrence: impl Fn(usize, u32, u32) -> String,
     max_items: usize,
 ) -> Vec<DuplicateSpanGroup> {
+    if max_items == 0 {
+        return Vec::new();
+    }
     if files.is_empty() {
         return Vec::new();
     }
@@ -1493,16 +1520,16 @@ fn detect_duplicate_span_groups_with_len_filter(
         }
     }
 
-    finalize_span_groups(
+    let mut out = finalize_span_groups(
         groups,
         &ScanOptions {
             cross_repo_only,
             ..ScanOptions::default()
         },
-    )
-    .into_iter()
-    .take(max_items)
-    .collect()
+    );
+    sort_span_groups_for_report(&mut out);
+    out.truncate(max_items);
+    out
 }
 
 fn finalize_span_groups(
@@ -2021,11 +2048,14 @@ fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<Str
 fn make_rel_path(root: &Path, abs_path: &Path) -> String {
     match abs_path.strip_prefix(root) {
         Ok(rel) => rel.to_string_lossy().to_string(),
-        Err(_) => abs_path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("<unknown>")
-            .to_string(),
+        Err(_) => {
+            let name = abs_path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("<unknown>");
+            let hash = fnv1a64(abs_path.to_string_lossy().as_bytes());
+            format!("<external:{hash:016x}>/{name}")
+        }
     }
 }
 
@@ -2364,6 +2394,24 @@ mod tests {
         let report = generate_duplication_report(&[root], &options)?;
         assert_eq!(report.file_duplicates.len(), 1);
         assert_eq!(report.file_duplicates[0].files.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn report_truncates_file_duplicates() -> io::Result<()> {
+        let root = temp_dir("report_truncate_files");
+        fs::create_dir_all(&root)?;
+        fs::write(root.join("a.txt"), "same1")?;
+        fs::write(root.join("b.txt"), "same1")?;
+        fs::write(root.join("c.txt"), "same2")?;
+        fs::write(root.join("d.txt"), "same2")?;
+
+        let options = ScanOptions {
+            max_report_items: 1,
+            ..ScanOptions::default()
+        };
+        let report = generate_duplication_report(&[root], &options)?;
+        assert_eq!(report.file_duplicates.len(), 1);
         Ok(())
     }
 

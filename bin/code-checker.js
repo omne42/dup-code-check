@@ -27,6 +27,7 @@ function printHelp() {
       '  --code-spans            Find suspected duplicate code spans',
       '  --json                  Output JSON',
       '  --cross-repo-only       Only report groups spanning >= 2 roots',
+      '  --no-gitignore          Do not respect .gitignore rules',
       '  --min-match-len <n>     Code spans: minimum normalized length (default: 50)',
       '  --min-token-len <n>     Token-based: minimum token length (default: 50)',
       '  --similarity-threshold <f>  Similarity: 0..1 (default: 0.85)',
@@ -55,6 +56,7 @@ function parseArgs(argv) {
   let codeSpans = false;
   let json = false;
   let crossRepoOnly = false;
+  let respectGitignore = true;
   let followSymlinks = false;
   let maxFileSize;
   let minMatchLen;
@@ -83,6 +85,14 @@ function parseArgs(argv) {
     }
     if (arg === '--cross-repo-only') {
       crossRepoOnly = true;
+      continue;
+    }
+    if (arg === '--no-gitignore') {
+      respectGitignore = false;
+      continue;
+    }
+    if (arg === '--gitignore') {
+      respectGitignore = true;
       continue;
     }
     if (arg === '--follow-symlinks') {
@@ -180,6 +190,7 @@ function parseArgs(argv) {
       similarityThreshold: similarityThreshold,
       simhashMaxDistance: simhashMaxDistance,
       maxReportItems: maxReportItems,
+      respectGitignore: respectGitignore,
       crossRepoOnly: crossRepoOnly,
       followSymlinks: followSymlinks
     }
@@ -319,7 +330,9 @@ function main() {
     );
   } catch (err) {
     const message =
-      err && typeof err === 'object' && 'message' in err ? err.message : `${err}`;
+      err && typeof err === 'object' && 'message' in err
+        ? String(err.message)
+        : `${err}`;
     process.stderr.write(`Error: ${message}\n`);
     process.exitCode = 1;
   }

@@ -62,27 +62,82 @@ if (groups.length !== 1 || groups[0].files.length !== 3) {
 		      [path.join(repoRoot, 'bin', 'code-checker.js'), '--json', '--', dashRepo],
 		      { encoding: 'utf8' }
 		    );
-		    if (dashCli.status !== 0) {
-		      process.stderr.write(
-		        `Unexpected CLI exit code (dash root): ${dashCli.status}\nstdout:\n${dashCli.stdout}\nstderr:\n${dashCli.stderr}\n`
-		      );
-		      process.exitCode = 1;
-		    } else {
-		      try {
-		        const parsed = JSON.parse(dashCli.stdout);
-		        if (!Array.isArray(parsed) || parsed.length !== 1 || parsed[0].files.length !== 2) {
-		          throw new Error(`unexpected output: ${dashCli.stdout}`);
-		        }
-		      } catch (err) {
-		        process.stderr.write(`Failed to parse --json output: ${err}\n`);
-		        process.exitCode = 1;
-		      }
-		    }
+			    if (dashCli.status !== 0) {
+			      process.stderr.write(
+			        `Unexpected CLI exit code (dash root): ${dashCli.status}\nstdout:\n${dashCli.stdout}\nstderr:\n${dashCli.stderr}\n`
+			      );
+			      process.exitCode = 1;
+			    } else {
+			      try {
+			        const parsed = JSON.parse(dashCli.stdout);
+			        if (!Array.isArray(parsed) || parsed.length !== 1 || parsed[0].files.length !== 2) {
+			          throw new Error(`unexpected output: ${dashCli.stdout}`);
+			        }
+			      } catch (err) {
+			        process.stderr.write(`Failed to parse --json output: ${err}\n`);
+			        process.exitCode = 1;
+			      }
+			    }
 
-		    function expectThrow(name, fn) {
-		      let threw = false;
-		      try {
-		        fn();
+			    const ignoreRepo = path.join(tmp, 'ignoreRepo');
+			    fs.mkdirSync(ignoreRepo, { recursive: true });
+			    fs.writeFileSync(path.join(ignoreRepo, '.gitignore'), 'ignored.txt\n');
+			    fs.writeFileSync(path.join(ignoreRepo, 'a.txt'), 'same content');
+			    fs.writeFileSync(path.join(ignoreRepo, 'ignored.txt'), 'same content');
+
+			    const defaultGitignoreCli = spawnSync(
+			      process.execPath,
+			      [path.join(repoRoot, 'bin', 'code-checker.js'), '--json', ignoreRepo],
+			      { encoding: 'utf8' }
+			    );
+			    if (defaultGitignoreCli.status !== 0) {
+			      process.stderr.write(
+			        `Unexpected CLI exit code (default gitignore): ${defaultGitignoreCli.status}\nstdout:\n${defaultGitignoreCli.stdout}\nstderr:\n${defaultGitignoreCli.stderr}\n`
+			      );
+			      process.exitCode = 1;
+			    } else {
+			      try {
+			        const parsed = JSON.parse(defaultGitignoreCli.stdout);
+			        if (!Array.isArray(parsed) || parsed.length !== 0) {
+			          throw new Error(`unexpected output: ${defaultGitignoreCli.stdout}`);
+			        }
+			      } catch (err) {
+			        process.stderr.write(`Failed to parse --json output: ${err}\n`);
+			        process.exitCode = 1;
+			      }
+			    }
+
+			    const noGitignoreCli = spawnSync(
+			      process.execPath,
+			      [
+			        path.join(repoRoot, 'bin', 'code-checker.js'),
+			        '--json',
+			        '--no-gitignore',
+			        ignoreRepo,
+			      ],
+			      { encoding: 'utf8' }
+			    );
+			    if (noGitignoreCli.status !== 0) {
+			      process.stderr.write(
+			        `Unexpected CLI exit code (--no-gitignore): ${noGitignoreCli.status}\nstdout:\n${noGitignoreCli.stdout}\nstderr:\n${noGitignoreCli.stderr}\n`
+			      );
+			      process.exitCode = 1;
+			    } else {
+			      try {
+			        const parsed = JSON.parse(noGitignoreCli.stdout);
+			        if (!Array.isArray(parsed) || parsed.length !== 1 || parsed[0].files.length !== 2) {
+			          throw new Error(`unexpected output: ${noGitignoreCli.stdout}`);
+			        }
+			      } catch (err) {
+			        process.stderr.write(`Failed to parse --json output: ${err}\n`);
+			        process.exitCode = 1;
+			      }
+			    }
+
+			    function expectThrow(name, fn) {
+			      let threw = false;
+			      try {
+			        fn();
 	      } catch {
 	        threw = true;
 	      }

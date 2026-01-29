@@ -46,17 +46,43 @@ if (groups.length !== 1 || groups[0].files.length !== 3) {
 	      [path.join(repoRoot, 'bin', 'code-checker.js'), '--max-file-size', '1.5', repoA],
 	      { encoding: 'utf8' }
 	    );
-	    if (badCli.status !== 2) {
-	      process.stderr.write(
-	        `Unexpected CLI exit code: ${badCli.status}\nstdout:\n${badCli.stdout}\nstderr:\n${badCli.stderr}\n`
-	      );
-	      process.exitCode = 1;
-	    }
+		    if (badCli.status !== 2) {
+		      process.stderr.write(
+		        `Unexpected CLI exit code: ${badCli.status}\nstdout:\n${badCli.stdout}\nstderr:\n${badCli.stderr}\n`
+		      );
+		      process.exitCode = 1;
+		    }
 
-	    function expectThrow(name, fn) {
-	      let threw = false;
-	      try {
-	        fn();
+		    const dashRepo = path.join(tmp, '-repo');
+		    fs.mkdirSync(dashRepo, { recursive: true });
+		    fs.writeFileSync(path.join(dashRepo, 'a.txt'), 'a b\nc');
+		    fs.writeFileSync(path.join(dashRepo, 'b.txt'), 'ab\tc');
+		    const dashCli = spawnSync(
+		      process.execPath,
+		      [path.join(repoRoot, 'bin', 'code-checker.js'), '--json', '--', dashRepo],
+		      { encoding: 'utf8' }
+		    );
+		    if (dashCli.status !== 0) {
+		      process.stderr.write(
+		        `Unexpected CLI exit code (dash root): ${dashCli.status}\nstdout:\n${dashCli.stdout}\nstderr:\n${dashCli.stderr}\n`
+		      );
+		      process.exitCode = 1;
+		    } else {
+		      try {
+		        const parsed = JSON.parse(dashCli.stdout);
+		        if (!Array.isArray(parsed) || parsed.length !== 1 || parsed[0].files.length !== 2) {
+		          throw new Error(`unexpected output: ${dashCli.stdout}`);
+		        }
+		      } catch (err) {
+		        process.stderr.write(`Failed to parse --json output: ${err}\n`);
+		        process.exitCode = 1;
+		      }
+		    }
+
+		    function expectThrow(name, fn) {
+		      let threw = false;
+		      try {
+		        fn();
 	      } catch {
 	        threw = true;
 	      }

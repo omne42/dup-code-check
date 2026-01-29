@@ -817,6 +817,7 @@ fn tokenize_for_dup_detection(text: &str) -> TokenizedText {
 
         if b == b'"' || b == b'\'' {
             let quote = b;
+            let start_line = line;
             i += 1;
             while i < bytes.len() {
                 let c = bytes[i];
@@ -834,7 +835,7 @@ fn tokenize_for_dup_detection(text: &str) -> TokenizedText {
                 i += 1;
             }
             tokens.push(TOK_STR);
-            token_lines.push(line);
+            token_lines.push(start_line);
             continue;
         }
 
@@ -1800,6 +1801,7 @@ fn repo_label(root: &Path, id: usize) -> String {
 
 fn collect_repo_files(repo: &Repo, options: &ScanOptions) -> io::Result<Vec<RepoFile>> {
     if options.respect_gitignore
+        && !options.follow_symlinks
         && let Some(files) = try_collect_repo_files_via_git(repo, options)?
     {
         return Ok(files);
@@ -2404,6 +2406,87 @@ mod tests {
         assert!(!report.similar_blocks_minhash.is_empty());
         assert!(!report.similar_blocks_simhash.is_empty());
         Ok(())
+    }
+
+    #[test]
+    fn follow_symlinks_includes_symlinked_files_in_git_repo() -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            use std::process::Stdio;
+
+            let root = temp_dir("symlink_git");
+            fs::create_dir_all(&root)?;
+
+            let git_ok = std::process::Command::new("git")
+                .arg("--version")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .is_ok_and(|s| s.success());
+            if !git_ok {
+                return Ok(());
+            }
+
+            let init_ok = std::process::Command::new("git")
+                .arg("init")
+                .current_dir(&root)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .is_ok_and(|s| s.success());
+            if !init_ok {
+                return Ok(());
+            }
+
+            fs::write(root.join("a.txt"), "a b\nc")?;
+            fs::write(root.join("b.txt"), "ab\tc")?;
+            symlink("a.txt", root.join("link.txt"))?;
+
+            let options_no = ScanOptions::default();
+            let groups_no = find_duplicate_files(&[root.clone()], &options_no)?;
+            assert_eq!(groups_no.len(), 1);
+            assert_eq!(groups_no[0].files.len(), 2);
+
+            let options_yes = ScanOptions {
+                follow_symlinks: true,
+                ..ScanOptions::default()
+            };
+            let groups_yes = find_duplicate_files(&[root], &options_yes)?;
+            assert_eq!(groups_yes.len(), 1);
+            assert_eq!(groups_yes[0].files.len(), 3);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn tokenize_tracks_string_start_line() {
+        let text = "let a = \"x\ny\";\nlet b = 1;\n";
+        let tokens = tokenize_for_dup_detection(text);
+
+        let str_idx = tokens
+            .tokens
+            .iter()
+            .position(|&tok| tok == 3)
+            .expect("should contain TOK_STR");
+        assert_eq!(tokens.token_lines[str_idx], 1);
+
+        let semi_idx = tokens
+            .tokens
+            .iter()
+            .position(|&tok| tok == 10_000 + u32::from(b';'))
+            .expect("should contain ';' token");
+        assert_eq!(tokens.token_lines[semi_idx], 2);
+
+        let let_positions: Vec<usize> = tokens
+            .tokens
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &tok)| (tok == 122).then_some(i))
+            .collect();
+        assert!(let_positions.len() >= 2);
+        assert_eq!(tokens.token_lines[let_positions[1]], 3);
     }
 
     fn temp_dir(suffix: &str) -> PathBuf {

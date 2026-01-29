@@ -20,3 +20,6 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Avoid panics in `git check-ignore` integration; fall back when it fails.
 - Avoid leaking absolute paths in results when path prefix stripping fails.
 - NAPI now validates numeric scan options (rejects NaN / fractional / out-of-range values).
+- `--follow-symlinks` now works reliably by using the walker path when enabled.
+- Token-based detectors now record the start line for multi-line string tokens.
+- CLI now supports `--` to terminate option parsing (allows roots that start with `-`).

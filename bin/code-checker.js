@@ -65,6 +65,10 @@ function parseArgs(argv) {
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    if (arg === '--') {
+      roots.push(...argv.slice(i + 1));
+      break;
+    }
     if (arg === '--report') {
       report = true;
       continue;

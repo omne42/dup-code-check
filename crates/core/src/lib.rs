@@ -11,6 +11,8 @@ use ignore::WalkBuilder;
 pub struct ScanOptions {
     pub ignore_dirs: HashSet<String>,
     pub max_file_size: Option<u64>,
+    pub max_files: Option<usize>,
+    pub max_total_bytes: Option<u64>,
     pub min_match_len: usize,
     pub min_token_len: usize,
     pub similarity_threshold: f64,
@@ -28,6 +30,8 @@ impl Default for ScanOptions {
         Self {
             ignore_dirs: default_ignore_dirs(),
             max_file_size: Some(DEFAULT_MAX_FILE_SIZE_BYTES),
+            max_files: None,
+            max_total_bytes: None,
             min_match_len: 50,
             min_token_len: 50,
             similarity_threshold: 0.85,
@@ -38,6 +42,26 @@ impl Default for ScanOptions {
             follow_symlinks: false,
         }
     }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ScanStats {
+    pub candidate_files: u64,
+    pub scanned_files: u64,
+    pub scanned_bytes: u64,
+    pub skipped_not_found: u64,
+    pub skipped_permission_denied: u64,
+    pub skipped_too_large: u64,
+    pub skipped_binary: u64,
+    pub skipped_walk_errors: u64,
+    pub skipped_budget_max_files: u64,
+    pub skipped_budget_max_total_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScanOutcome<T> {
+    pub result: T,
+    pub stats: ScanStats,
 }
 
 pub fn default_ignore_dirs() -> HashSet<String> {
@@ -110,6 +134,20 @@ pub struct DuplicationReport {
     pub similar_blocks_simhash: Vec<SimilarityPair>,
 }
 
+fn validate_roots(roots: &[PathBuf]) -> io::Result<()> {
+    for root in roots {
+        let meta = fs::metadata(root)
+            .map_err(|err| io::Error::new(err.kind(), format!("root {}: {err}", root.display())))?;
+        if !meta.is_dir() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("root {} is not a directory", root.display()),
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 struct Repo {
     id: usize,
@@ -134,6 +172,15 @@ struct NormalizedFile {
     line_map: Vec<u32>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct NormalizedFileView<'a> {
+    repo_id: usize,
+    repo_label: &'a str,
+    rel_path: &'a str,
+    normalized: &'a [u32],
+    line_map: &'a [u32],
+}
+
 #[derive(Debug)]
 struct SpanGroupBuilder {
     content_hash: u64,
@@ -149,9 +196,21 @@ pub fn find_duplicate_files(
     roots: &[PathBuf],
     options: &ScanOptions,
 ) -> io::Result<Vec<DuplicateGroup>> {
+    Ok(find_duplicate_files_with_stats(roots, options)?.result)
+}
+
+pub fn find_duplicate_files_with_stats(
+    roots: &[PathBuf],
+    options: &ScanOptions,
+) -> io::Result<ScanOutcome<Vec<DuplicateGroup>>> {
     if roots.is_empty() {
-        return Ok(Vec::new());
+        return Ok(ScanOutcome {
+            result: Vec::new(),
+            stats: ScanStats::default(),
+        });
     }
+
+    validate_roots(roots)?;
 
     let repos: Vec<Repo> = roots
         .iter()
@@ -163,9 +222,12 @@ pub fn find_duplicate_files(
         })
         .collect();
 
+    let mut stats = ScanStats::default();
     let mut all_files = Vec::new();
     for repo in &repos {
-        all_files.extend(collect_repo_files(repo, options)?);
+        let files = collect_repo_files(repo, options, &mut stats)?;
+        stats.candidate_files = stats.candidate_files.saturating_add(files.len() as u64);
+        all_files.extend(files);
     }
 
     #[derive(Debug)]
@@ -179,28 +241,61 @@ pub fn find_duplicate_files(
 
     let mut groups: HashMap<(u64, usize), Vec<GroupBuilder>> = HashMap::new();
 
-    for repo_file in all_files {
+    let total_files = all_files.len();
+    for (idx, repo_file) in all_files.into_iter().enumerate() {
+        if let Some(max_files) = options.max_files
+            && stats.scanned_files as usize >= max_files
+        {
+            stats.skipped_budget_max_files = stats
+                .skipped_budget_max_files
+                .saturating_add((total_files - idx) as u64);
+            break;
+        }
+
         let metadata = match fs::metadata(&repo_file.abs_path) {
             Ok(m) => m,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                continue;
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                continue;
+            }
             Err(err) => return Err(err),
         };
         if let Some(max_file_size) = options.max_file_size
             && metadata.len() > max_file_size
         {
+            stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
+            continue;
+        }
+        if let Some(max_total_bytes) = options.max_total_bytes
+            && stats.scanned_bytes.saturating_add(metadata.len()) > max_total_bytes
+        {
+            stats.skipped_budget_max_total_bytes =
+                stats.skipped_budget_max_total_bytes.saturating_add(1);
             continue;
         }
 
         let bytes = match fs::read(&repo_file.abs_path) {
             Ok(b) => b,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                continue;
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                continue;
+            }
             Err(err) => return Err(err),
         };
         if bytes.contains(&0) {
+            stats.skipped_binary = stats.skipped_binary.saturating_add(1);
             continue;
         }
+        stats.scanned_files = stats.scanned_files.saturating_add(1);
+        stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
 
         let normalized = normalize_whitespace(&bytes);
         let content_hash = fnv1a64(&normalized);
@@ -260,16 +355,28 @@ pub fn find_duplicate_files(
             b.files.len(),
         ))
     });
-    Ok(out)
+    Ok(ScanOutcome { result: out, stats })
 }
 
 pub fn find_duplicate_code_spans(
     roots: &[PathBuf],
     options: &ScanOptions,
 ) -> io::Result<Vec<DuplicateSpanGroup>> {
+    Ok(find_duplicate_code_spans_with_stats(roots, options)?.result)
+}
+
+pub fn find_duplicate_code_spans_with_stats(
+    roots: &[PathBuf],
+    options: &ScanOptions,
+) -> io::Result<ScanOutcome<Vec<DuplicateSpanGroup>>> {
     if roots.is_empty() {
-        return Ok(Vec::new());
+        return Ok(ScanOutcome {
+            result: Vec::new(),
+            stats: ScanStats::default(),
+        });
     }
+
+    validate_roots(roots)?;
 
     let min_match_len = options.min_match_len.max(1);
     let fingerprint_len = min_match_len.clamp(1, 25);
@@ -287,34 +394,70 @@ pub fn find_duplicate_code_spans(
         })
         .collect();
 
+    let mut stats = ScanStats::default();
     let mut repo_files = Vec::new();
     for repo in &repos {
-        repo_files.extend(collect_repo_files(repo, options)?);
+        let files = collect_repo_files(repo, options, &mut stats)?;
+        stats.candidate_files = stats.candidate_files.saturating_add(files.len() as u64);
+        repo_files.extend(files);
     }
 
     let mut files = Vec::new();
-    for repo_file in repo_files {
+    let total_files = repo_files.len();
+    for (idx, repo_file) in repo_files.into_iter().enumerate() {
+        if let Some(max_files) = options.max_files
+            && stats.scanned_files as usize >= max_files
+        {
+            stats.skipped_budget_max_files = stats
+                .skipped_budget_max_files
+                .saturating_add((total_files - idx) as u64);
+            break;
+        }
+
         let metadata = match fs::metadata(&repo_file.abs_path) {
             Ok(m) => m,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                continue;
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                continue;
+            }
             Err(err) => return Err(err),
         };
         if let Some(max_file_size) = options.max_file_size
             && metadata.len() > max_file_size
         {
+            stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
+            continue;
+        }
+        if let Some(max_total_bytes) = options.max_total_bytes
+            && stats.scanned_bytes.saturating_add(metadata.len()) > max_total_bytes
+        {
+            stats.skipped_budget_max_total_bytes =
+                stats.skipped_budget_max_total_bytes.saturating_add(1);
             continue;
         }
 
         let bytes = match fs::read(&repo_file.abs_path) {
             Ok(b) => b,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                continue;
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                continue;
+            }
             Err(err) => return Err(err),
         };
         if bytes.contains(&0) {
+            stats.skipped_binary = stats.skipped_binary.saturating_add(1);
             continue;
         }
+        stats.scanned_files = stats.scanned_files.saturating_add(1);
+        stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
 
         let normalized = normalize_for_code_spans(&bytes);
         if normalized.chars.len() < min_match_len {
@@ -361,9 +504,12 @@ pub fn find_duplicate_code_spans(
     let mut seen_matches: HashSet<MatchKey> = HashSet::new();
     let mut groups: HashMap<(u64, usize), Vec<SpanGroupBuilder>> = HashMap::new();
 
-    for occs in fingerprints.into_values() {
-        if occs.len() <= 1 || occs.len() > MAX_BUCKET {
+    for mut occs in fingerprints.into_values() {
+        if occs.len() <= 1 {
             continue;
+        }
+        if occs.len() > MAX_BUCKET {
+            occs.truncate(MAX_BUCKET);
         }
 
         for i in 0..occs.len() {
@@ -472,7 +618,7 @@ pub fn find_duplicate_code_spans(
             b.occurrences.len(),
         ))
     });
-    Ok(out)
+    Ok(ScanOutcome { result: out, stats })
 }
 
 #[derive(Debug)]
@@ -505,20 +651,48 @@ pub fn generate_duplication_report(
     roots: &[PathBuf],
     options: &ScanOptions,
 ) -> io::Result<DuplicationReport> {
+    Ok(generate_duplication_report_with_stats(roots, options)?.result)
+}
+
+pub fn generate_duplication_report_with_stats(
+    roots: &[PathBuf],
+    options: &ScanOptions,
+) -> io::Result<ScanOutcome<DuplicationReport>> {
     if roots.is_empty() {
-        return Ok(DuplicationReport {
-            file_duplicates: Vec::new(),
-            code_span_duplicates: Vec::new(),
-            line_span_duplicates: Vec::new(),
-            token_span_duplicates: Vec::new(),
-            block_duplicates: Vec::new(),
-            ast_subtree_duplicates: Vec::new(),
-            similar_blocks_minhash: Vec::new(),
-            similar_blocks_simhash: Vec::new(),
+        return Ok(ScanOutcome {
+            result: DuplicationReport {
+                file_duplicates: Vec::new(),
+                code_span_duplicates: Vec::new(),
+                line_span_duplicates: Vec::new(),
+                token_span_duplicates: Vec::new(),
+                block_duplicates: Vec::new(),
+                ast_subtree_duplicates: Vec::new(),
+                similar_blocks_minhash: Vec::new(),
+                similar_blocks_simhash: Vec::new(),
+            },
+            stats: ScanStats::default(),
         });
     }
 
-    let (files, file_duplicates) = scan_text_files_for_report(roots, options)?;
+    validate_roots(roots)?;
+    if options.max_report_items == 0 {
+        return Ok(ScanOutcome {
+            result: DuplicationReport {
+                file_duplicates: Vec::new(),
+                code_span_duplicates: Vec::new(),
+                line_span_duplicates: Vec::new(),
+                token_span_duplicates: Vec::new(),
+                block_duplicates: Vec::new(),
+                ast_subtree_duplicates: Vec::new(),
+                similar_blocks_minhash: Vec::new(),
+                similar_blocks_simhash: Vec::new(),
+            },
+            stats: ScanStats::default(),
+        });
+    }
+
+    let mut stats = ScanStats::default();
+    let (files, file_duplicates) = scan_text_files_for_report(roots, options, &mut stats)?;
 
     let code_span_duplicates = detect_duplicate_code_spans(&files, options);
     let line_span_duplicates = detect_duplicate_line_spans(&files, options);
@@ -528,21 +702,25 @@ pub fn generate_duplication_report(
     let similar_blocks_minhash = find_similar_blocks_minhash(&files, options);
     let similar_blocks_simhash = find_similar_blocks_simhash(&files, options);
 
-    Ok(DuplicationReport {
-        file_duplicates,
-        code_span_duplicates,
-        line_span_duplicates,
-        token_span_duplicates,
-        block_duplicates,
-        ast_subtree_duplicates,
-        similar_blocks_minhash,
-        similar_blocks_simhash,
+    Ok(ScanOutcome {
+        result: DuplicationReport {
+            file_duplicates,
+            code_span_duplicates,
+            line_span_duplicates,
+            token_span_duplicates,
+            block_duplicates,
+            ast_subtree_duplicates,
+            similar_blocks_minhash,
+            similar_blocks_simhash,
+        },
+        stats,
     })
 }
 
 fn scan_text_files_for_report(
     roots: &[PathBuf],
     options: &ScanOptions,
+    stats: &mut ScanStats,
 ) -> io::Result<(Vec<ScannedTextFile>, Vec<DuplicateGroup>)> {
     let repos: Vec<Repo> = roots
         .iter()
@@ -556,7 +734,9 @@ fn scan_text_files_for_report(
 
     let mut repo_files = Vec::new();
     for repo in &repos {
-        repo_files.extend(collect_repo_files(repo, options)?);
+        let files = collect_repo_files(repo, options, stats)?;
+        stats.candidate_files = stats.candidate_files.saturating_add(files.len() as u64);
+        repo_files.extend(files);
     }
 
     #[derive(Debug)]
@@ -571,28 +751,61 @@ fn scan_text_files_for_report(
     let mut file_groups: HashMap<(u64, usize), Vec<FileGroupBuilder>> = HashMap::new();
     let mut files = Vec::new();
 
-    for repo_file in repo_files {
+    let total_files = repo_files.len();
+    for (idx, repo_file) in repo_files.into_iter().enumerate() {
+        if let Some(max_files) = options.max_files
+            && stats.scanned_files as usize >= max_files
+        {
+            stats.skipped_budget_max_files = stats
+                .skipped_budget_max_files
+                .saturating_add((total_files - idx) as u64);
+            break;
+        }
+
         let metadata = match fs::metadata(&repo_file.abs_path) {
             Ok(m) => m,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                continue;
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                continue;
+            }
             Err(err) => return Err(err),
         };
         if let Some(max_file_size) = options.max_file_size
             && metadata.len() > max_file_size
         {
+            stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
+            continue;
+        }
+        if let Some(max_total_bytes) = options.max_total_bytes
+            && stats.scanned_bytes.saturating_add(metadata.len()) > max_total_bytes
+        {
+            stats.skipped_budget_max_total_bytes =
+                stats.skipped_budget_max_total_bytes.saturating_add(1);
             continue;
         }
 
         let bytes = match fs::read(&repo_file.abs_path) {
             Ok(b) => b,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                continue;
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                continue;
+            }
             Err(err) => return Err(err),
         };
         if bytes.contains(&0) {
+            stats.skipped_binary = stats.skipped_binary.saturating_add(1);
             continue;
         }
+        stats.scanned_files = stats.scanned_files.saturating_add(1);
+        stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
 
         let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
 
@@ -975,12 +1188,12 @@ fn detect_duplicate_code_spans(
         if file.code_chars.len() < min_match_len {
             continue;
         }
-        normalized.push(NormalizedFile {
+        normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: file.repo_label.clone(),
-            rel_path: file.path.clone(),
-            normalized: file.code_chars.clone(),
-            line_map: file.code_char_lines.clone(),
+            repo_label: &file.repo_label,
+            rel_path: &file.path,
+            normalized: &file.code_chars,
+            line_map: &file.code_char_lines,
         });
     }
 
@@ -996,7 +1209,7 @@ fn detect_duplicate_code_spans(
 
     let mut fingerprints: HashMap<u64, Vec<FingerprintOcc>> = HashMap::new();
     for (file_id, file) in normalized.iter().enumerate() {
-        for (hash, pos) in winnowed_fingerprints(&file.normalized, fingerprint_len, window_size) {
+        for (hash, pos) in winnowed_fingerprints(file.normalized, fingerprint_len, window_size) {
             fingerprints
                 .entry(hash)
                 .or_default()
@@ -1018,9 +1231,12 @@ fn detect_duplicate_code_spans(
     let mut seen_matches: HashSet<MatchKey> = HashSet::new();
     let mut groups: HashMap<(u64, usize), Vec<SpanGroupBuilder>> = HashMap::new();
 
-    for occs in fingerprints.into_values() {
-        if occs.len() <= 1 || occs.len() > MAX_BUCKET {
+    for mut occs in fingerprints.into_values() {
+        if occs.len() <= 1 {
             continue;
+        }
+        if occs.len() > MAX_BUCKET {
+            occs.truncate(MAX_BUCKET);
         }
 
         for i in 0..occs.len() {
@@ -1032,9 +1248,9 @@ fn detect_duplicate_code_spans(
                 }
 
                 let (start_a, start_b, len) = match maximal_match(
-                    &normalized[a.file_id].normalized,
+                    normalized[a.file_id].normalized,
                     a.pos,
-                    &normalized[b.file_id].normalized,
+                    normalized[b.file_id].normalized,
                     b.pos,
                     fingerprint_len,
                 ) {
@@ -1088,8 +1304,8 @@ fn detect_duplicate_code_spans(
                     }
                 };
 
-                add_occurrence(builder, &normalized[file_a], file_a, start_a, len);
-                add_occurrence(builder, &normalized[file_b], file_b, start_b, len);
+                add_occurrence_view(builder, &normalized[file_a], file_a, start_a, len);
+                add_occurrence_view(builder, &normalized[file_b], file_b, start_b, len);
             }
         }
     }
@@ -1114,15 +1330,15 @@ fn detect_duplicate_line_spans(
         if file.line_tokens.is_empty() {
             continue;
         }
-        normalized.push(NormalizedFile {
+        normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: file.repo_label.clone(),
-            rel_path: file.path.clone(),
-            normalized: file.line_tokens.clone(),
-            line_map: file.line_token_lines.clone(),
+            repo_label: &file.repo_label,
+            rel_path: &file.path,
+            normalized: &file.line_tokens,
+            line_map: &file.line_token_lines,
         });
-        file_line_lens.push(file.line_token_char_lens.clone());
-        file_texts.push(file.text.clone());
+        file_line_lens.push(file.line_token_char_lens.as_slice());
+        file_texts.push(file.text.as_str());
     }
 
     detect_duplicate_span_groups_with_len_filter(
@@ -1132,7 +1348,7 @@ fn detect_duplicate_line_spans(
         8,
         options.cross_repo_only,
         |file_id, start, len| {
-            let lens = &file_line_lens[file_id];
+            let lens = file_line_lens[file_id];
             let mut total = 0usize;
             for &l in &lens[start..start + len] {
                 total += l;
@@ -1143,7 +1359,7 @@ fn detect_duplicate_line_spans(
             false
         },
         |file_id, start_line, end_line| {
-            preview_from_lines(&file_texts[file_id], start_line, end_line, 120)
+            preview_from_lines(file_texts[file_id], start_line, end_line, 120)
         },
         options.max_report_items,
     )
@@ -1166,14 +1382,14 @@ fn detect_duplicate_token_spans(
         if file.tokens.len() < min_token_len {
             continue;
         }
-        normalized.push(NormalizedFile {
+        normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: file.repo_label.clone(),
-            rel_path: file.path.clone(),
-            normalized: file.tokens.clone(),
-            line_map: file.token_lines.clone(),
+            repo_label: &file.repo_label,
+            rel_path: &file.path,
+            normalized: &file.tokens,
+            line_map: &file.token_lines,
         });
-        file_texts.push(file.text.clone());
+        file_texts.push(file.text.as_str());
     }
 
     detect_duplicate_span_groups_with_len_filter(
@@ -1184,7 +1400,7 @@ fn detect_duplicate_token_spans(
         options.cross_repo_only,
         |_file_id, _start, _len| true,
         |file_id, start_line, end_line| {
-            preview_from_lines(&file_texts[file_id], start_line, end_line, 120)
+            preview_from_lines(file_texts[file_id], start_line, end_line, 120)
         },
         options.max_report_items,
     )
@@ -1383,8 +1599,8 @@ fn detect_duplicate_ast_subtrees(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn detect_duplicate_span_groups_with_len_filter(
-    files: &[NormalizedFile],
+fn detect_duplicate_span_groups_with_len_filter<'a>(
+    files: &[NormalizedFileView<'a>],
     min_len: usize,
     fingerprint_len: usize,
     window_size: usize,
@@ -1411,7 +1627,7 @@ fn detect_duplicate_span_groups_with_len_filter(
         if file.normalized.len() < fingerprint_len {
             continue;
         }
-        for (hash, pos) in winnowed_fingerprints(&file.normalized, fingerprint_len, window_size) {
+        for (hash, pos) in winnowed_fingerprints(file.normalized, fingerprint_len, window_size) {
             fingerprints
                 .entry(hash)
                 .or_default()
@@ -1433,9 +1649,12 @@ fn detect_duplicate_span_groups_with_len_filter(
     let mut seen_matches: HashSet<MatchKey> = HashSet::new();
     let mut groups: HashMap<(u64, usize), Vec<SpanGroupBuilder>> = HashMap::new();
 
-    for occs in fingerprints.into_values() {
-        if occs.len() <= 1 || occs.len() > MAX_BUCKET {
+    for mut occs in fingerprints.into_values() {
+        if occs.len() <= 1 {
             continue;
+        }
+        if occs.len() > MAX_BUCKET {
+            occs.truncate(MAX_BUCKET);
         }
 
         for i in 0..occs.len() {
@@ -1447,9 +1666,9 @@ fn detect_duplicate_span_groups_with_len_filter(
                 }
 
                 let (start_a, start_b, len) = match maximal_match(
-                    &files[a.file_id].normalized,
+                    files[a.file_id].normalized,
                     a.pos,
-                    &files[b.file_id].normalized,
+                    files[b.file_id].normalized,
                     b.pos,
                     fingerprint_len,
                 ) {
@@ -1514,8 +1733,8 @@ fn detect_duplicate_span_groups_with_len_filter(
                     builder.preview = preview_from_occurrence(file_a, start_line, end_line);
                 }
 
-                add_occurrence(builder, &files[file_a], file_a, start_a, len);
-                add_occurrence(builder, &files[file_b], file_b, start_b, len);
+                add_occurrence_view(builder, &files[file_a], file_a, start_a, len);
+                add_occurrence_view(builder, &files[file_b], file_b, start_b, len);
             }
         }
     }
@@ -1832,18 +2051,26 @@ fn repo_label(root: &Path, id: usize) -> String {
         .unwrap_or_else(|| format!("repo{id}"))
 }
 
-fn collect_repo_files(repo: &Repo, options: &ScanOptions) -> io::Result<Vec<RepoFile>> {
+fn collect_repo_files(
+    repo: &Repo,
+    options: &ScanOptions,
+    stats: &mut ScanStats,
+) -> io::Result<Vec<RepoFile>> {
     if options.respect_gitignore
         && !options.follow_symlinks
-        && let Some(files) = try_collect_repo_files_via_git(repo, options)?
+        && let Some(files) = try_collect_repo_files_via_git(repo, options, stats)?
     {
         return Ok(files);
     }
 
-    collect_repo_files_via_walk(repo, options)
+    collect_repo_files_via_walk(repo, options, stats)
 }
 
-fn collect_repo_files_via_walk(repo: &Repo, options: &ScanOptions) -> io::Result<Vec<RepoFile>> {
+fn collect_repo_files_via_walk(
+    repo: &Repo,
+    options: &ScanOptions,
+    stats: &mut ScanStats,
+) -> io::Result<Vec<RepoFile>> {
     let ignore_dirs = options.ignore_dirs.clone();
     let follow_symlinks = options.follow_symlinks;
     let respect_gitignore = options.respect_gitignore;
@@ -1853,7 +2080,6 @@ fn collect_repo_files_via_walk(repo: &Repo, options: &ScanOptions) -> io::Result
     builder
         .hidden(false)
         .follow_links(follow_symlinks)
-        .max_filesize(options.max_file_size)
         .ignore(false)
         .git_ignore(respect_gitignore)
         .git_global(respect_gitignore && is_git_repo)
@@ -1888,13 +2114,20 @@ fn collect_repo_files_via_walk(repo: &Repo, options: &ScanOptions) -> io::Result
             Ok(e) => e,
             Err(err) => {
                 if let Some(io_err) = err.io_error() {
-                    if matches!(
-                        io_err.kind(),
-                        io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
-                    ) {
-                        continue;
+                    match io_err.kind() {
+                        io::ErrorKind::NotFound => {
+                            stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                            continue;
+                        }
+                        io::ErrorKind::PermissionDenied => {
+                            stats.skipped_permission_denied =
+                                stats.skipped_permission_denied.saturating_add(1);
+                            continue;
+                        }
+                        _ => {}
                     }
                 }
+                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
                 continue;
             }
         };
@@ -1923,6 +2156,7 @@ fn collect_repo_files_via_walk(repo: &Repo, options: &ScanOptions) -> io::Result
 fn try_collect_repo_files_via_git(
     repo: &Repo,
     options: &ScanOptions,
+    stats: &mut ScanStats,
 ) -> io::Result<Option<Vec<RepoFile>>> {
     if !repo.root.join(".git").exists() {
         return Ok(None);
@@ -1982,8 +2216,14 @@ fn try_collect_repo_files_via_git(
         let abs_path = repo.root.join(&rel);
         let meta = match fs::symlink_metadata(&abs_path) {
             Ok(m) => m,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                continue;
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                continue;
+            }
             Err(err) => return Err(err),
         };
 
@@ -2047,7 +2287,7 @@ fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<Str
 
 fn make_rel_path(root: &Path, abs_path: &Path) -> String {
     match abs_path.strip_prefix(root) {
-        Ok(rel) => rel.to_string_lossy().to_string(),
+        Ok(rel) => rel.to_string_lossy().replace('\\', "/"),
         Err(_) => {
             let name = abs_path
                 .file_name()
@@ -2250,6 +2490,34 @@ fn add_occurrence(
         repo_id: file.repo_id,
         repo_label: file.repo_label.clone(),
         path: file.rel_path.clone(),
+        start_line,
+        end_line,
+    });
+}
+
+fn add_occurrence_view(
+    builder: &mut SpanGroupBuilder,
+    file: &NormalizedFileView<'_>,
+    file_id: usize,
+    start: usize,
+    len: usize,
+) {
+    if !builder.occurrence_keys.insert((file_id, start)) {
+        return;
+    }
+
+    let Some(&start_line) = file.line_map.get(start) else {
+        return;
+    };
+    let Some(&end_line) = file.line_map.get(start + len - 1) else {
+        return;
+    };
+
+    builder.repo_ids.insert(file.repo_id);
+    builder.occurrences.push(DuplicateSpanOccurrence {
+        repo_id: file.repo_id,
+        repo_label: file.repo_label.to_string(),
+        path: file.rel_path.to_string(),
         start_line,
         end_line,
     });

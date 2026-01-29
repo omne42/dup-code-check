@@ -1,6 +1,8 @@
 export interface ScanOptions {
   ignoreDirs?: string[];
   maxFileSize?: number;
+  maxFiles?: number;
+  maxTotalBytes?: number;
   minMatchLen?: number;
   minTokenLen?: number;
   similarityThreshold?: number;
@@ -56,17 +58,60 @@ export interface DuplicationReport {
   similarBlocksSimhash: SimilarityPair[];
 }
 
+export interface ScanStats {
+  candidateFiles: number;
+  scannedFiles: number;
+  scannedBytes: number;
+  skippedNotFound: number;
+  skippedPermissionDenied: number;
+  skippedTooLarge: number;
+  skippedBinary: number;
+  skippedWalkErrors: number;
+  skippedBudgetMaxFiles: number;
+  skippedBudgetMaxTotalBytes: number;
+}
+
+export interface DuplicateGroupsWithStats {
+  groups: DuplicateGroup[];
+  scanStats: ScanStats;
+}
+
+export interface DuplicateSpanGroupsWithStats {
+  groups: DuplicateSpanGroup[];
+  scanStats: ScanStats;
+}
+
+export interface DuplicationReportWithStats {
+  report: DuplicationReport;
+  scanStats: ScanStats;
+}
+
 export function findDuplicateFiles(
   roots: string[],
   options?: ScanOptions
 ): DuplicateGroup[];
+
+export function findDuplicateFilesWithStats(
+  roots: string[],
+  options?: ScanOptions
+): DuplicateGroupsWithStats;
 
 export function findDuplicateCodeSpans(
   roots: string[],
   options?: ScanOptions
 ): DuplicateSpanGroup[];
 
+export function findDuplicateCodeSpansWithStats(
+  roots: string[],
+  options?: ScanOptions
+): DuplicateSpanGroupsWithStats;
+
 export function generateDuplicationReport(
   roots: string[],
   options?: ScanOptions
 ): DuplicationReport;
+
+export function generateDuplicationReportWithStats(
+  roots: string[],
+  options?: ScanOptions
+): DuplicationReportWithStats;

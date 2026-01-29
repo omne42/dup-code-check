@@ -8,12 +8,16 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 
 ### Added
 - Initial scaffolding.
+- Scan budgets: `maxFiles` / `maxTotalBytes` (CLI: `--max-files` / `--max-total-bytes`).
+- Scan stats + strict mode in CLI (`--stats`, `--strict`) and JS API (`*WithStats` functions).
 
 ### Changed
 - Default scan skips files larger than 10 MiB (`DEFAULT_MAX_FILE_SIZE_BYTES`).
 - Fallback scanner now respects nested `.gitignore` rules via the `ignore` crate.
 - CLI integer options now reject non-integers (e.g. `--max-file-size 1.5`).
 - CLI `--help` no longer requires the native module to be present.
+- `--report` memory usage reduced by avoiding large intermediate clones.
+- Invalid roots now fail early instead of producing empty results.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

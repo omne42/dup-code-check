@@ -7,6 +7,8 @@ use napi_derive::napi;
 pub struct ScanOptions {
     pub ignore_dirs: Option<Vec<String>>,
     pub max_file_size: Option<f64>,
+    pub max_files: Option<f64>,
+    pub max_total_bytes: Option<f64>,
     pub min_match_len: Option<f64>,
     pub min_token_len: Option<f64>,
     pub similarity_threshold: Option<f64>,
@@ -68,6 +70,38 @@ pub struct DuplicationReport {
     pub similar_blocks_simhash: Vec<SimilarityPair>,
 }
 
+#[napi(object)]
+pub struct ScanStats {
+    pub candidate_files: f64,
+    pub scanned_files: f64,
+    pub scanned_bytes: f64,
+    pub skipped_not_found: f64,
+    pub skipped_permission_denied: f64,
+    pub skipped_too_large: f64,
+    pub skipped_binary: f64,
+    pub skipped_walk_errors: f64,
+    pub skipped_budget_max_files: f64,
+    pub skipped_budget_max_total_bytes: f64,
+}
+
+#[napi(object)]
+pub struct DuplicateGroupsWithStats {
+    pub groups: Vec<DuplicateGroup>,
+    pub scan_stats: ScanStats,
+}
+
+#[napi(object)]
+pub struct DuplicateSpanGroupsWithStats {
+    pub groups: Vec<DuplicateSpanGroup>,
+    pub scan_stats: ScanStats,
+}
+
+#[napi(object)]
+pub struct DuplicationReportWithStats {
+    pub report: DuplicationReport,
+    pub scan_stats: ScanStats,
+}
+
 #[napi(js_name = "findDuplicateFiles")]
 pub fn find_duplicate_files(
     roots: Vec<String>,
@@ -83,22 +117,28 @@ pub fn find_duplicate_files(
     let groups = code_checker_core::find_duplicate_files(&roots, &options)
         .map_err(|e| Error::from_reason(format!("scan failed: {e}")))?;
 
-    Ok(groups
-        .into_iter()
-        .map(|g| DuplicateGroup {
-            hash: format!("{:016x}", g.content_hash),
-            normalized_len: g.normalized_len as u32,
-            files: g
-                .files
-                .into_iter()
-                .map(|f| DuplicateFile {
-                    repo_id: f.repo_id as u32,
-                    repo_label: f.repo_label,
-                    path: f.path,
-                })
-                .collect(),
-        })
-        .collect())
+    Ok(map_duplicate_groups(groups))
+}
+
+#[napi(js_name = "findDuplicateFilesWithStats")]
+pub fn find_duplicate_files_with_stats(
+    roots: Vec<String>,
+    options: Option<ScanOptions>,
+) -> Result<DuplicateGroupsWithStats> {
+    if roots.is_empty() {
+        return Err(Error::from_reason("roots must not be empty"));
+    }
+
+    let roots: Vec<PathBuf> = roots.into_iter().map(PathBuf::from).collect();
+    let options = to_core_options(options)?;
+
+    let outcome = code_checker_core::find_duplicate_files_with_stats(&roots, &options)
+        .map_err(|e| Error::from_reason(format!("scan failed: {e}")))?;
+
+    Ok(DuplicateGroupsWithStats {
+        groups: map_duplicate_groups(outcome.result),
+        scan_stats: map_scan_stats(outcome.stats),
+    })
 }
 
 #[napi(js_name = "findDuplicateCodeSpans")]
@@ -116,25 +156,28 @@ pub fn find_duplicate_code_spans(
     let groups = code_checker_core::find_duplicate_code_spans(&roots, &options)
         .map_err(|e| Error::from_reason(format!("scan failed: {e}")))?;
 
-    Ok(groups
-        .into_iter()
-        .map(|g| DuplicateSpanGroup {
-            hash: format!("{:016x}", g.content_hash),
-            normalized_len: g.normalized_len as u32,
-            preview: g.preview,
-            occurrences: g
-                .occurrences
-                .into_iter()
-                .map(|o| DuplicateSpanOccurrence {
-                    repo_id: o.repo_id as u32,
-                    repo_label: o.repo_label,
-                    path: o.path,
-                    start_line: o.start_line,
-                    end_line: o.end_line,
-                })
-                .collect(),
-        })
-        .collect())
+    Ok(map_span_groups(groups))
+}
+
+#[napi(js_name = "findDuplicateCodeSpansWithStats")]
+pub fn find_duplicate_code_spans_with_stats(
+    roots: Vec<String>,
+    options: Option<ScanOptions>,
+) -> Result<DuplicateSpanGroupsWithStats> {
+    if roots.is_empty() {
+        return Err(Error::from_reason("roots must not be empty"));
+    }
+
+    let roots: Vec<PathBuf> = roots.into_iter().map(PathBuf::from).collect();
+    let options = to_core_options(options)?;
+
+    let outcome = code_checker_core::find_duplicate_code_spans_with_stats(&roots, &options)
+        .map_err(|e| Error::from_reason(format!("scan failed: {e}")))?;
+
+    Ok(DuplicateSpanGroupsWithStats {
+        groups: map_span_groups(outcome.result),
+        scan_stats: map_scan_stats(outcome.stats),
+    })
 }
 
 #[napi(js_name = "generateDuplicationReport")]
@@ -152,24 +195,74 @@ pub fn generate_duplication_report(
     let report = code_checker_core::generate_duplication_report(&roots, &options)
         .map_err(|e| Error::from_reason(format!("scan failed: {e}")))?;
 
-    Ok(DuplicationReport {
-        file_duplicates: report
-            .file_duplicates
-            .into_iter()
-            .map(|g| DuplicateGroup {
-                hash: format!("{:016x}", g.content_hash),
-                normalized_len: g.normalized_len as u32,
-                files: g
-                    .files
-                    .into_iter()
-                    .map(|f| DuplicateFile {
-                        repo_id: f.repo_id as u32,
-                        repo_label: f.repo_label,
-                        path: f.path,
-                    })
-                    .collect(),
-            })
-            .collect(),
+    Ok(map_report(report))
+}
+
+#[napi(js_name = "generateDuplicationReportWithStats")]
+pub fn generate_duplication_report_with_stats(
+    roots: Vec<String>,
+    options: Option<ScanOptions>,
+) -> Result<DuplicationReportWithStats> {
+    if roots.is_empty() {
+        return Err(Error::from_reason("roots must not be empty"));
+    }
+
+    let roots: Vec<PathBuf> = roots.into_iter().map(PathBuf::from).collect();
+    let options = to_core_options(options)?;
+
+    let outcome = code_checker_core::generate_duplication_report_with_stats(&roots, &options)
+        .map_err(|e| Error::from_reason(format!("scan failed: {e}")))?;
+
+    Ok(DuplicationReportWithStats {
+        report: map_report(outcome.result),
+        scan_stats: map_scan_stats(outcome.stats),
+    })
+}
+
+fn map_span_groups(groups: Vec<code_checker_core::DuplicateSpanGroup>) -> Vec<DuplicateSpanGroup> {
+    groups
+        .into_iter()
+        .map(|g| DuplicateSpanGroup {
+            hash: format!("{:016x}", g.content_hash),
+            normalized_len: g.normalized_len as u32,
+            preview: g.preview,
+            occurrences: g
+                .occurrences
+                .into_iter()
+                .map(|o| DuplicateSpanOccurrence {
+                    repo_id: o.repo_id as u32,
+                    repo_label: o.repo_label,
+                    path: o.path,
+                    start_line: o.start_line,
+                    end_line: o.end_line,
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+fn map_duplicate_groups(groups: Vec<code_checker_core::DuplicateGroup>) -> Vec<DuplicateGroup> {
+    groups
+        .into_iter()
+        .map(|g| DuplicateGroup {
+            hash: format!("{:016x}", g.content_hash),
+            normalized_len: g.normalized_len as u32,
+            files: g
+                .files
+                .into_iter()
+                .map(|f| DuplicateFile {
+                    repo_id: f.repo_id as u32,
+                    repo_label: f.repo_label,
+                    path: f.path,
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+fn map_report(report: code_checker_core::DuplicationReport) -> DuplicationReport {
+    DuplicationReport {
+        file_duplicates: map_duplicate_groups(report.file_duplicates),
         code_span_duplicates: map_span_groups(report.code_span_duplicates),
         line_span_duplicates: map_span_groups(report.line_span_duplicates),
         token_span_duplicates: map_span_groups(report.token_span_duplicates),
@@ -219,29 +312,22 @@ pub fn generate_duplication_report(
                 distance: p.distance,
             })
             .collect(),
-    })
+    }
 }
 
-fn map_span_groups(groups: Vec<code_checker_core::DuplicateSpanGroup>) -> Vec<DuplicateSpanGroup> {
-    groups
-        .into_iter()
-        .map(|g| DuplicateSpanGroup {
-            hash: format!("{:016x}", g.content_hash),
-            normalized_len: g.normalized_len as u32,
-            preview: g.preview,
-            occurrences: g
-                .occurrences
-                .into_iter()
-                .map(|o| DuplicateSpanOccurrence {
-                    repo_id: o.repo_id as u32,
-                    repo_label: o.repo_label,
-                    path: o.path,
-                    start_line: o.start_line,
-                    end_line: o.end_line,
-                })
-                .collect(),
-        })
-        .collect()
+fn map_scan_stats(stats: code_checker_core::ScanStats) -> ScanStats {
+    ScanStats {
+        candidate_files: stats.candidate_files as f64,
+        scanned_files: stats.scanned_files as f64,
+        scanned_bytes: stats.scanned_bytes as f64,
+        skipped_not_found: stats.skipped_not_found as f64,
+        skipped_permission_denied: stats.skipped_permission_denied as f64,
+        skipped_too_large: stats.skipped_too_large as f64,
+        skipped_binary: stats.skipped_binary as f64,
+        skipped_walk_errors: stats.skipped_walk_errors as f64,
+        skipped_budget_max_files: stats.skipped_budget_max_files as f64,
+        skipped_budget_max_total_bytes: stats.skipped_budget_max_total_bytes as f64,
+    }
 }
 
 fn to_core_options(options: Option<ScanOptions>) -> Result<code_checker_core::ScanOptions> {
@@ -292,6 +378,32 @@ fn to_core_options(options: Option<ScanOptions>) -> Result<code_checker_core::Sc
                 )));
             }
             out.max_file_size = Some(max_file_size as u64);
+        }
+        if let Some(max_files) = options.max_files {
+            out.max_files = Some(parse_u32_in_range("maxFiles", max_files, 0, u32::MAX)? as usize);
+        }
+        if let Some(max_total_bytes) = options.max_total_bytes {
+            if !max_total_bytes.is_finite() {
+                return Err(Error::from_reason(
+                    "maxTotalBytes must be a finite number".to_string(),
+                ));
+            }
+            if max_total_bytes < 0.0 {
+                return Err(Error::from_reason(
+                    "maxTotalBytes must be a non-negative integer".to_string(),
+                ));
+            }
+            if max_total_bytes.fract() != 0.0 {
+                return Err(Error::from_reason(
+                    "maxTotalBytes must be an integer".to_string(),
+                ));
+            }
+            if max_total_bytes > (MAX_SAFE_INTEGER as f64) {
+                return Err(Error::from_reason(format!(
+                    "maxTotalBytes must be <= {MAX_SAFE_INTEGER} (Number.MAX_SAFE_INTEGER)"
+                )));
+            }
+            out.max_total_bytes = Some(max_total_bytes as u64);
         }
         if let Some(min_match_len) = options.min_match_len {
             out.min_match_len =

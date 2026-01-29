@@ -26,6 +26,8 @@ function printHelp() {
       '  --report                Run all detectors and output a report',
       '  --code-spans            Find suspected duplicate code spans',
       '  --json                  Output JSON',
+      '  --stats                 Include scan stats (JSON) or print to stderr',
+      '  --strict                Exit non-zero if scan was incomplete',
       '  --cross-repo-only       Only report groups spanning >= 2 roots',
       '  --no-gitignore          Do not respect .gitignore rules',
       '  --min-match-len <n>     Code spans: minimum normalized length (default: 50)',
@@ -33,6 +35,8 @@ function printHelp() {
       '  --similarity-threshold <f>  Similarity: 0..1 (default: 0.85)',
       '  --simhash-max-distance <n>  SimHash: max Hamming distance (default: 3)',
       '  --max-report-items <n>  Limit items per report section (default: 200)',
+      '  --max-files <n>         Stop after scanning n files',
+      '  --max-total-bytes <n>   Skip files that would exceed total scanned bytes',
       `  --max-file-size <n>     Skip files larger than n bytes (default: ${DEFAULT_MAX_FILE_SIZE_BYTES})`,
       '  --ignore-dir <name>     Add an ignored directory name (repeatable)',
       '  --follow-symlinks       Follow symlinks (default: off)',
@@ -55,10 +59,14 @@ function parseArgs(argv) {
   let report = false;
   let codeSpans = false;
   let json = false;
+  let stats = false;
+  let strict = false;
   let crossRepoOnly = false;
   let respectGitignore = true;
   let followSymlinks = false;
   let maxFileSize;
+  let maxFiles;
+  let maxTotalBytes;
   let minMatchLen;
   let minTokenLen;
   let similarityThreshold;
@@ -83,6 +91,14 @@ function parseArgs(argv) {
       json = true;
       continue;
     }
+    if (arg === '--stats') {
+      stats = true;
+      continue;
+    }
+    if (arg === '--strict') {
+      strict = true;
+      continue;
+    }
     if (arg === '--cross-repo-only') {
       crossRepoOnly = true;
       continue;
@@ -97,6 +113,30 @@ function parseArgs(argv) {
     }
     if (arg === '--follow-symlinks') {
       followSymlinks = true;
+      continue;
+    }
+    if (arg === '--max-files') {
+      const raw = argv[++i];
+      if (!raw) throw new Error('--max-files requires a value');
+      const value = Number(raw);
+      if (!Number.isSafeInteger(value) || value < 0) {
+        throw new Error(
+          `--max-files must be an integer 0..${Number.MAX_SAFE_INTEGER}`
+        );
+      }
+      maxFiles = value;
+      continue;
+    }
+    if (arg === '--max-total-bytes') {
+      const raw = argv[++i];
+      if (!raw) throw new Error('--max-total-bytes requires a value');
+      const value = Number(raw);
+      if (!Number.isSafeInteger(value) || value < 0) {
+        throw new Error(
+          `--max-total-bytes must be an integer 0..${Number.MAX_SAFE_INTEGER}`
+        );
+      }
+      maxTotalBytes = value;
       continue;
     }
     if (arg === '--max-file-size') {
@@ -179,12 +219,16 @@ function parseArgs(argv) {
   return {
     help: false,
     json,
+    stats,
+    strict,
     report,
     codeSpans,
     roots: roots.length ? roots : [process.cwd()],
     options: {
       ignoreDirs: ignoreDirs.length ? ignoreDirs : undefined,
       maxFileSize: maxFileSize,
+      maxFiles: maxFiles,
+      maxTotalBytes: maxTotalBytes,
       minMatchLen: minMatchLen,
       minTokenLen: minTokenLen,
       similarityThreshold: similarityThreshold,
@@ -195,6 +239,41 @@ function parseArgs(argv) {
       followSymlinks: followSymlinks
     }
   };
+}
+
+function formatScanStats(stats) {
+  const lines = [];
+  lines.push('== scan stats ==');
+  lines.push(
+    `candidates=${stats.candidateFiles} scanned=${stats.scannedFiles} bytes=${stats.scannedBytes}`
+  );
+  const skips = [
+    ['not_found', stats.skippedNotFound],
+    ['permission_denied', stats.skippedPermissionDenied],
+    ['too_large', stats.skippedTooLarge],
+    ['binary', stats.skippedBinary],
+    ['walk_errors', stats.skippedWalkErrors],
+    ['budget_max_files', stats.skippedBudgetMaxFiles],
+    ['budget_max_total_bytes', stats.skippedBudgetMaxTotalBytes]
+  ].filter(([, v]) => v > 0);
+
+  if (skips.length) {
+    lines.push('skipped:');
+    for (const [k, v] of skips) {
+      lines.push(`- ${k}=${v}`);
+    }
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function hasFatalSkips(stats) {
+  return (
+    stats.skippedPermissionDenied > 0 ||
+    stats.skippedWalkErrors > 0 ||
+    stats.skippedBudgetMaxFiles > 0 ||
+    stats.skippedBudgetMaxTotalBytes > 0
+  );
 }
 
 function formatText(groups) {
@@ -303,31 +382,80 @@ function main() {
 
   try {
     const roots = parsed.roots.map((p) => path.resolve(p));
-    const { findDuplicateFiles, findDuplicateCodeSpans, generateDuplicationReport } =
-      getApi();
+    const needStats = parsed.stats || parsed.strict;
+    const {
+      findDuplicateFiles,
+      findDuplicateFilesWithStats,
+      findDuplicateCodeSpans,
+      findDuplicateCodeSpansWithStats,
+      generateDuplicationReport,
+      generateDuplicationReportWithStats
+    } = getApi();
 
     if (parsed.report) {
-      const report = generateDuplicationReport(roots, parsed.options);
+      const outcome = needStats
+        ? generateDuplicationReportWithStats(roots, parsed.options)
+        : { report: generateDuplicationReport(roots, parsed.options), scanStats: null };
+      const { report, scanStats } = outcome;
       if (parsed.json) {
-        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+        process.stdout.write(
+          `${JSON.stringify(parsed.stats ? { report, scanStats } : report, null, 2)}\n`
+        );
+        if (parsed.strict && scanStats && hasFatalSkips(scanStats)) {
+          process.stderr.write(formatScanStats(scanStats));
+          process.exitCode = 1;
+        }
         return;
       }
       process.stdout.write(formatTextReport(report));
+      if (parsed.stats && scanStats) {
+        process.stderr.write(formatScanStats(scanStats));
+      }
+      if (parsed.strict && scanStats && hasFatalSkips(scanStats)) {
+        if (!parsed.stats) {
+          process.stderr.write(formatScanStats(scanStats));
+        }
+        process.exitCode = 1;
+      }
       return;
     }
 
-    const groups = parsed.codeSpans
-      ? findDuplicateCodeSpans(roots, parsed.options)
-      : findDuplicateFiles(roots, parsed.options);
+    const outcome = needStats
+      ? parsed.codeSpans
+        ? findDuplicateCodeSpansWithStats(roots, parsed.options)
+        : findDuplicateFilesWithStats(roots, parsed.options)
+      : { groups: null, scanStats: null };
+
+    const groups = needStats
+      ? outcome.groups
+      : parsed.codeSpans
+        ? findDuplicateCodeSpans(roots, parsed.options)
+        : findDuplicateFiles(roots, parsed.options);
+    const scanStats = needStats ? outcome.scanStats : null;
 
     if (parsed.json) {
-      process.stdout.write(`${JSON.stringify(groups, null, 2)}\n`);
+      process.stdout.write(
+        `${JSON.stringify(parsed.stats ? { groups, scanStats } : groups, null, 2)}\n`
+      );
+      if (parsed.strict && scanStats && hasFatalSkips(scanStats)) {
+        process.stderr.write(formatScanStats(scanStats));
+        process.exitCode = 1;
+      }
       return;
     }
 
     process.stdout.write(
       parsed.codeSpans ? formatTextCodeSpans(groups) : formatText(groups)
     );
+    if (parsed.stats && scanStats) {
+      process.stderr.write(formatScanStats(scanStats));
+    }
+    if (parsed.strict && scanStats && hasFatalSkips(scanStats)) {
+      if (!parsed.stats) {
+        process.stderr.write(formatScanStats(scanStats));
+      }
+      process.exitCode = 1;
+    }
   } catch (err) {
     const message =
       err && typeof err === 'object' && 'message' in err

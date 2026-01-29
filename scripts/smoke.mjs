@@ -29,6 +29,42 @@ if (groups.length !== 1 || groups[0].files.length !== 3) {
   process.stderr.write(`Unexpected result: ${JSON.stringify(groups, null, 2)}\n`);
   process.exitCode = 1;
 } else {
+  if (typeof pkg.findDuplicateFilesWithStats !== 'function') {
+    process.stderr.write('Expected findDuplicateFilesWithStats to exist\n');
+    process.exitCode = 1;
+  } else {
+    const withStats = pkg.findDuplicateFilesWithStats([repoA, repoB], {
+      crossRepoOnly: true
+    });
+    if (
+      !withStats ||
+      !Array.isArray(withStats.groups) ||
+      withStats.groups.length !== 1 ||
+      typeof withStats.scanStats?.scannedFiles !== 'number'
+    ) {
+      process.stderr.write(
+        `Unexpected result (with stats): ${JSON.stringify(withStats, null, 2)}\n`
+      );
+      process.exitCode = 1;
+    }
+
+    const limited = pkg.findDuplicateFilesWithStats([repoA, repoB], {
+      crossRepoOnly: true,
+      maxFiles: 1
+    });
+    if (
+      !limited ||
+      typeof limited.scanStats?.scannedFiles !== 'number' ||
+      limited.scanStats.scannedFiles !== 1 ||
+      limited.scanStats.skippedBudgetMaxFiles !== 3
+    ) {
+      process.stderr.write(
+        `Unexpected result (maxFiles): ${JSON.stringify(limited, null, 2)}\n`
+      );
+      process.exitCode = 1;
+    }
+  }
+
   const bigSize = 10 * 1024 * 1024 + 1;
   const big = Buffer.alloc(bigSize, 'a');
   fs.writeFileSync(path.join(repoA, 'big_a.txt'), big);
@@ -193,6 +229,12 @@ if (groups.length !== 1 || groups[0].files.length !== 3) {
       minTokenLen: 5,
       similarityThreshold: 0.8
     });
+    const reportWithStats = pkg.generateDuplicationReportWithStats?.([repoA, repoB], {
+      crossRepoOnly: true,
+      minMatchLen: 50,
+      minTokenLen: 5,
+      similarityThreshold: 0.8
+    });
     if (
       !report ||
       report.fileDuplicates?.length !== 1 ||
@@ -201,6 +243,20 @@ if (groups.length !== 1 || groups[0].files.length !== 3) {
       !Array.isArray(report.tokenSpanDuplicates)
     ) {
       process.stderr.write(`Unexpected result: ${JSON.stringify(report, null, 2)}\n`);
+      process.exitCode = 1;
+    } else if (
+      !reportWithStats ||
+      !reportWithStats.report ||
+      !reportWithStats.scanStats ||
+      typeof reportWithStats.scanStats.scannedFiles !== 'number'
+    ) {
+      process.stderr.write(
+        `Unexpected result (reportWithStats): ${JSON.stringify(
+          reportWithStats,
+          null,
+          2
+        )}\n`
+      );
       process.exitCode = 1;
     } else {
       process.stdout.write('smoke ok\n');

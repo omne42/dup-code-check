@@ -1,38 +1,40 @@
-# 竞品/相似工具速览（重复代码/克隆检测）
+# Competitors / Similar Tools (Duplicate Code / Clone Detection)
 
-> 目标：快速定位生态里成熟方案，明确我们做“Rust 底座 + Node 发布”的差异化方向。
+[中文](competitors.zh-CN.md)
 
-## 典型工具（按常见度/可落地性）
+Goal: quickly locate mature solutions in the ecosystem and clarify a differentiated direction for “Rust core + npm distribution”.
 
-- jscpd：偏“文本/Token”重复检测，适合多语言/多目录扫描，工程落地成本低
-- PMD CPD：Java 生态常见的 Copy/Paste Detector（Token 级）
-- SonarQube Duplication：质量平台中的重复检测能力（多语言、平台化报告）
-- Simian 等：偏通用克隆检测（更多是“已有产品形态”的参考）
+## Common tools (by adoption / practicality)
 
-## 按克隆类型（Clone Types）理解竞品能力
+- jscpd: text/token duplication detection; multi-language/multi-directory; easy to integrate
+- PMD CPD: Java ecosystem “Copy/Paste Detector” (token-level)
+- SonarQube Duplication: duplication detection inside a quality platform (multi-language, platform reporting)
+- Simian, etc.: general clone detection products (good references for product shape)
 
-- Type-1：完全一致或仅格式变化（空白/注释）——我们当前 MVP 对齐这一层（更严格：仅去 whitespace）
-- Type-2：变量/字面量重命名等轻微改动（通常需要 token 化）
-- Type-3：增删少量语句（需要更复杂的相似度/窗口/指纹/AST）
-- Type-4：语义相同结构不同（通常超出“简单重复检测”范畴）
+## Clone types as a lens
 
-## 学术/大规模方案（作为方法论参考）
+- Type-1: identical or only formatting changes (whitespace/comments) — current MVP aligns here (even stricter: whitespace removal only)
+- Type-2: renaming identifiers/literals — typically needs tokenization
+- Type-3: small edits/insertions/deletions — needs more complex similarity/windowing/fingerprints/AST
+- Type-4: semantic equivalence with different structure — usually beyond “simple duplicate detection”
 
-- SourcererCC：面向大规模代码库的克隆检索思路（索引/检索）
-- Deckard：偏结构化/特征向量方法（AST 特征）
-- NiCad：偏规范化 + 比对的路线（更强调“规范化”策略）
+## Research / large-scale approaches (methodology references)
 
-## 对比维度（我们做竞品分析时建议记录）
+- SourcererCC: large-scale clone search (index/retrieval)
+- Deckard: structured / feature-vector approaches (AST features)
+- NiCad: normalization + comparison (emphasizes normalization strategy)
 
-- 粒度：文件级 / 片段级（函数/块）/ 跨文件拼接
-- 归一化：仅 whitespace / 去注释 / token 化 / AST
-- Clone Types 覆盖：Type-1/2/3
-- 输出：可定位性（path + range）、JSON/SARIF、阈值/最小块大小
-- 工程集成：CLI、CI、增量扫描、缓存、ignore 规则
-- 性能：扫描速度、内存、对大仓库/多仓库的扩展方式（索引 vs 全量比对）
+## Comparison dimensions (what to record)
 
-## 我们可以走的差异化（建议）
+- granularity: file / span (function/block) / cross-file composition
+- normalization: whitespace-only / comment removal / tokenization / AST
+- clone type coverage: Type-1/2/3
+- output: localization (path + range), JSON/SARIF, thresholds/min-block sizes
+- integration: CLI, CI, incremental scan, caching, ignore rules
+- performance: speed/memory, scaling for large/multi-repo (index vs full compare)
 
-- Rust 做核心扫描/归一化/指纹，追求速度与可移植性
-- Node 提供 CLI + npm 发布，方便在前端/全栈工程落地
-- 先把“跨仓库 + 去格式影响”的文件级重复做扎实，再逐步下探到片段级克隆
+## Suggested differentiation
+
+- Rust for scanning/normalization/fingerprints → speed + portability
+- Node for CLI distribution via npm → easy adoption in frontend/fullstack repos
+- start with robust cross-repo/file-level duplicates, then expand to span-level clones

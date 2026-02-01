@@ -10,10 +10,41 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const cliName = process.platform === 'win32' ? 'dup-code-check.exe' : 'dup-code-check';
 const cliPath = path.join(repoRoot, 'bin', cliName);
 
+function newestMtimeMs(p) {
+  try {
+    const st = fs.statSync(p);
+    if (st.isFile()) return st.mtimeMs;
+    if (st.isDirectory()) {
+      let max = st.mtimeMs;
+      for (const ent of fs.readdirSync(p, { withFileTypes: true })) {
+        max = Math.max(max, newestMtimeMs(path.join(p, ent.name)));
+      }
+      return max;
+    }
+  } catch {
+    // ignore
+  }
+  return 0;
+}
+
+function newestSourceMtimeMs() {
+  const candidates = [
+    path.join(repoRoot, 'Cargo.toml'),
+    path.join(repoRoot, 'Cargo.lock'),
+    path.join(repoRoot, 'rust-toolchain.toml'),
+    path.join(repoRoot, 'crates'),
+    path.join(repoRoot, 'scripts', 'build-binary.mjs'),
+  ];
+  return Math.max(...candidates.map(newestMtimeMs));
+}
+
 function buildIfNeeded() {
   if (fs.existsSync(cliPath)) {
     const probe = spawnSync(cliPath, ['--help'], { encoding: 'utf8' });
-    if (probe.status === 0) return;
+    if (probe.status === 0) {
+      const binMtime = newestMtimeMs(cliPath);
+      if (newestSourceMtimeMs() <= binMtime) return;
+    }
   }
   const build = spawnSync(process.execPath, [path.join(repoRoot, 'scripts', 'build-binary.mjs')], {
     encoding: 'utf8',
@@ -225,6 +256,39 @@ if (
 ) {
   process.stderr.write(
     `Unexpected result (reportWithStats): ${JSON.stringify(reportWithStats, null, 2)}\n`
+  );
+  process.exit(1);
+}
+
+// i18n: default en; `--localization zh` switches help and text output language
+const helpEn = runCli(['--help']);
+if (helpEn.status !== 0 || !helpEn.stdout.includes('Usage:')) {
+  process.stderr.write(
+    `Unexpected --help output (en).\nstatus=${helpEn.status}\nstdout:\n${helpEn.stdout}\nstderr:\n${helpEn.stderr}\n`
+  );
+  process.exit(1);
+}
+
+const helpZh = runCli(['--localization', 'zh', '--help']);
+if (helpZh.status !== 0 || !helpZh.stdout.includes('用法:')) {
+  process.stderr.write(
+    `Unexpected --help output (zh).\nstatus=${helpZh.status}\nstdout:\n${helpZh.stdout}\nstderr:\n${helpZh.stderr}\n`
+  );
+  process.exit(1);
+}
+
+const textEn = runCli([repoA]);
+if (textEn.status !== 0 || !textEn.stdout.includes('duplicate groups:')) {
+  process.stderr.write(
+    `Unexpected text output (en).\nstatus=${textEn.status}\nstdout:\n${textEn.stdout}\nstderr:\n${textEn.stderr}\n`
+  );
+  process.exit(1);
+}
+
+const textZh = runCli(['--localization', 'zh', repoA]);
+if (textZh.status !== 0 || !textZh.stdout.includes('重复文件组:')) {
+  process.stderr.write(
+    `Unexpected text output (zh).\nstatus=${textZh.status}\nstdout:\n${textZh.stdout}\nstderr:\n${textZh.stderr}\n`
   );
   process.exit(1);
 }

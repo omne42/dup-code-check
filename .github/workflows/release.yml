@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-binaries:
+    name: Build binaries (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --release -p dup-code-check
+
+      - name: Package (tar.gz)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          bin_name="dup-code-check"
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          if [[ "$os" == "darwin" ]]; then os="macos"; fi
+          arch="$(uname -m)"
+          case "$arch" in
+            x86_64) arch="x64" ;;
+            aarch64|arm64) arch="arm64" ;;
+          esac
+
+          asset="dup-code-check-${os}-${arch}.tar.gz"
+          tar -C target/release -czf "dist/${asset}" "${bin_name}"
+          (
+            cd dist
+            shasum -a 256 "${asset}" | awk '{print $1 "  " $2}' >"${asset}.sha256"
+          )
+
+      - name: Package (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $os = "windows"
+          $arch = $env:RUNNER_ARCH.ToLower()
+          if ($arch -eq "x64") { $arch = "x64" }
+          elseif ($arch -eq "arm64") { $arch = "arm64" }
+          $asset = "dup-code-check-$os-$arch.zip"
+          $exe = "target\\release\\dup-code-check.exe"
+          Compress-Archive -Path $exe -DestinationPath ("dist\\" + $asset) -Force
+          $hash = (Get-FileHash ("dist\\" + $asset) -Algorithm SHA256).Hash.ToLower()
+          "$hash  $asset" | Out-File -Encoding utf8NoBOM ("dist\\" + $asset + ".sha256")
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ matrix.os }}
+          path: dist/*
+
+  publish:
+    name: Publish (GitHub Release + npm)
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          merge-multiple: true
+          path: dist
+
+      - name: Create SHA256SUMS.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          ls -la
+          cat *.sha256 >SHA256SUMS.txt
+
+      - name: Create GitHub release (attach binaries)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          pkg_version="$(node -p "require('./package.json').version")"
+          if [[ "$version" != "$pkg_version" ]]; then
+            echo "Tag version ($version) does not match package.json version ($pkg_version)" >&2
+            exit 1
+          fi
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

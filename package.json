@@ -3,6 +3,14 @@
   "version": "0.0.1",
   "description": "Duplication checker (Rust binary; Node.js installer)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shiertier/dup-code-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shiertier/dup-code-check/issues"
+  },
+  "homepage": "https://shiertier.github.io/dup-code-check/",
   "bin": {
     "dup-code-check": "bin/dup-code-check"
   },
@@ -13,14 +21,26 @@
     "scripts/",
     "Cargo.lock",
     "Cargo.toml",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "CHANGELOG.zh-CN.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "node scripts/build-binary.mjs",
     "postinstall": "node scripts/build-binary.mjs",
     "prepack": "node scripts/prepack.mjs",
     "check": "node scripts/smoke.mjs",
-    "test": "node scripts/smoke.mjs"
+    "test": "node scripts/smoke.mjs",
+    "docs:build": "honkit build docs _book",
+    "docs:serve": "honkit serve docs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "honkit": "^6.0.0"
   },
   "engines": {
     "node": ">=22",

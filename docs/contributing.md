@@ -1,64 +1,66 @@
-# 贡献指南
+# Contributing
 
-欢迎贡献！本页描述最小的协作约定，保证改动可维护、可回溯、可验证。
+[中文](contributing.zh-CN.md)
 
-## 开发准备
+Contributions are welcome. This page documents a minimal collaboration contract so changes stay maintainable, traceable, and verifiable.
+
+## Setup
 
 ```bash
 ./scripts/bootstrap.sh
 ```
 
-它会：
+It will:
 
-- 初始化 git（如果不是仓库）
-- 配置 git hooks（`core.hooksPath=githooks`）
-- 安装 Node 依赖（`npm install`）
+- initialize git (if this directory isn’t a repo yet)
+- configure git hooks (`core.hooksPath=githooks`)
+- install Node dependencies (`npm install`)
 
-## 改动前建议
+## Before you change things
 
-1. 先跑一次 gate，确保本地环境正确：
+1. Run the gate once to verify your local environment:
 
 ```bash
 ./scripts/gate.sh
 ```
 
-2. 明确你在改哪一层：
+2. Be explicit about what layer you’re changing:
 
-- Rust 核心能力 → `crates/core`
-- CLI 体验 → `crates/cli`
+- core scanning/detectors → `crates/core`
+- CLI experience/output → `crates/cli`
 
-## Commit 约定
+## Commit conventions
 
-### 分支名
+### Branch naming
 
-允许的分支前缀示例：
+Allowed branch prefixes include:
 
 - `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `perf/...`, `test/...`, `chore/...`, `build/...`, `ci/...`, `revert/...`
 
-### Commit message
+### Commit messages
 
-要求 Conventional Commits（示例）：
+We use Conventional Commits, for example:
 
 - `feat(core): add new detector`
 - `fix(cli): handle invalid option`
 - `docs(readme): add usage examples`
 
-## CHANGELOG 规则
+## CHANGELOG rules
 
-`pre-commit` 会强制：
+The `pre-commit` hook enforces:
 
-- 每个 commit 必须更新 `CHANGELOG.md` 的 `[Unreleased]` 部分
-- 禁止修改已发布版本的 changelog section（除非显式设置环境变量）
+- every commit must update the `[Unreleased]` section in `CHANGELOG.md`
+- released sections are immutable (unless an explicit env var is set)
 
-## 提交前检查
+## Pre-submit checks
 
-建议在提交前执行：
+Recommended:
 
 ```bash
 ./scripts/gate.sh
 ```
 
-或至少：
+Or at least:
 
 ```bash
 cargo test

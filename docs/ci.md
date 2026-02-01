@@ -1,71 +1,73 @@
-# CI 集成
+# CI Integration
 
-本页给出一些可直接落地的 CI 用法（重点：稳定输出、可控成本、明确退出码）。
+[中文](ci.zh-CN.md)
 
-## 推荐命令模板
+This page provides CI-ready recipes with stable output, controlled cost, and explicit exit code behavior.
 
-### 1) 最小成本：只做重复文件
+## Recommended command templates
+
+### 1) Lowest cost: duplicate files only
 
 ```bash
 dup-code-check --json --stats --strict .
 ```
 
-适合做“低成本守门”：如果扫描遇到权限/遍历错误或被预算中断，会直接失败；否则输出 JSON 供后续处理。
+Good for a low-cost gate: permission/traversal errors or budget aborts will fail; otherwise it outputs JSON for downstream checks.
 
-### 2) 完整报告：一次跑全套检测器
+### 2) Full report: run all detectors
 
 ```bash
 dup-code-check --json --stats --strict --report .
 ```
 
-配合 `--max-report-items` 控制输出规模：
+Control output size with `--max-report-items`:
 
 ```bash
 dup-code-check --json --stats --strict --report --max-report-items 100 .
 ```
 
-### 3) 多仓库/多目录：只看跨 root 重复
+### 3) Multiple repos/roots: only cross-root duplicates
 
 ```bash
 dup-code-check --json --stats --strict --report --cross-repo-only /repoA /repoB
 ```
 
-## 输出落盘与产物归档
+## Persist outputs as CI artifacts
 
-推荐把结果与统计分开保存（避免 stdout/stderr 混在一起）：
+Save results and stats separately (avoid mixing stdout/stderr):
 
 ```bash
 dup-code-check --json --stats --report . >dup-code-check.result.json 2>dup-code-check.stats.txt
 ```
 
-> 文本模式下 `--stats` 打印到 stderr；JSON 模式下当 `--stats` 开启会把 `scanStats` 合并进 stdout 的 JSON。
+> In text mode, `--stats` prints to stderr. In JSON mode, `--stats` merges `scanStats` into stdout JSON.
 
-## 如何“让 CI 失败”？
+## How to fail the CI?
 
-`dup-code-check` 的失败条件主要有两类：
+`dup-code-check` fails mainly in two cases:
 
-1. 运行期错误：参数错误、root 不存在/不是目录、扫描异常等
-2. `--strict` 触发：扫描不完整（权限/遍历错误/预算中断）
+1. runtime errors: invalid args, root does not exist / is not a directory, scan failures
+2. `--strict`: scan was incomplete (permission / traversal / budget abort)
 
-如果你还希望在“发现重复”时失败，可以在 CI 的下一步对 JSON 做检查，例如：
+If you also want to fail when duplicates are found, add a separate step to check the JSON output, e.g.:
 
 - `fileDuplicates.length > 0` → fail
 - `codeSpanDuplicates.length > 0` → fail
 
-（这一步属于“策略层”，建议由你的团队按实际容忍度来定义。）
+(This is policy; define thresholds based on your team’s tolerance.)
 
-## 扫描成本控制建议
+## Cost control tips
 
-在大仓库中建议至少开启其中一项：
+In large repos, consider enabling at least one of:
 
-- `--ignore-dir`（忽略构建产物/依赖目录）
-- `--max-file-size`（跳过超大文件）
-- `--max-files` / `--max-total-bytes`（设置预算，避免 CI 过慢）
+- `--ignore-dir` (skip dependencies/build outputs)
+- `--max-file-size` (skip huge files)
+- `--max-files` / `--max-total-bytes` (set budgets)
 
-并谨慎使用：
+Use carefully:
 
-- `--follow-symlinks`（可能扩大扫描范围）
+- `--follow-symlinks` (may expand scan scope)
 
-## 退出码速查
+## Exit code quick reference
 
-详见《[CLI 使用](cli.md)》的退出码章节。
+See the “Exit codes” section in [CLI Usage](cli.md).

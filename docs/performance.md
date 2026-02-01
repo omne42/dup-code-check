@@ -1,43 +1,45 @@
-# 性能与可扩展性
+# Performance & Scaling
 
-`dup-code-check` 的默认目标是：在本地与 CI 中快速扫描工程目录，给出可定位的重复/相似结果。
+[中文](performance.zh-CN.md)
 
-## 扫描阶段：I/O 与文件收集
+The default goal of `dup-code-check` is to scan repos quickly in local dev and CI, and output duplicates/similarity results with actionable file/line locations.
 
-### 文件收集策略
+## Scanning: I/O and file collection
 
-默认会尊重 `.gitignore`，并在满足条件时优先走 Git 路径收集文件列表：
+### File collection strategy
+
+By default it respects `.gitignore` and, when possible, uses Git to speed up file enumeration:
 
 - `respectGitignore=true`
 - `followSymlinks=false`
-- root 是 Git 仓库且系统上可用 `git`
+- the root is a Git repo and `git` is available
 
-当 Git 路径不可用时，会退回到基于 walker 的遍历方式。
+If Git-based collection is not available, it falls back to a walker-based traversal.
 
-### I/O 成本控制
+### Controlling I/O cost
 
-你可以用以下选项控制扫描成本：
+Use these options to control scan cost:
 
-- `maxFileSize`：跳过超大文件（默认 10 MiB）
-- `maxFiles`：扫描文件数量预算
-- `maxTotalBytes`：扫描字节数预算
-- `ignoreDirs`：跳过依赖/构建目录（默认已包含常见目录）
+- `maxFileSize`: skip huge files (default 10 MiB)
+- `maxFiles`: file-count budget
+- `maxTotalBytes`: total-bytes budget
+- `ignoreDirs`: skip dependency/build directories (defaults include common ones)
 
-## 检测阶段：算法复杂度直觉
+## Detection: rough complexity intuition
 
-不同检测器的成本差异很大：
+Detectors vary significantly in cost:
 
-- `fileDuplicates`：低成本（线性扫描 + 分组）
-- `codeSpanDuplicates` / `tokenSpanDuplicates`：中等成本（指纹/窗口/候选匹配）
-- `similarBlocks*`：成本更高（候选对生成 + 相似度计算），但实现上限制了 block 深度并有阈值过滤
+- `fileDuplicates`: low cost (linear scan + grouping)
+- `codeSpanDuplicates` / `tokenSpanDuplicates`: medium cost (fingerprints/windows/candidate matching)
+- `similarBlocks*`: higher cost (candidate generation + similarity computation), but depth is limited and thresholds filter aggressively
 
-如果你只想“先把最强信号跑出来”，建议先只跑重复文件，再逐步升级到 `--report`。
+If you want “highest signal first”, start with duplicate files, then move to `--report` only when needed.
 
-## 大仓库建议（经验法则）
+## Large repo tips (rules of thumb)
 
-1. 优先把扫描 root 控制到“你真正关心的目录”
-2. 对依赖/产物目录明确加 `--ignore-dir`
-3. CI 中尽量设预算（`--max-total-bytes` 或 `--max-files`），并用 `--strict` 显式感知“预算导致的不完整扫描”
-4. 需要更快时：
-   - 先尝试关闭 `--report`
-   - 再尝试提高阈值（`--min-token-len` / `--min-match-len`）
+1. keep scan roots tight (only the directories you care about)
+2. add explicit `--ignore-dir` for dependencies/build outputs
+3. in CI, set budgets (`--max-total-bytes` or `--max-files`) and use `--strict` to surface incomplete scans
+4. if it’s too slow:
+   - first try disabling `--report`
+   - then raise thresholds (`--min-token-len` / `--min-match-len`)

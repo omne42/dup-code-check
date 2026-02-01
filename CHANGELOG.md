@@ -1,5 +1,7 @@
 # Changelog
 
+[中文](CHANGELOG.zh-CN.md)
+
 All notable changes to this project will be documented in this file.
 
 The format is based on *Keep a Changelog*, and this project adheres to *Semantic Versioning*.
@@ -9,8 +11,11 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 ### Added
 - Initial scaffolding.
 - Rust CLI binary: `dup-code-check`.
+- CLI i18n: `--localization <en|zh>` (default: `en`).
 - Scan budgets: `maxFiles` / `maxTotalBytes` (CLI: `--max-files` / `--max-total-bytes`).
 - Scan stats + strict mode in CLI (`--stats`, `--strict`).
+- GitHub Actions: CI (Linux/macOS/Windows), docs (GitHub Pages), and release (GitHub Release + npm publish).
+- Docs: bilingual (EN/ZH) with cross-links.
 
 ### Changed
 - Rename project: `dup-check` → `dup-code-check`.

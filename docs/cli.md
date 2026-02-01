@@ -1,101 +1,104 @@
-# CLI 使用
+# CLI Usage
 
-`dup-code-check` 是一个 Rust 二进制程序：负责参数解析、调用 Rust 核心、格式化输出与退出码策略。
+[中文](cli.zh-CN.md)
 
-## 基本用法
+`dup-code-check` is a Rust CLI binary: it parses arguments, calls the Rust core, formats output, and decides exit codes.
+
+## Basic usage
 
 ```bash
 dup-code-check [options] [root ...]
 ```
 
-- `root ...`：要扫描的目录列表；不传时默认是当前工作目录
-- 支持 `--` 结束参数解析（当 root 以 `-` 开头时很有用）
+- `root ...`: directories to scan; defaults to current working directory when omitted
+- supports `--` to terminate option parsing (useful when a root starts with `-`)
 
-示例：
+Examples:
 
 ```bash
-dup-code-check .                 # 默认：重复文件检测
-dup-code-check --code-spans .    # 疑似重复代码片段
-dup-code-check --report .        # 一次输出多种检测结果
-dup-code-check -- --repo         # root 以 '-' 开头时用 -- 终止 option 解析
+dup-code-check .                 # default: duplicate files
+dup-code-check --code-spans .    # suspected duplicate code spans
+dup-code-check --report .        # all detectors in one report
+dup-code-check -- --repo         # root starts with '-' (use --)
 ```
 
-## 三种运行模式
+## Modes
 
-### 1) 默认模式：重复文件检测
+### 1) Default: duplicate files
 
 ```bash
 dup-code-check [root ...]
 ```
 
-输出为“重复文件组”（每组包含 2 个及以上文件）。
+Outputs “duplicate file groups” (each group contains 2+ files).
 
-### 2) `--code-spans`：疑似重复代码片段
+### 2) `--code-spans`: suspected duplicate code spans
 
 ```bash
 dup-code-check --code-spans [root ...]
 ```
 
-输出为“疑似重复片段组”（每组包含 2 个及以上 occurrence，带行号范围）。
+Outputs “duplicate span groups” (each group contains 2+ occurrences with line ranges).
 
-### 3) `--report`：报告模式
+### 3) `--report`: report mode
 
 ```bash
 dup-code-check --report [root ...]
 ```
 
-一次扫描输出多种粒度的结果，适合做人工 review 或接入 CI 产物。
+Runs multiple detectors and outputs a consolidated report (useful for manual review or CI artifacts).
 
-## 输出格式
+## Output formats
 
-- 文本（默认）：面向人类阅读
-- JSON：`--json` 输出结构化数据
-- 统计：`--stats` 在 JSON 中附带 `scanStats`；在文本模式下打印到 stderr
+- text (default): human-friendly
+- JSON: `--json` for machine-readable output
+- stats: `--stats` adds `scanStats` in JSON; prints to stderr in text mode
 
-更完整的字段说明见《[输出与报告](output.md)》。
+See [Output & Report](output.md) for a full field reference.
 
-## 参数一览
+## Flags reference
 
-> 以下参数同时适用于 “默认/`--code-spans`/`--report`”，但有些参数只会影响特定检测器（见《[扫描选项](scan-options.md)》）。
+> Flags apply across default / `--code-spans` / `--report`, but some only affect specific detectors (see [Scan Options](scan-options.md)).
 
-### 行为开关
+### Behavior switches
 
-- `--report`：运行全部检测器并输出报告
-- `--code-spans`：发现疑似重复代码片段（输出行号范围）
-- `--json`：输出 JSON（机器可读）
-- `--stats`：输出扫描统计（文本模式写 stderr；JSON 模式附带 `scanStats`）
-- `--strict`：若扫描不完整（出现“致命跳过”）则退出码非 0
-- `--cross-repo-only`：仅输出跨 `>=2` 个 root 的重复组
-- `--no-gitignore`：不尊重 `.gitignore`（默认会尊重）
-- `--gitignore`：显式启用 `.gitignore`（默认已启用；主要用于脚本里和 `--no-gitignore` 做开关）
-- `--follow-symlinks`：跟随符号链接（默认关闭）
+- `--localization <en|zh>`: set help/text output language (default `en`; JSON output is unchanged)
+- `--report`: run all detectors and output a report
+- `--code-spans`: find suspected duplicate code spans (with line ranges)
+- `--json`: JSON output
+- `--stats`: scan stats (stderr in text; `scanStats` in JSON)
+- `--strict`: non-zero exit code if scan was incomplete
+- `--cross-repo-only`: only output groups spanning `>=2` roots
+- `--no-gitignore`: do not respect `.gitignore` (default: respect)
+- `--gitignore`: explicitly enable `.gitignore` (mainly useful in scripts)
+- `--follow-symlinks`: follow symlinks (default: off)
 
-### 阈值/上限
+### Thresholds & limits
 
-- `--min-match-len <n>`：`--code-spans` 的最小归一化长度（默认 `50`）
-- `--min-token-len <n>`：token/block/“AST 子树”等检测的最小 token 长度（默认 `50`）
-- `--similarity-threshold <f>`：相似度阈值 `0..1`（默认 `0.85`）
-- `--simhash-max-distance <n>`：SimHash 最大汉明距离 `0..64`（默认 `3`）
-- `--max-report-items <n>`：每个报告 section 最多输出条目数（默认 `200`）
+- `--min-match-len <n>`: minimum normalized length for `--code-spans` (default `50`)
+- `--min-token-len <n>`: minimum token length for token/block/AST-ish detectors (default `50`)
+- `--similarity-threshold <f>`: similarity threshold `0..1` (default `0.85`)
+- `--simhash-max-distance <n>`: SimHash max Hamming distance `0..64` (default `3`)
+- `--max-report-items <n>`: max items per report section (default `200`)
 
-### 扫描预算（Budget）
+### Scan budgets
 
-- `--max-files <n>`：最多扫描 `n` 个文件（超过会提前停止）
-- `--max-total-bytes <n>`：跳过会导致“累计扫描字节数”超过 `n` 的文件
-- `--max-file-size <n>`：跳过大于 `n` 字节的文件（默认 `10485760`，即 10 MiB）
+- `--max-files <n>`: scan at most `n` files (then stop)
+- `--max-total-bytes <n>`: skip files that would exceed total scanned bytes budget
+- `--max-file-size <n>`: skip files larger than `n` bytes (default `10485760` = 10 MiB)
 
-### 忽略规则
+### Ignore rules
 
-- `--ignore-dir <name>`：忽略目录名（可重复）
+- `--ignore-dir <name>`: ignore directory name (repeatable)
 
-### 帮助
+### Help
 
-- `-h, --help`：显示帮助
+- `-h, --help`: show help
 
-## 退出码（Exit Codes）
+## Exit codes
 
-- `0`：正常完成（即使跳过了 “NotFound/TooLarge/Binary”等非致命情况）
-- `1`：
-  - 运行期错误（例如 root 不存在/不是目录、扫描过程异常）
-  - 启用 `--strict` 且出现“致命跳过”：`PermissionDenied` / 遍历错误 / 被预算中断（`maxFiles` / `maxTotalBytes`）
-- `2`：参数解析错误（未知参数、非整数的整数参数等）
+- `0`: completed successfully (even if some non-fatal skips happened: `NotFound`/`TooLarge`/`Binary`)
+- `1`:
+  - runtime error (e.g. root does not exist / is not a directory, scan failures)
+  - with `--strict`: scan was incomplete due to `PermissionDenied`, walker errors, or budget abort (`maxFiles`/`maxTotalBytes`)
+- `2`: argument parsing error (unknown flags, non-integers for integer flags, etc.)

@@ -1,45 +1,45 @@
-# 输出与报告
+# Output & Report
 
-`dup-code-check` 支持文本输出与 JSON 输出。文本输出适合人工阅读；JSON 输出适合二次处理与 CI 集成。
+[中文](output.zh-CN.md)
 
-## 1) 重复文件（默认模式）
+`dup-code-check` supports both text output and JSON output. Text is for humans; JSON is for post-processing and CI integration.
 
-### 文本输出
+## 1) Duplicate files (default mode)
 
-形如：
+### Text
+
+You’ll see:
 
 - `duplicate groups: <N>`
-- 每组：
+- for each group:
   - `hash=<...> normalized_len=<...> files=<...>`
   - `- [repoLabel] path`
 
-### JSON 输出（`--json`）
+### JSON (`--json`)
 
-输出为数组，每个元素是：
+JSON output is an array, each element:
 
 ```ts
 interface DuplicateGroup {
-  hash: string;          // 16 位 hex 字符串（FNV-1a 64）
-  normalizedLen: number; // 去 whitespace 后的字节长度
+  hash: string;          // 16 hex chars (FNV-1a 64)
+  normalizedLen: number; // byte length after ASCII whitespace removal
   files: { repoId: number; repoLabel: string; path: string }[];
 }
 ```
 
-## 2) 疑似重复代码片段（`--code-spans`）
+## 2) Suspected duplicate code spans (`--code-spans`)
 
-### 文本输出
-
-形如：
+### Text
 
 - `duplicate code span groups: <N>`
-- 每组：
+- per group:
   - `hash=<...> normalized_len=<...> occurrences=<...>`
   - `preview=<...>`
   - `- [repoLabel] path:startLine-endLine`
 
-### JSON 输出（`--json`）
+### JSON (`--json`)
 
-输出为数组，每个元素是：
+JSON output is an array, each element:
 
 ```ts
 interface DuplicateSpanGroup {
@@ -56,48 +56,41 @@ interface DuplicateSpanGroup {
 }
 ```
 
-## 3) 扫描统计（`--stats`）
+## 3) Scan stats (`--stats`)
 
-### JSON 模式
+### JSON mode
 
-当你同时开启 `--json --stats`：
+With `--json --stats`:
 
-- 默认模式 / `--code-spans`：输出 `{ groups, scanStats }`
-- `--report`：输出 `{ report, scanStats }`
+- default / `--code-spans`: `{ groups, scanStats }`
+- `--report`: `{ report, scanStats }`
 
-`scanStats` 字段：
+`scanStats` fields include:
 
-- `candidateFiles`：候选文件数（收集到的路径数量）
-- `scannedFiles`：实际读取并处理的文件数
-- `scannedBytes`：实际读取的总字节数
-- `skippedNotFound`：扫描时遇到 `NotFound`（文件被删/变更）
-- `skippedPermissionDenied`：权限不足
-- `skippedTooLarge`：超过 `maxFileSize`
-- `skippedBinary`：包含 `\\0` 字节的二进制文件
-- `skippedWalkErrors`：遍历错误（walker errors）
-- `skippedBudgetMaxFiles`：因 `maxFiles` 提前停止导致未扫描的文件数
-- `skippedBudgetMaxTotalBytes`：因 `maxTotalBytes` 预算跳过的文件数（当某文件会使累计扫描字节数超出预算时被跳过）
+- `candidateFiles`, `scannedFiles`, `scannedBytes`
+- `skippedNotFound`, `skippedPermissionDenied`, `skippedTooLarge`, `skippedBinary`, `skippedWalkErrors`
+- `skippedBudgetMaxFiles`, `skippedBudgetMaxTotalBytes`
 
-### 文本模式
+### Text mode
 
-`--stats` 会把统计信息打印到 stderr（stdout 仍输出扫描结果），便于管道处理：
+In text mode, `--stats` prints stats to stderr while keeping results on stdout:
 
 ```bash
 dup-code-check --stats . >result.txt 2>stats.txt
 ```
 
-## 4) 严格模式（`--strict`）
+## 4) Strict mode (`--strict`)
 
-`--strict` 用于在 CI 中判断“扫描是否完整”：
+`--strict` is intended for CI and answers “was the scan complete?”:
 
-- 若出现 `PermissionDenied` / 遍历错误 / 预算中断（`maxFiles` / `maxTotalBytes`），退出码为 `1`
-- 其他跳过（`NotFound` / `TooLarge` / `Binary`）不会触发失败
+- exits `1` on `PermissionDenied`, traversal errors, or budget abort (`maxFiles` / `maxTotalBytes`)
+- does **not** fail on `NotFound`, `TooLarge`, or `Binary`
 
-当 `--json` 开启且 `--stats` 未开启时，`--strict` 仍会在失败时把统计打印到 stderr，避免你拿不到原因。
+When `--json` is enabled and `--stats` is not, `--strict` still prints stats to stderr on failure (so you can see why).
 
-## 5) 报告模式（`--report`）
+## 5) Report mode (`--report`)
 
-文本输出包含多个 section（顺序如下）：
+Text output contains multiple sections (in this order):
 
 1. `file duplicates`
 2. `code span duplicates`
@@ -108,7 +101,7 @@ dup-code-check --stats . >result.txt 2>stats.txt
 7. `similar blocks (minhash)`
 8. `similar blocks (simhash)`
 
-JSON 输出为：
+JSON output:
 
 ```ts
 interface DuplicationReport {
@@ -123,4 +116,4 @@ interface DuplicationReport {
 }
 ```
 
-各 section 的语义/实现思路见《[检测器与算法](detectors.md)》。
+For the meaning/implementation ideas of each section, see [Detectors & Algorithms](detectors.md).

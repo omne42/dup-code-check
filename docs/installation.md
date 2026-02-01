@@ -1,66 +1,68 @@
-# 安装与构建
+# Installation & Build
 
-`dup-code-check` 是一个 Rust 二进制程序。Node.js 仅作为一种安装方式（npm），安装阶段会从源码编译二进制，因此需要 Rust 工具链。
+[中文](installation.zh-CN.md)
 
-## 方式 A：直接使用 Rust（推荐）
+`dup-code-check` is a Rust CLI binary. Node.js is only used as an installation option (npm). The current npm package builds the binary from source during install, so Rust is required.
 
-在仓库根目录：
+## Option A: Rust (recommended)
+
+From the repo root:
 
 ```bash
 cargo build --release -p dup-code-check
 ./target/release/dup-code-check --help
 ```
 
-或安装到本机：
+Or install locally:
 
 ```bash
 cargo install --path . --bin dup-code-check
 dup-code-check --help
 ```
 
-## 方式 B：作为 npm 依赖（工程接入）
+## Option B: Install via npm (project dependency)
 
 ```bash
 npm i -D dup-code-check
 ```
 
-安装完成后：
+After installation:
 
 ```bash
 npx dup-code-check --help
 ```
 
-> 提示：如果你的环境禁用了 npm scripts（例如 `npm_config_ignore_scripts=true`），`postinstall` 不会编译二进制；你需要在项目中手动执行 `npm run build`（在 `node_modules/dup-code-check/` 目录下）或改用 Rust 方式。
+> Tip: if your environment disables npm scripts (e.g. `npm_config_ignore_scripts=true`), `postinstall` won’t build the binary. You can run `npm run build` inside `node_modules/dup-code-check/`, or use the Rust option.
 
-## 方式 C：全局安装（适合本机工具）
+## Option C: Global npm install (local tooling)
 
 ```bash
 npm i -g dup-code-check
 dup-code-check --help
 ```
 
-## 方式 D：从源码开发/贡献（推荐用于改代码）
+## Option D: Contribute / develop from source
 
 ```bash
-git clone <repo>
+git clone git@github.com:shiertier/dup-code-check.git
 cd dup-code-check
 npm install
 npm run build
 ./bin/dup-code-check --help
 ```
 
-## `npm run build` 到底做了什么？
+## What does `npm run build` do?
 
-`npm run build` 会执行 `scripts/build-binary.mjs`，核心步骤是：
+`npm run build` executes `scripts/build-binary.mjs`:
 
 1. `cargo build --release -p dup-code-check`
-2. 将产物复制到 `bin/` 下生成可执行文件
+2. copy the output into `bin/`
 
-不同平台产物文件名不同：
+Output binary name:
 
-- macOS / Linux：`bin/dup-code-check`
-- Windows：`bin/dup-code-check.exe`
+- macOS / Linux: `bin/dup-code-check`
+- Windows: `bin/dup-code-check.exe`
 
-## 常见构建问题
+## Common build issues
 
-如果你遇到 “Rust toolchain is required…”，先看《[排障](troubleshooting.md)》。
+If you see “Rust toolchain is required…”, check [Troubleshooting](troubleshooting.md).

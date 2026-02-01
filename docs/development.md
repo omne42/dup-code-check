@@ -1,70 +1,72 @@
-# 开发指南
+# Development
 
-本页面向想修改 `dup-code-check` 的贡献者：如何构建、测试、理解目录结构。
+[中文](development.zh-CN.md)
 
-## 目录结构
+This page is for contributors who want to modify `dup-code-check`: how to build, test, and navigate the repo structure.
 
-- `crates/core`：Rust 核心（扫描、归一化、检测器、report 生成）
-- `crates/cli`：Rust CLI（二进制入口）
-- `bin/`：构建后的二进制输出目录（`bin/dup-code-check`）
-- `scripts/`：构建/验证脚本
+## Repo layout
 
-## 构建
+- `crates/core`: Rust core (scanning, normalization, detectors, report generation)
+- `crates/cli`: Rust CLI binary
+- `bin/`: built binary output (`bin/dup-code-check`)
+- `scripts/`: build/validation scripts
+
+## Build
 
 ```bash
 npm install
 npm run build
 ```
 
-构建产物会写到 `bin/dup-code-check`。
+The binary is written to `bin/dup-code-check`.
 
-## 运行
+## Run
 
 ```bash
 ./bin/dup-code-check --help
 ./bin/dup-code-check .
 ```
 
-## 测试与验证
+## Tests & validation
 
-### Rust 测试
+### Rust tests
 
 ```bash
 cargo test
 ```
 
-### CLI smoke
+### CLI smoke tests
 
 ```bash
 npm test
 ```
 
-`npm test` 会运行 `scripts/smoke.mjs`，它会在临时目录构造一些小文件来验证：
+`npm test` runs `scripts/smoke.mjs`, which creates small temporary repos/files to validate:
 
-- 重复文件扫描基本正确
-- `--max-file-size` 等参数校验正确
-- `--` 终止参数解析可用
-- `.gitignore` 默认生效，`--no-gitignore` 可关闭
+- duplicate file scan is correct
+- argument validation (e.g. `--max-file-size`) is strict
+- `--` option terminator works
+- `.gitignore` is respected by default and can be disabled via `--no-gitignore`
 
-### 统一 gate（本地/钩子使用）
+### Unified gate (for local/hooks)
 
 ```bash
 ./scripts/gate.sh
 ```
 
-它会按项目标记自动执行：
+It auto-detects project markers and runs:
 
 - `cargo fmt --check`
 - `cargo check`
 - `npm run check`
 
-## Git hooks（可选但推荐）
+## Git hooks (optional but recommended)
 
 ```bash
 ./scripts/bootstrap.sh
 ```
 
-会配置 `core.hooksPath=githooks`，并启用：
+This configures `core.hooksPath=githooks` and enables:
 
-- `pre-commit`：要求每个 commit 同步更新 `CHANGELOG.md`，并运行 gate
-- `commit-msg`：强制 Conventional Commits 格式 + 分支名前缀策略
+- `pre-commit`: requires updating `CHANGELOG.md` for every commit, then runs the gate
+- `commit-msg`: enforces Conventional Commits + branch prefix rules

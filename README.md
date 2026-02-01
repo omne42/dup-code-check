@@ -1,87 +1,53 @@
 # dup-code-check
 
-面向“重复/相似检测”的工具箱：以 **Rust 二进制程序** 交付；Node.js 仅作为一种安装方式（npm）。
+[中文文档](README.zh-CN.md)
 
-## 文档
+`dup-code-check` is a toolbox for detecting duplicates/similarity in codebases. It ships as a **Rust CLI binary**; Node.js is used as an installation option via npm.
 
-更完整的文档（GitBook 风格目录）在：
+- CI: `.github/workflows/ci.yml`
+- Docs (GitBook-style): `docs/README.md` (English) / `docs/README.zh-CN.md` (中文)
 
-- `docs/README.md`
-- `docs/SUMMARY.md`
+## What it does (MVP)
 
-## 当前功能（MVP）
+- Duplicate file detection (ignores ASCII whitespace differences)
+  - Single root or multiple roots
+  - Optionally only report groups that span >= 2 roots (`--cross-repo-only`)
+- Suspected duplicate code spans (`--code-spans`)
+  - Normalizes by removing symbols + whitespace (keeps `[A-Za-z0-9_]`)
+  - Reports line ranges for occurrences
+- Report mode (`--report`): multiple detectors/levels in one run
+- Respects `.gitignore` by default
 
-- 重复文件检测（忽略空白字符差异：换行 / tab / 空格等）
-  - 单仓库：扫描一个 root
-  - 多仓库：扫描多个 root（可只输出跨仓库重复）
-- 疑似重复代码片段检测
-  - 对文件内容去除“符号 + 空白字符”（仅保留字母/数字/下划线）
-  - 连续 `>= 50` 个字符相同视为疑似重复，报告真实行号范围
-- 重复检测报告（`--report`）
-  - 行级 / token 级 / block 级 / “AST 子树”级（基于 `{}` 结构）重复
-  - 近似重复（MinHash / SimHash）
-- 扫描默认会跳过 `.gitignore` 命中的文件
+## Install
 
-## 安装
-
-### 方式 A：直接使用 Rust 二进制（推荐）
-
-在仓库根目录：
+### Option A: Rust (recommended)
 
 ```bash
 cargo build --release -p dup-code-check
 ./target/release/dup-code-check --help
 ```
 
-或者安装到本机（开发期常用）：
+Or install locally:
 
 ```bash
 cargo install --path . --bin dup-code-check
 dup-code-check --help
 ```
 
-### 方式 B：通过 npm 安装（二进制从源码编译）
-
-当前版本会在 `postinstall` 阶段从 Rust 源码编译二进制，因此需要：
-
-- Node.js `>=22`（参考 Codex 项目）
-- Rust toolchain `1.92.0`（已通过 `rust-toolchain.toml` 固定，参考 Codex 项目）
-
-## 本地开发
-
-### 1) 构建二进制
+### Option B: npm (builds from source on install)
 
 ```bash
-npm run build
+npm i -D dup-code-check
+npx dup-code-check --help
 ```
 
-生成 `bin/dup-code-check`。
+> Note: this package builds the Rust binary during `postinstall`, so Rust is required.
 
-### 2) 运行 CLI
+## Quick examples
 
 ```bash
-./bin/dup-code-check --help
-./bin/dup-code-check .
-./bin/dup-code-check --cross-repo-only /path/to/repoA /path/to/repoB
-./bin/dup-code-check --code-spans --cross-repo-only /path/to/repoA /path/to/repoB
-./bin/dup-code-check --report --cross-repo-only /path/to/repoA /path/to/repoB
-./bin/dup-code-check --max-file-size 20971520 .
+dup-code-check .
+dup-code-check --cross-repo-only /repoA /repoB
+dup-code-check --code-spans --cross-repo-only /repoA /repoB
+dup-code-check --json --report .
 ```
-
-### 3) 运行测试
-
-```bash
-cargo test
-npm test
-```
-
-## 说明
-
-当前包含两类检测：
-
-- 重复文件：对文件内容做 ASCII whitespace 删除后完全一致（Type-1 clone 的一种极简形式）
-- 代码片段：对内容去除“符号 + 空白字符”后，存在连续 `>= 50` 字符相同的片段，输出行号范围
-
-默认会跳过大于 10 MiB（10485760 bytes）的文件；可用 `--max-file-size` 调整（Rust 侧常量：`DEFAULT_MAX_FILE_SIZE_BYTES`）。
-
-后续可以扩展为 token/AST 级别的克隆检测，支持 Type-2/Type-3。

@@ -1,21 +1,23 @@
-# 路线图
+# Roadmap
 
-本页记录一些方向性的想法，方便在开源协作中对齐优先级（不代表承诺）。
+[中文](roadmap.zh-CN.md)
 
-## 短期（稳定性/易用性）
+This page records directional ideas to align priorities in open-source collaboration (not a promise).
 
-- 输出格式增强：例如 SARIF（便于与安全/质量平台对接）
-- 更友好的 report JSON schema（版本化 + 向后兼容策略）
-- 更强的 ignore 规则：支持 `.dup-code-checkignore` 或类似配置文件
-- CLI 更细粒度的子命令（只跑某个 detector、只输出某个 section）
+## Short term (stability & usability)
 
-## 中期（能力扩展）
+- richer output formats (e.g. SARIF for quality/security platforms)
+- a more friendly report JSON schema (versioning + backward compatibility policy)
+- stronger ignore rules (e.g. `.dup-code-checkignore` or similar)
+- finer-grained CLI subcommands (run one detector / output one section)
 
-- Type-2/Type-3 检测增强：更稳健的 tokenization、窗口策略、去噪
-- 增量扫描：缓存文件指纹/块指纹，只扫描变更
-- 更细的粒度：函数级、类级的重复定位
+## Mid term (capability expansion)
 
-## 长期（深度分析）
+- better Type-2/Type-3 detection: more robust tokenization, windowing, denoising
+- incremental scanning: cache file/block fingerprints and scan only changes
+- finer granularity: function/class-level duplicate localization
 
-- 语言级 AST（Tree-sitter 等）与结构化克隆检测
-- 大规模索引/检索（SourcererCC 风格的索引方案）
+## Long term (deep analysis)
+
+- real language AST (Tree-sitter, etc.) and structured clone detection
+- large-scale indexing/retrieval (SourcererCC-style indexing)

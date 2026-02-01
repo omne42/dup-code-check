@@ -150,7 +150,17 @@ jobs:
             exit 0
           fi
           cargo publish -p dup-code-check-core
-          cargo publish -p dup-code-check
+          # crates.io index can take some time to update after publishing the core crate.
+          # Retry the CLI publish a few times to avoid flaky releases.
+          for attempt in 1 2 3 4 5 6; do
+            if cargo publish -p dup-code-check; then
+              exit 0
+            fi
+            echo "dup-code-check publish failed (attempt ${attempt}); retrying in 15s..." >&2
+            sleep 15
+          done
+          echo "dup-code-check publish still failing after retries." >&2
+          exit 1
 
       - name: Publish to npm
         env:

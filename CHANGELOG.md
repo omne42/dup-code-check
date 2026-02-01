@@ -30,6 +30,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Docs workflow: auto-enable GitHub Pages (Actions) when deploying docs.
 - Release workflow: publish to crates.io on tag releases (and skip when token is missing).
 - Release workflow: avoid `secrets.*` in `if:` to prevent workflow validation issues.
+- Release workflow: retry `cargo publish` for the CLI to tolerate crates.io index propagation delay.
 - Repo links: update GitHub owner / Pages URLs (`omne42`).
 
 ### Fixed

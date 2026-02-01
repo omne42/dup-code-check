@@ -18,6 +18,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI `--help` no longer requires the native module to be present.
 - `--report` memory usage reduced by avoiding large intermediate clones.
 - Invalid roots now fail early instead of producing empty results.
+- Docs: add GitBook-style documentation under `docs/`.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

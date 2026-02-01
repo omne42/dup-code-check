@@ -2,6 +2,13 @@
 
 面向“代码检测”的工具箱：底层 Rust，高层 Node.js（可做 CLI / npm 包）。
 
+## 文档
+
+更完整的文档（GitBook 风格目录）在：
+
+- `docs/README.md`
+- `docs/SUMMARY.md`
+
 ## 当前功能（MVP）
 
 - 重复文件检测（忽略空白字符差异：换行 / tab / 空格等）

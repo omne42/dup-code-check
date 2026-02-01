@@ -1,0 +1,20 @@
+# Summary
+
+- [简介](README.md)
+- [快速开始](getting-started.md)
+- [安装与构建](installation.md)
+- [CLI 使用](cli.md)
+- [Node.js API](api.md)
+- [扫描选项](scan-options.md)
+- [检测器与算法](detectors.md)
+- [输出与报告](output.md)
+- [CI 集成](ci.md)
+- [性能与可扩展性](performance.md)
+- [架构](architecture.md)
+- [开发指南](development.md)
+- [贡献指南](contributing.md)
+- [排障](troubleshooting.md)
+- [FAQ](faq.md)
+- [路线图](roadmap.md)
+- [竞品对比](competitors.md)
+

@@ -3,6 +3,9 @@ name = "dup-code-check-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Core library for dup-code-check duplication scanning."
+repository = "https://github.com/omne42/dup-code-check"
+homepage = "https://omne42.github.io/dup-code-check/"
 
 [dependencies]
 ignore = "0.4"

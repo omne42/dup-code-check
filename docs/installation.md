@@ -44,7 +44,7 @@ dup-code-check --help
 ## Option D: Contribute / develop from source
 
 ```bash
-git clone git@github.com:shiertier/dup-code-check.git
+git clone git@github.com:omne42/dup-code-check.git
 cd dup-code-check
 npm install
 npm run build

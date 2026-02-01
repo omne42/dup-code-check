@@ -5,12 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/shiertier/dup-code-check.git"
+    "url": "git+https://github.com/omne42/dup-code-check.git"
   },
   "bugs": {
-    "url": "https://github.com/shiertier/dup-code-check/issues"
+    "url": "https://github.com/omne42/dup-code-check/issues"
   },
-  "homepage": "https://shiertier.github.io/dup-code-check/",
+  "homepage": "https://omne42.github.io/dup-code-check/",
   "bin": {
     "dup-code-check": "bin/dup-code-check"
   },

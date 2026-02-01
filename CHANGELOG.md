@@ -28,6 +28,8 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Docs: add GitBook-style documentation under `docs/`.
 - Docs workflow: skip GitHub Pages deployment when the repository is private.
 - Docs workflow: auto-enable GitHub Pages (Actions) when deploying docs.
+- Release workflow: publish to crates.io on tag releases (and skip when token is missing).
+- Repo links: update GitHub owner / Pages URLs (`omne42`).
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

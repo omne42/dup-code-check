@@ -27,6 +27,7 @@
 - 无效 root 现在会尽早失败，而不是输出空结果。
 - 文档：在 `docs/` 下增加 GitBook 风格文档。
 - 文档 workflow：当仓库为私有时跳过 GitHub Pages 部署。
+- 文档 workflow：部署文档时自动启用 GitHub Pages（GitHub Actions）。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。

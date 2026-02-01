@@ -26,6 +26,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - `--report` memory usage reduced by avoiding large intermediate clones.
 - Invalid roots now fail early instead of producing empty results.
 - Docs: add GitBook-style documentation under `docs/`.
+- Docs workflow: skip GitHub Pages deployment when the repository is private.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

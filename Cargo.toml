@@ -6,3 +6,6 @@ members = ["crates/core", "crates/cli"]
 version = "0.0.1"
 edition = "2024"
 license = "MIT"
+authors = ["omne42"]
+repository = "https://github.com/omne42/dup-code-check"
+homepage = "https://omne42.github.io/dup-code-check/"

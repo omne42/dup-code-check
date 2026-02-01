@@ -2,6 +2,14 @@
   "name": "dup-code-check",
   "version": "0.0.1",
   "description": "Duplication checker (Rust binary; Node.js installer)",
+  "author": "omne42",
+  "keywords": [
+    "duplication",
+    "code",
+    "scanner",
+    "cli",
+    "rust"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

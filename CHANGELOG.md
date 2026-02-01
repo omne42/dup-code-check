@@ -32,6 +32,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Release workflow: avoid `secrets.*` in `if:` to prevent workflow validation issues.
 - Release workflow: retry `cargo publish` for the CLI to tolerate crates.io index propagation delay.
 - Repo links: update GitHub owner / Pages URLs (`omne42`).
+- Metadata: use MIT-only license identifier.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

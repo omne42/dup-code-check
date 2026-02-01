@@ -3,9 +3,13 @@ name = "dup-code-check"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "Duplication checker CLI."
-repository = "https://github.com/omne42/dup-code-check"
-homepage = "https://omne42.github.io/dup-code-check/"
+readme = "README.md"
+keywords = ["duplication", "scanner", "cli", "code", "similarity"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 dup-code-check-core = { version = "0.0.1", path = "../core" }

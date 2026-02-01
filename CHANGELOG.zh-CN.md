@@ -32,6 +32,7 @@
 - 发布 workflow：避免在 `if:` 中引用 `secrets.*`，以规避 workflow 校验问题。
 - 发布 workflow：对 CLI 的 `cargo publish` 增加重试，以容忍 crates.io index 的同步延迟。
 - 仓库链接：更新 GitHub owner / Pages 地址（`omne42`）。
+- 元数据：license 仅使用 MIT（不再是双协议）。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。

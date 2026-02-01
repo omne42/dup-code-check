@@ -25,13 +25,14 @@ rustup override set 1.92.0
 npm run build
 ```
 
-## 2) Native binding not found
+## 2) 二进制不存在 / 无法执行
 
-现象：Node 加载时报：
+现象：
 
-- `Native binding not found. Build it first: npm run build`
+- 运行 `dup-code-check` 提示 “command not found”
+- 或运行 `./bin/dup-code-check` 报 “No such file or directory”
 
-原因：`code_checker.node` 不存在（或放置位置不对）。
+原因：二进制尚未构建（或放置位置不对）。
 
 处理：
 
@@ -39,7 +40,13 @@ npm run build
 npm run build
 ```
 
-并确认仓库根目录存在 `code_checker.node`。
+或直接用 Rust 构建：
+
+```bash
+cargo build --release -p dup-code-check
+```
+
+并确认存在 `bin/dup-code-check`（Windows 为 `bin/dup-code-check.exe`）。
 
 ## 3) CLI 参数报错（退出码 2）
 
@@ -71,10 +78,10 @@ npm run build
 默认会尊重 `.gitignore`。如果你希望完全扫描（包括被忽略的文件），使用：
 
 ```bash
-code-checker --no-gitignore .
+dup-code-check --no-gitignore .
 ```
 
-## 6) Windows 构建问题（常见于原生模块）
+## 6) Windows 构建问题
 
 如果你在 Windows 上从源码构建失败，通常需要：
 
@@ -82,4 +89,3 @@ code-checker --no-gitignore .
 - 确保 Rust toolchain 与 Node 版本满足要求
 
 由于环境差异较大，建议优先在 CI 中用容器/固定镜像构建，或使用 WSL。
-

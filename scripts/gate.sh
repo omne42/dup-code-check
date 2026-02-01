@@ -72,4 +72,3 @@ EOF
     npm run -s check
   )
 fi
-

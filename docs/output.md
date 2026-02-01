@@ -1,6 +1,6 @@
 # 输出与报告
 
-`code-checker` 支持文本输出与 JSON 输出。文本输出适合人工阅读；JSON 输出适合二次处理与 CI 集成。
+`dup-code-check` 支持文本输出与 JSON 输出。文本输出适合人工阅读；JSON 输出适合二次处理与 CI 集成。
 
 ## 1) 重复文件（默认模式）
 
@@ -83,7 +83,7 @@ interface DuplicateSpanGroup {
 `--stats` 会把统计信息打印到 stderr（stdout 仍输出扫描结果），便于管道处理：
 
 ```bash
-code-checker --stats . >result.txt 2>stats.txt
+dup-code-check --stats . >result.txt 2>stats.txt
 ```
 
 ## 4) 严格模式（`--strict`）

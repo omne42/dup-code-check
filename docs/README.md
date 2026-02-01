@@ -1,6 +1,6 @@
-# code-checker 文档
+# dup-code-check 文档
 
-`code-checker` 是一个面向“代码检测/重复检测”的工具箱：**底层 Rust（性能/可移植性）**，上层通过 **Node.js（CLI / npm 包）** 交付。
+`dup-code-check` 是一个面向“重复/相似检测”的工具箱：以 **Rust 二进制** 交付；Node.js 仅作为一种安装方式（npm）。
 
 当前重点在“重复”相关能力：
 
@@ -20,19 +20,18 @@
 
 ```bash
 # 扫描当前目录（默认：重复文件）
-code-checker .
+dup-code-check .
 
 # 仅报告跨仓库/跨 root 的重复组
-code-checker --cross-repo-only /repoA /repoB
+dup-code-check --cross-repo-only /repoA /repoB
 
 # 发现疑似重复代码片段（输出行号范围）
-code-checker --code-spans --cross-repo-only /repoA /repoB
+dup-code-check --code-spans --cross-repo-only /repoA /repoB
 
 # 输出 JSON（便于做二次处理/接入 CI 报告）
-code-checker --json --report .
+dup-code-check --json --report .
 ```
 
 ## 文档导航
 
 GitBook 目录见 `docs/SUMMARY.md`。
-

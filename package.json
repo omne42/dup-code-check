@@ -1,12 +1,10 @@
 {
-  "name": "code-checker",
+  "name": "dup-code-check",
   "version": "0.0.1",
-  "description": "Code checking toolkit (Rust core + Node.js CLI)",
+  "description": "Duplication checker (Rust binary; Node.js installer)",
   "license": "MIT",
-  "main": "index.js",
-  "types": "index.d.ts",
   "bin": {
-    "code-checker": "bin/code-checker.js"
+    "dup-code-check": "bin/dup-code-check"
   },
   "files": [
     "bin/",
@@ -15,17 +13,14 @@
     "scripts/",
     "Cargo.lock",
     "Cargo.toml",
-    "index.d.ts",
-    "index.js",
     "README.md"
   ],
   "scripts": {
-    "build:native": "node scripts/build-native.mjs",
-    "build": "node scripts/build-native.mjs",
-    "postinstall": "node scripts/build-native.mjs",
+    "build": "node scripts/build-binary.mjs",
+    "postinstall": "node scripts/build-binary.mjs",
+    "prepack": "node scripts/prepack.mjs",
     "check": "node scripts/smoke.mjs",
-    "test": "node scripts/smoke.mjs",
-    "cli": "node bin/code-checker.js"
+    "test": "node scripts/smoke.mjs"
   },
   "engines": {
     "node": ">=22",

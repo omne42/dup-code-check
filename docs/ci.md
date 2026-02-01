@@ -7,7 +7,7 @@
 ### 1) 最小成本：只做重复文件
 
 ```bash
-code-checker --json --stats --strict .
+dup-code-check --json --stats --strict .
 ```
 
 适合做“低成本守门”：如果扫描遇到权限/遍历错误或被预算中断，会直接失败；否则输出 JSON 供后续处理。
@@ -15,19 +15,19 @@ code-checker --json --stats --strict .
 ### 2) 完整报告：一次跑全套检测器
 
 ```bash
-code-checker --json --stats --strict --report .
+dup-code-check --json --stats --strict --report .
 ```
 
 配合 `--max-report-items` 控制输出规模：
 
 ```bash
-code-checker --json --stats --strict --report --max-report-items 100 .
+dup-code-check --json --stats --strict --report --max-report-items 100 .
 ```
 
 ### 3) 多仓库/多目录：只看跨 root 重复
 
 ```bash
-code-checker --json --stats --strict --report --cross-repo-only /repoA /repoB
+dup-code-check --json --stats --strict --report --cross-repo-only /repoA /repoB
 ```
 
 ## 输出落盘与产物归档
@@ -35,14 +35,14 @@ code-checker --json --stats --strict --report --cross-repo-only /repoA /repoB
 推荐把结果与统计分开保存（避免 stdout/stderr 混在一起）：
 
 ```bash
-code-checker --json --stats --report . >code-checker.result.json 2>code-checker.stats.txt
+dup-code-check --json --stats --report . >dup-code-check.result.json 2>dup-code-check.stats.txt
 ```
 
 > 文本模式下 `--stats` 打印到 stderr；JSON 模式下当 `--stats` 开启会把 `scanStats` 合并进 stdout 的 JSON。
 
 ## 如何“让 CI 失败”？
 
-`code-checker` 的失败条件主要有两类：
+`dup-code-check` 的失败条件主要有两类：
 
 1. 运行期错误：参数错误、root 不存在/不是目录、扫描异常等
 2. `--strict` 触发：扫描不完整（权限/遍历错误/预算中断）
@@ -69,4 +69,3 @@ code-checker --json --stats --report . >code-checker.result.json 2>code-checker.
 ## 退出码速查
 
 详见《[CLI 使用](cli.md)》的退出码章节。
-

@@ -1,11 +1,11 @@
 # CLI 使用
 
-`code-checker` CLI 是对 Rust 核心能力的一个薄封装：负责参数解析、调用原生模块、格式化输出与退出码策略。
+`dup-code-check` 是一个 Rust 二进制程序：负责参数解析、调用 Rust 核心、格式化输出与退出码策略。
 
 ## 基本用法
 
 ```bash
-code-checker [options] [root ...]
+dup-code-check [options] [root ...]
 ```
 
 - `root ...`：要扫描的目录列表；不传时默认是当前工作目录
@@ -14,10 +14,10 @@ code-checker [options] [root ...]
 示例：
 
 ```bash
-code-checker .                 # 默认：重复文件检测
-code-checker --code-spans .    # 疑似重复代码片段
-code-checker --report .        # 一次输出多种检测结果
-code-checker -- --repo         # root 以 '-' 开头时用 -- 终止 option 解析
+dup-code-check .                 # 默认：重复文件检测
+dup-code-check --code-spans .    # 疑似重复代码片段
+dup-code-check --report .        # 一次输出多种检测结果
+dup-code-check -- --repo         # root 以 '-' 开头时用 -- 终止 option 解析
 ```
 
 ## 三种运行模式
@@ -25,7 +25,7 @@ code-checker -- --repo         # root 以 '-' 开头时用 -- 终止 option 解�
 ### 1) 默认模式：重复文件检测
 
 ```bash
-code-checker [root ...]
+dup-code-check [root ...]
 ```
 
 输出为“重复文件组”（每组包含 2 个及以上文件）。
@@ -33,7 +33,7 @@ code-checker [root ...]
 ### 2) `--code-spans`：疑似重复代码片段
 
 ```bash
-code-checker --code-spans [root ...]
+dup-code-check --code-spans [root ...]
 ```
 
 输出为“疑似重复片段组”（每组包含 2 个及以上 occurrence，带行号范围）。
@@ -41,7 +41,7 @@ code-checker --code-spans [root ...]
 ### 3) `--report`：报告模式
 
 ```bash
-code-checker --report [root ...]
+dup-code-check --report [root ...]
 ```
 
 一次扫描输出多种粒度的结果，适合做人工 review 或接入 CI 产物。

@@ -25,8 +25,7 @@
 2. 明确你在改哪一层：
 
 - Rust 核心能力 → `crates/core`
-- Node API/类型 → `index.js` / `index.d.ts`
-- CLI 体验 → `bin/code-checker.js`
+- CLI 体验 → `crates/cli`
 
 ## Commit 约定
 
@@ -65,4 +64,3 @@
 cargo test
 npm test
 ```
-

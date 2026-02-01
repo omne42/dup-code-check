@@ -4,30 +4,37 @@
 
 ## 0) 前置条件
 
-- Node.js `>= 22`
 - Rust toolchain `1.92.0`（仓库用 `rust-toolchain.toml` 固定）
+- （可选）Node.js `>= 22`（如果你想用 npm 安装/构建）
 - （可选）Git：默认会尊重 `.gitignore`，并在可用时通过 `git ls-files` 加速文件收集
 
 ## 1) 从源码跑 CLI（推荐：最稳定）
 
-在仓库根目录（`code-checker/`）：
+在仓库根目录：
+
+```bash
+cargo build --release -p dup-code-check
+./target/release/dup-code-check --help
+```
+
+你也可以通过 npm 构建并运行：
 
 ```bash
 npm install
 npm run build
-node bin/code-checker.js --help
+./bin/dup-code-check --help
 ```
 
-你也可以用 npm 的 `bin` 入口（取决于你的环境如何处理 `bin`）：
+你也可以用 `npx`（会执行 `postinstall` 编译二进制）：
 
 ```bash
-npx code-checker --help
+npx dup-code-check --help
 ```
 
 ## 2) 扫描一个目录：重复文件（默认）
 
 ```bash
-code-checker .
+dup-code-check .
 ```
 
 输出示例（文本模式）大致是：
@@ -43,7 +50,7 @@ code-checker .
 当你要比较多个仓库/多个目录时：
 
 ```bash
-code-checker --cross-repo-only /repoA /repoB
+dup-code-check --cross-repo-only /repoA /repoB
 ```
 
 `--cross-repo-only` 会过滤掉“只在同一个 root 内出现”的重复组。
@@ -51,7 +58,7 @@ code-checker --cross-repo-only /repoA /repoB
 ## 4) 扫描疑似重复代码片段（输出行号范围）
 
 ```bash
-code-checker --code-spans --cross-repo-only /repoA /repoB
+dup-code-check --code-spans --cross-repo-only /repoA /repoB
 ```
 
 这会输出：
@@ -65,7 +72,7 @@ code-checker --code-spans --cross-repo-only /repoA /repoB
 ## 5) 输出 JSON（用于二次处理/CI）
 
 ```bash
-code-checker --json --stats --strict .
+dup-code-check --json --stats --strict .
 ```
 
 - `--json`：结构化输出（机器可读）
@@ -73,4 +80,3 @@ code-checker --json --stats --strict .
 - `--strict`：如果扫描过程中出现“致命跳过”（例如权限错误、遍历错误、预算打断），退出码为非 0
 
 更完整的输出字段说明见《[输出与报告](output.md)》。
-

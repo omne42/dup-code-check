@@ -17,7 +17,7 @@ CLI 与 Node.js API 共享同一套扫描选项；CLI 参数会被转换为 `Sca
 CLI 中可多次传入：
 
 ```bash
-code-checker --ignore-dir vendor --ignore-dir .venv .
+dup-code-check --ignore-dir vendor --ignore-dir .venv .
 ```
 
 ### `respectGitignore` / `--no-gitignore`
@@ -27,13 +27,13 @@ code-checker --ignore-dir vendor --ignore-dir .venv .
 关闭：
 
 ```bash
-code-checker --no-gitignore .
+dup-code-check --no-gitignore .
 ```
 
 重新启用（默认已启用；主要用于脚本组合）：
 
 ```bash
-code-checker --gitignore .
+dup-code-check --gitignore .
 ```
 
 注意：
@@ -46,7 +46,7 @@ code-checker --gitignore .
 默认 `false`（不跟随符号链接）。开启后会跟随 symlink 目录/文件进行扫描：
 
 ```bash
-code-checker --follow-symlinks .
+dup-code-check --follow-symlinks .
 ```
 
 > 在包含大量 symlink 的 monorepo/构建目录中，建议谨慎开启，以免扫描范围爆炸或产生循环。

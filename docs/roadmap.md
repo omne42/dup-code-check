@@ -6,7 +6,7 @@
 
 - 输出格式增强：例如 SARIF（便于与安全/质量平台对接）
 - 更友好的 report JSON schema（版本化 + 向后兼容策略）
-- 更强的 ignore 规则：支持 `.code-checkerignore` 或类似配置文件
+- 更强的 ignore 规则：支持 `.dup-code-checkignore` 或类似配置文件
 - CLI 更细粒度的子命令（只跑某个 detector、只输出某个 section）
 
 ## 中期（能力扩展）
@@ -19,4 +19,3 @@
 
 - 语言级 AST（Tree-sitter 等）与结构化克隆检测
 - 大规模索引/检索（SourcererCC 风格的索引方案）
-

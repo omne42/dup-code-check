@@ -8,15 +8,16 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 
 ### Added
 - Initial scaffolding.
+- Rust CLI binary: `dup-code-check`.
 - Scan budgets: `maxFiles` / `maxTotalBytes` (CLI: `--max-files` / `--max-total-bytes`).
-- Scan stats + strict mode in CLI (`--stats`, `--strict`) and JS API (`*WithStats` functions).
+- Scan stats + strict mode in CLI (`--stats`, `--strict`).
 
 ### Changed
-- Dev: rename the released-changelog edit override env var to `CODE_CHECKER_ALLOW_CHANGELOG_RELEASE_EDIT`.
+- Rename project: `dup-check` → `dup-code-check`.
+- Dev: rename the released-changelog edit override env var to `DUP_CODE_CHECK_ALLOW_CHANGELOG_RELEASE_EDIT`.
 - Default scan skips files larger than 10 MiB (`DEFAULT_MAX_FILE_SIZE_BYTES`).
 - Fallback scanner now respects nested `.gitignore` rules via the `ignore` crate.
 - CLI integer options now reject non-integers (e.g. `--max-file-size 1.5`).
-- CLI `--help` no longer requires the native module to be present.
 - `--report` memory usage reduced by avoiding large intermediate clones.
 - Invalid roots now fail early instead of producing empty results.
 - Docs: add GitBook-style documentation under `docs/`.
@@ -25,7 +26,6 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
 - Avoid panics in `git check-ignore` integration; fall back when it fails.
 - Avoid leaking absolute paths in results when path prefix stripping fails.
-- NAPI now validates numeric scan options (rejects NaN / fractional / out-of-range values).
 - `--follow-symlinks` now works reliably by using the walker path when enabled.
 - Token-based detectors now record the start line for multi-line string tokens.
 - CLI now supports `--` to terminate option parsing (allows roots that start with `-`).

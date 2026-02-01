@@ -1,6 +1,6 @@
-# code-checker
+# dup-code-check
 
-面向“代码检测”的工具箱：底层 Rust，高层 Node.js（可做 CLI / npm 包）。
+面向“重复/相似检测”的工具箱：以 **Rust 二进制程序** 交付；Node.js 仅作为一种安装方式（npm）。
 
 ## 文档
 
@@ -22,32 +22,50 @@
   - 近似重复（MinHash / SimHash）
 - 扫描默认会跳过 `.gitignore` 命中的文件
 
-## 安装（作为 npm 包依赖）
+## 安装
 
-当前版本会在 `postinstall` 阶段从 Rust 源码编译原生模块，因此需要：
+### 方式 A：直接使用 Rust 二进制（推荐）
+
+在仓库根目录：
+
+```bash
+cargo build --release -p dup-code-check
+./target/release/dup-code-check --help
+```
+
+或者安装到本机（开发期常用）：
+
+```bash
+cargo install --path . --bin dup-code-check
+dup-code-check --help
+```
+
+### 方式 B：通过 npm 安装（二进制从源码编译）
+
+当前版本会在 `postinstall` 阶段从 Rust 源码编译二进制，因此需要：
 
 - Node.js `>=22`（参考 Codex 项目）
 - Rust toolchain `1.92.0`（已通过 `rust-toolchain.toml` 固定，参考 Codex 项目）
 
 ## 本地开发
 
-### 1) 构建原生模块
+### 1) 构建二进制
 
 ```bash
 npm run build
 ```
 
-生成 `code_checker.node`（N-API 动态库）。
+生成 `bin/dup-code-check`。
 
 ### 2) 运行 CLI
 
 ```bash
-node bin/code-checker.js --help
-node bin/code-checker.js .
-node bin/code-checker.js --cross-repo-only /path/to/repoA /path/to/repoB
-node bin/code-checker.js --code-spans --cross-repo-only /path/to/repoA /path/to/repoB
-node bin/code-checker.js --report --cross-repo-only /path/to/repoA /path/to/repoB
-node bin/code-checker.js --max-file-size 20971520 .
+./bin/dup-code-check --help
+./bin/dup-code-check .
+./bin/dup-code-check --cross-repo-only /path/to/repoA /path/to/repoB
+./bin/dup-code-check --code-spans --cross-repo-only /path/to/repoA /path/to/repoB
+./bin/dup-code-check --report --cross-repo-only /path/to/repoA /path/to/repoB
+./bin/dup-code-check --max-file-size 20971520 .
 ```
 
 ### 3) 运行测试

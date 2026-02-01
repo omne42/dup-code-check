@@ -2851,6 +2851,6 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("clock should be monotonic")
             .as_nanos();
-        std::env::temp_dir().join(format!("code-checker-core-{suffix}-{nanos}"))
+        std::env::temp_dir().join(format!("dup-code-check-core-{suffix}-{nanos}"))
     }
 }

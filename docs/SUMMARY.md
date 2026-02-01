@@ -4,7 +4,6 @@
 - [快速开始](getting-started.md)
 - [安装与构建](installation.md)
 - [CLI 使用](cli.md)
-- [Node.js API](api.md)
 - [扫描选项](scan-options.md)
 - [检测器与算法](detectors.md)
 - [输出与报告](output.md)
@@ -17,4 +16,3 @@
 - [FAQ](faq.md)
 - [路线图](roadmap.md)
 - [竞品对比](competitors.md)
-

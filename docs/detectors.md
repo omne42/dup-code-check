@@ -6,7 +6,7 @@
 
 ## 0) 扫描与归一化：所有检测器的共同前提
 
-无论哪种检测器，`code-checker` 都会先做两件事：
+无论哪种检测器，`dup-code-check` 都会先做两件事：
 
 1. 收集要扫描的文件路径（默认尊重 `.gitignore`，并忽略常见目录如 `node_modules/`）
 2. 读取文件内容并跳过：
@@ -186,4 +186,3 @@
 - 用 `--cross-repo-only` 聚焦“跨 root 复用/复制”的问题
 - 用 `--max-report-items` 控制输出规模
 - 用 `--strict` 确保扫描完整性（配合 `--stats`）
-

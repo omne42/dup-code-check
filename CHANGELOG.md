@@ -12,6 +12,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan stats + strict mode in CLI (`--stats`, `--strict`) and JS API (`*WithStats` functions).
 
 ### Changed
+- Dev: rename the released-changelog edit override env var to `CODE_CHECKER_ALLOW_CHANGELOG_RELEASE_EDIT`.
 - Default scan skips files larger than 10 MiB (`DEFAULT_MAX_FILE_SIZE_BYTES`).
 - Fallback scanner now respects nested `.gitignore` rules via the `ignore` crate.
 - CLI integer options now reject non-integers (e.g. `--max-file-size 1.5`).

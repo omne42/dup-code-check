@@ -29,6 +29,7 @@
 - 文档 workflow：当仓库为私有时跳过 GitHub Pages 部署。
 - 文档 workflow：部署文档时自动启用 GitHub Pages（GitHub Actions）。
 - 发布 workflow：在 tag 发布时执行 crates.io 发布（未配置 token 时自动跳过）。
+- 发布 workflow：避免在 `if:` 中引用 `secrets.*`，以规避 workflow 校验问题。
 - 仓库链接：更新 GitHub owner / Pages 地址（`omne42`）。
 
 ### Fixed

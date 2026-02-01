@@ -140,17 +140,26 @@ jobs:
           fi
 
       - name: Publish to crates.io
-        if: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -z "${CARGO_REGISTRY_TOKEN:-}" ]]; then
+            echo "Skipping crates.io publish (CARGO_REGISTRY_TOKEN is not set)."
+            exit 0
+          fi
           cargo publish -p dup-code-check-core
           cargo publish -p dup-code-check
 
       - name: Publish to npm
-        if: ${{ secrets.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Skipping npm publish (NPM_TOKEN is not set)."
+            exit 0
+          fi
+          npm publish --access public

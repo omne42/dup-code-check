@@ -29,6 +29,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Docs workflow: skip GitHub Pages deployment when the repository is private.
 - Docs workflow: auto-enable GitHub Pages (Actions) when deploying docs.
 - Release workflow: publish to crates.io on tag releases (and skip when token is missing).
+- Release workflow: avoid `secrets.*` in `if:` to prevent workflow validation issues.
 - Repo links: update GitHub owner / Pages URLs (`omne42`).
 
 ### Fixed

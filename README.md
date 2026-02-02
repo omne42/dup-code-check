@@ -5,7 +5,7 @@
 `dup-code-check` is a toolbox for detecting duplicates/similarity in codebases. It ships as a **Rust CLI binary**; Node.js is used as an installation option via npm.
 
 - CI: `.github/workflows/ci.yml`
-- Docs (GitBook-style): `docs/README.md` (English) / `docs/README.zh-CN.md` (中文)
+- Docs (VitePress): `docs/index.md` (English) / `docs/index.zh-CN.md` (中文)
 
 ## What it does (MVP)
 

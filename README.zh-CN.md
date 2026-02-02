@@ -6,10 +6,10 @@
 
 ## 文档
 
-更完整的文档（GitBook 风格目录）在：
+更完整的文档（VitePress）在：
 
-- `docs/README.zh-CN.md`
-- `docs/SUMMARY.md`（含中英导航）
+- `docs/index.zh-CN.md`（中文）
+- `docs/index.md`（English）
 
 ## 当前功能（MVP）
 

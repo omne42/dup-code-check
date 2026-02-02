@@ -36,7 +36,8 @@ dup-code-check --json --report .
 
 ## 文档导航
 
-GitBook 目录见 `docs/SUMMARY.md`（含中英导航）。
+- 首页：`docs/index.md` / `docs/index.zh-CN.md`
+- 介绍：`docs/introduction.md` / `docs/introduction.zh-CN.md`
 
 ## 本地预览文档
 
@@ -46,3 +47,7 @@ GitBook 目录见 `docs/SUMMARY.md`（含中英导航）。
 npm install --ignore-scripts
 npm run docs:serve
 ```
+
+## 面向 LLM 的 `llms.txt`
+
+在执行 `docs:build` / `docs:serve` 时，会生成 `/llms.txt`（纯文本的文档合集）。

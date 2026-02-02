@@ -41,14 +41,15 @@
     "prepack": "node scripts/prepack.mjs",
     "check": "node scripts/smoke.mjs",
     "test": "node scripts/smoke.mjs",
-    "docs:build": "honkit build docs _book",
-    "docs:serve": "honkit serve docs"
+    "docs:llms": "node scripts/generate-llms.mjs",
+    "docs:build": "npm run -s docs:llms && vitepress build docs",
+    "docs:serve": "npm run -s docs:llms && vitepress dev docs"
   },
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
-    "honkit": "^6.0.0"
+    "vitepress": "^1.6.3"
   },
   "engines": {
     "node": ">=22",

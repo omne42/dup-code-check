@@ -31,7 +31,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI integer options now reject non-integers (e.g. `--max-file-size 1.5`).
 - `--report` memory usage reduced by avoiding large intermediate clones.
 - Invalid roots now fail early instead of producing empty results.
-- Docs: add GitBook-style documentation under `docs/`.
+- Docs: migrate docs site from Honkit to VitePress (with `llms.txt`).
 - Docs workflow: skip GitHub Pages deployment when the repository is private.
 - Docs workflow: auto-enable GitHub Pages (Actions) when deploying docs.
 - Release workflow: publish to crates.io on tag releases (and skip when token is missing).

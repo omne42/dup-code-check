@@ -31,7 +31,7 @@
 - CLI 整数参数拒绝非整数（例如 `--max-file-size 1.5`）。
 - `--report` 通过避免大对象中间 clone 降低内存占用。
 - 无效 root 现在会尽早失败，而不是输出空结果。
-- 文档：在 `docs/` 下增加 GitBook 风格文档。
+- 文档：从 Honkit 迁移到 VitePress（并提供 `llms.txt`）。
 - 文档 workflow：当仓库为私有时跳过 GitHub Pages 部署。
 - 文档 workflow：部署文档时自动启用 GitHub Pages（GitHub Actions）。
 - 发布 workflow：在 tag 发布时执行 crates.io 发布（未配置 token 时自动跳过）。

@@ -28,7 +28,8 @@ dup-code-check --json --report .
 
 ## Navigation
 
-GitBook-style TOC: `docs/SUMMARY.md` (English + 中文).
+- Home: `docs/index.md` / `docs/index.zh-CN.md`
+- Intro: `docs/introduction.md` / `docs/introduction.zh-CN.md`
 
 ## Build docs locally
 
@@ -38,3 +39,7 @@ To preview docs locally (without requiring Rust), install dependencies without r
 npm install --ignore-scripts
 npm run docs:serve
 ```
+
+## LLM bundle (`llms.txt`)
+
+This docs site generates `llms.txt` at `/llms.txt` during `docs:build` / `docs:serve`.

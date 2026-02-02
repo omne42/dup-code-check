@@ -22,6 +22,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Rename project: `dup-check` → `dup-code-check`.
 - Dev: rename the released-changelog edit override env var to `DUP_CODE_CHECK_ALLOW_CHANGELOG_RELEASE_EDIT`.
 - Rust: refactor core/report and CLI into smaller modules (no behavior change).
+- Rust: de-duplicate scan file reading/skip logic via a shared helper.
 - Default scan skips files larger than 10 MiB (`DEFAULT_MAX_FILE_SIZE_BYTES`).
 - Fallback scanner now respects nested `.gitignore` rules via the `ignore` crate.
 - CLI integer options now reject non-integers (e.g. `--max-file-size 1.5`).
@@ -53,3 +54,5 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI now supports `--no-gitignore` to disable `.gitignore` filtering.
 - When path prefix stripping fails, output uses `<external:...>/name` to keep paths distinguishable without leaking absolute paths.
 - Ignore unsafe relative paths from `git ls-files` (absolute paths, `..`, etc.) instead of attempting to read them.
+- Scan budgets: keep the Git fast path enabled when `maxFiles` / `maxTotalBytes` are set.
+- Docs: clarify `maxFiles` behavior and `skippedBudgetMaxFiles` meaning.

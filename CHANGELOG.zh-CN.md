@@ -22,6 +22,7 @@
 - 项目重命名：`dup-check` → `dup-code-check`。
 - 开发：released changelog 编辑的 override 环境变量重命名为 `DUP_CODE_CHECK_ALLOW_CHANGELOG_RELEASE_EDIT`。
 - Rust：重构 core/report 与 CLI，拆分为更小的模块（无行为变化）。
+- Rust：通过共享 helper 去重“扫描读取/跳过”的重复逻辑。
 - 默认跳过大于 10 MiB 的文件（`DEFAULT_MAX_FILE_SIZE_BYTES`）。
 - fallback scanner 现在通过 `ignore` crate 尊重嵌套 `.gitignore` 规则。
 - CLI 整数参数拒绝非整数（例如 `--max-file-size 1.5`）。
@@ -53,3 +54,5 @@
 - CLI 支持 `--no-gitignore` 关闭 `.gitignore` 过滤。
 - 当前缀剥离失败时，输出使用 `<external:...>/name`，以避免泄漏绝对路径同时保持可区分性。
 - `git ls-files` 输出中若出现不安全的相对路径（绝对路径、`..` 等），将跳过而不是尝试读取。
+- 扫描预算：启用 `maxFiles` / `maxTotalBytes` 时仍保持 Git 快路径（加速 CI 扫描）。
+- 文档：澄清 `maxFiles` 行为与 `skippedBudgetMaxFiles` 字段语义。

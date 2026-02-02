@@ -77,7 +77,7 @@ interface DuplicateSpanGroup {
 - `skippedTooLarge`：超过 `maxFileSize`
 - `skippedBinary`：包含 `\\0` 字节的二进制文件
 - `skippedWalkErrors`：遍历错误（walker errors）
-- `skippedBudgetMaxFiles`：因 `maxFiles` 提前停止导致未扫描的文件数
+- `skippedBudgetMaxFiles`：因 `maxFiles` 预算跳过的文件数（达到上限后不再读取后续文件）
 - `skippedBudgetMaxTotalBytes`：因 `maxTotalBytes` 预算跳过的文件数（当某文件会使累计扫描字节数超出预算时被跳过）
 
 ### 文本模式

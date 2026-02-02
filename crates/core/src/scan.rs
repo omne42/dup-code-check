@@ -61,8 +61,6 @@ where
 {
     if options.respect_gitignore
         && !options.follow_symlinks
-        && options.max_files.is_none()
-        && options.max_total_bytes.is_none()
         && let Some(files) = try_collect_repo_files_via_git(repo, options, stats)?
     {
         for file in files {
@@ -443,4 +441,75 @@ pub(crate) fn resolve_read_path(
     }
 
     Ok(Some(resolved))
+}
+
+pub(crate) fn read_repo_file_bytes(
+    repo_file: &RepoFile,
+    canonical_root: Option<&Path>,
+    options: &ScanOptions,
+    stats: &mut ScanStats,
+) -> io::Result<Option<Vec<u8>>> {
+    if let Some(max_files) = options.max_files
+        && stats.scanned_files as usize >= max_files
+    {
+        stats.skipped_budget_max_files = stats.skipped_budget_max_files.saturating_add(1);
+        return Ok(None);
+    }
+
+    let Some(read_path) =
+        resolve_read_path(repo_file, canonical_root, options.follow_symlinks, stats)?
+    else {
+        return Ok(None);
+    };
+
+    let metadata = match fs::metadata(&read_path) {
+        Ok(m) => m,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+            return Ok(None);
+        }
+        Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+            stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+            return Ok(None);
+        }
+        Err(err) => return Err(err),
+    };
+
+    if let Some(max_file_size) = options.max_file_size
+        && metadata.len() > max_file_size
+    {
+        stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
+        return Ok(None);
+    }
+
+    if let Some(max_total_bytes) = options.max_total_bytes
+        && stats.scanned_bytes.saturating_add(metadata.len()) > max_total_bytes
+    {
+        stats.skipped_budget_max_total_bytes =
+            stats.skipped_budget_max_total_bytes.saturating_add(1);
+        return Ok(None);
+    }
+
+    let bytes = match fs::read(&read_path) {
+        Ok(b) => b,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+            return Ok(None);
+        }
+        Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+            stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+            return Ok(None);
+        }
+        Err(err) => return Err(err),
+    };
+
+    if bytes.contains(&0) {
+        stats.skipped_binary = stats.skipped_binary.saturating_add(1);
+        return Ok(None);
+    }
+
+    stats.scanned_files = stats.scanned_files.saturating_add(1);
+    stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
+
+    Ok(Some(bytes))
 }

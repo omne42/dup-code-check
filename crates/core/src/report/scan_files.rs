@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use crate::scan::{Repo, make_rel_path, repo_label, resolve_read_path, visit_repo_files};
+use crate::scan::{Repo, make_rel_path, read_repo_file_bytes, repo_label, visit_repo_files};
 use crate::tokenize::{parse_brace_blocks, tokenize_for_dup_detection};
 use crate::types::{DuplicateFile, DuplicateGroup, ScanOptions, ScanStats};
 use crate::util::{
@@ -58,66 +57,10 @@ pub(super) fn scan_text_files_for_report(
 
         if let std::ops::ControlFlow::Break(()) =
             visit_repo_files(repo, options, stats, |stats, repo_file| {
-                if let Some(max_files) = options.max_files
-                    && stats.scanned_files as usize >= max_files
-                {
-                    stats.skipped_budget_max_files =
-                        stats.skipped_budget_max_files.saturating_add(1);
-                    return Ok(std::ops::ControlFlow::Continue(()));
-                }
-
-                let Some(read_path) =
-                    resolve_read_path(&repo_file, canonical_root, options.follow_symlinks, stats)?
+                let Some(bytes) = read_repo_file_bytes(&repo_file, canonical_root, options, stats)?
                 else {
                     return Ok(std::ops::ControlFlow::Continue(()));
                 };
-
-                let metadata = match fs::metadata(&read_path) {
-                    Ok(m) => m,
-                    Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                        stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
-                        return Ok(std::ops::ControlFlow::Continue(()));
-                    }
-                    Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
-                        stats.skipped_permission_denied =
-                            stats.skipped_permission_denied.saturating_add(1);
-                        return Ok(std::ops::ControlFlow::Continue(()));
-                    }
-                    Err(err) => return Err(err),
-                };
-                if let Some(max_file_size) = options.max_file_size
-                    && metadata.len() > max_file_size
-                {
-                    stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
-                    return Ok(std::ops::ControlFlow::Continue(()));
-                }
-                if let Some(max_total_bytes) = options.max_total_bytes
-                    && stats.scanned_bytes.saturating_add(metadata.len()) > max_total_bytes
-                {
-                    stats.skipped_budget_max_total_bytes =
-                        stats.skipped_budget_max_total_bytes.saturating_add(1);
-                    return Ok(std::ops::ControlFlow::Continue(()));
-                }
-
-                let bytes = match fs::read(&read_path) {
-                    Ok(b) => b,
-                    Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                        stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
-                        return Ok(std::ops::ControlFlow::Continue(()));
-                    }
-                    Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
-                        stats.skipped_permission_denied =
-                            stats.skipped_permission_denied.saturating_add(1);
-                        return Ok(std::ops::ControlFlow::Continue(()));
-                    }
-                    Err(err) => return Err(err),
-                };
-                if bytes.contains(&0) {
-                    stats.skipped_binary = stats.skipped_binary.saturating_add(1);
-                    return Ok(std::ops::ControlFlow::Continue(()));
-                }
-                stats.scanned_files = stats.scanned_files.saturating_add(1);
-                stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
 
                 let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
 

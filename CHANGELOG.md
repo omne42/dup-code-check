@@ -20,6 +20,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 ### Changed
 - Rename project: `dup-check` → `dup-code-check`.
 - Dev: rename the released-changelog edit override env var to `DUP_CODE_CHECK_ALLOW_CHANGELOG_RELEASE_EDIT`.
+- Rust: refactor core/report and CLI into smaller modules (no behavior change).
 - Default scan skips files larger than 10 MiB (`DEFAULT_MAX_FILE_SIZE_BYTES`).
 - Fallback scanner now respects nested `.gitignore` rules via the `ignore` crate.
 - CLI integer options now reject non-integers (e.g. `--max-file-size 1.5`).

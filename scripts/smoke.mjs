@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const cliName = process.platform === 'win32' ? 'dup-code-check.exe' : 'dup-code-check';
-const cliPath = path.join(repoRoot, 'bin', cliName);
+const wrapperPath = path.join(repoRoot, 'bin', 'dup-code-check.mjs');
+const binaryName = process.platform === 'win32' ? 'dup-code-check.exe' : 'dup-code-check';
+const binaryPath = path.join(repoRoot, 'bin', binaryName);
 
 function newestMtimeMs(p) {
   try {
@@ -39,10 +40,10 @@ function newestSourceMtimeMs() {
 }
 
 function buildIfNeeded() {
-  if (fs.existsSync(cliPath)) {
-    const probe = spawnSync(cliPath, ['--help'], { encoding: 'utf8' });
+  if (fs.existsSync(binaryPath)) {
+    const probe = spawnSync(process.execPath, [wrapperPath, '--help'], { encoding: 'utf8' });
     if (probe.status === 0) {
-      const binMtime = newestMtimeMs(cliPath);
+      const binMtime = newestMtimeMs(binaryPath);
       if (newestSourceMtimeMs() <= binMtime) return;
     }
   }
@@ -56,14 +57,14 @@ function buildIfNeeded() {
     );
     process.exit(1);
   }
-  if (!fs.existsSync(cliPath)) {
-    process.stderr.write(`Build reported success but ${cliPath} was not found\n`);
+  if (!fs.existsSync(binaryPath)) {
+    process.stderr.write(`Build reported success but ${binaryPath} was not found\n`);
     process.exit(1);
   }
 }
 
 function runCli(args) {
-  return spawnSync(cliPath, args, { encoding: 'utf8' });
+  return spawnSync(process.execPath, [wrapperPath, ...args], { encoding: 'utf8' });
 }
 
 function runCliJson(args) {
@@ -136,7 +137,7 @@ if (
   !limited ||
   typeof limited.scanStats?.scannedFiles !== 'number' ||
   limited.scanStats.scannedFiles !== 1 ||
-  limited.scanStats.skippedBudgetMaxFiles !== 3
+  limited.scanStats.skippedBudgetMaxFiles !== 1
 ) {
   process.stderr.write(
     `Unexpected result (maxFiles): ${JSON.stringify(limited, null, 2)}\n`

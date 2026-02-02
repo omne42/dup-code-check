@@ -15,6 +15,8 @@
 - 扫描预算：`maxFiles` / `maxTotalBytes`（CLI：`--max-files` / `--max-total-bytes`）。
 - 扫描统计 + 严格模式（`--stats`, `--strict`）。
 - CLI：`--gitignore` 显式启用 `.gitignore` 过滤（默认开启；主要用于脚本）。
+- npm：`bin/dup-code-check.mjs` 启动脚本（通过 npm 跨平台运行 `dup-code-check`）。
+- Core：支持通过 `DUP_CODE_CHECK_GIT_BIN` 覆盖 `git` 可执行文件路径。
 - GitHub Actions：CI（Linux/macOS/Windows）、文档（GitHub Pages）与发布（GitHub Release + npm publish）。
 - 文档：中英双语（EN/ZH），并提供互相跳转链接。
 
@@ -37,7 +39,9 @@
 - 发布 workflow：对 CLI 的 `cargo publish` 增加重试，以容忍 crates.io index 的同步延迟。
 - 仓库链接：更新 GitHub owner / Pages 地址（`omne42`）。
 - 元数据：license 仅使用 MIT（不再是双协议）。
-- 扫描流程：改为流式遍历文件，降低峰值内存（避免预先收集完整文件列表）。
+- 扫描预算：`maxFiles` 达到上限后会停止扫描（`skippedBudgetMaxFiles` 会变为非 0）。
+- Node 安装：`postinstall` 使用 `cargo build --locked` 构建 Rust 二进制。
+- 扫描流程：当设置 `maxFiles` 时，对 `git ls-files` 做流式遍历（提前停止，避免收集完整列表）。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
@@ -56,4 +60,5 @@
 - 当前缀剥离失败时，输出使用 `<external:...>/name`，以避免泄漏绝对路径同时保持可区分性。
 - `git ls-files` 输出中若出现不安全的相对路径（绝对路径、`..` 等），将跳过而不是尝试读取。
 - 扫描预算：启用 `maxFiles` / `maxTotalBytes` 时仍保持 Git 快路径（加速 CI 扫描）。
-- 文档：澄清 `maxFiles` 行为与 `skippedBudgetMaxFiles` 字段语义。
+- npm 安装：通过 Node wrapper 启动平台二进制，使 Windows 上的 `dup-code-check` 可用。
+- 文档：补充 `maxFiles` 停止行为与 `skippedBudgetMaxFiles` 字段语义。

@@ -42,6 +42,13 @@ npx dup-code-check --help
 ```
 
 > Note: this package builds the Rust binary during `postinstall`, so Rust is required.
+>
+> To avoid running install scripts, use `npm_config_ignore_scripts=true` and build manually:
+>
+> ```bash
+> npm_config_ignore_scripts=true npm i -D dup-code-check
+> npm run build
+> ```
 
 ## Quick examples
 

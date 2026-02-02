@@ -49,6 +49,13 @@ dup-code-check --help
 - Node.js `>=22`（参考 Codex 项目）
 - Rust toolchain `1.92.0`（已通过 `rust-toolchain.toml` 固定，参考 Codex 项目）
 
+如果你希望避免在安装时执行脚本，可以用 `npm_config_ignore_scripts=true` 安装后手动构建：
+
+```bash
+npm_config_ignore_scripts=true npm i -D dup-code-check
+npm run build
+```
+
 ## 本地开发
 
 ### 1) 构建二进制

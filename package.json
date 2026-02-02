@@ -20,7 +20,7 @@
   },
   "homepage": "https://omne42.github.io/dup-code-check/",
   "bin": {
-    "dup-code-check": "bin/dup-code-check"
+    "dup-code-check": "bin/dup-code-check.mjs"
   },
   "files": [
     "bin/",

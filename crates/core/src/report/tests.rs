@@ -363,7 +363,7 @@ c",
             path: secret_dir.clone(),
         };
 
-        // `maxFiles`: once limit is hit, remaining candidates are skipped.
+        // `maxFiles`: stop scanning once the file-count budget is hit.
         let options_files = ScanOptions {
             max_files: Some(1),
             ..ScanOptions::default()

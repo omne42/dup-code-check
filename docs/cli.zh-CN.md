@@ -83,7 +83,7 @@ dup-code-check --report [root ...]
 
 ### 扫描预算（Budget）
 
-- `--max-files <n>`：最多读取并处理 `n` 个文件（达到上限后不再读取后续文件；计入 `skippedBudgetMaxFiles`）
+- `--max-files <n>`：读取 `n` 个文件后停止扫描（`scanStats.skippedBudgetMaxFiles > 0` 表示触发了预算）
 - `--max-total-bytes <n>`：跳过会导致“累计扫描字节数”超过 `n` 的文件
 - `--max-file-size <n>`：跳过大于 `n` 字节的文件（默认 `10485760`，即 10 MiB）
 

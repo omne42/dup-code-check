@@ -7,8 +7,13 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 
+if (process.env.DUP_CODE_CHECK_SKIP_BUILD === '1') {
+  process.stdout.write('Skipping Rust binary build (DUP_CODE_CHECK_SKIP_BUILD=1)\n');
+  process.exit(0);
+}
+
 try {
-  execFileSync('cargo', ['build', '--release', '-p', 'dup-code-check'], {
+  execFileSync('cargo', ['build', '--release', '--locked', '-p', 'dup-code-check'], {
     cwd: repoRoot,
     stdio: 'inherit'
   });

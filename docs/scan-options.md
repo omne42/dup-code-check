@@ -59,7 +59,7 @@ Budgets help control scan cost, especially in CI.
 
 ### `maxFiles` / `--max-files`
 
-Read/process at most `n` files. Once the limit is reached, further candidate files are **skipped** (not read) and counted in `scanStats.skippedBudgetMaxFiles`.
+Stop scanning after reading/processing `n` files. When the limit is reached, the scan ends early and `scanStats.skippedBudgetMaxFiles` becomes non-zero.
 
 > With `--strict`, hitting `maxFiles` is treated as an “incomplete scan” and will fail.
 
@@ -67,7 +67,7 @@ Read/process at most `n` files. Once the limit is reached, further candidate fil
 
 Total bytes budget: if reading a file would make `scannedBytes + fileSize > maxTotalBytes`, that file is skipped and counted in `scanStats.skippedBudgetMaxTotalBytes`.
 
-> Unlike `maxFiles` (which stops reading further files once the limit is reached), `maxTotalBytes` continues scanning but may skip many files.
+> Unlike `maxFiles` (which stops scanning once the limit is reached), `maxTotalBytes` continues scanning but may skip many files.
 
 ### `maxFileSize` / `--max-file-size`
 

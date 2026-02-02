@@ -15,6 +15,8 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan budgets: `maxFiles` / `maxTotalBytes` (CLI: `--max-files` / `--max-total-bytes`).
 - Scan stats + strict mode in CLI (`--stats`, `--strict`).
 - CLI: `--gitignore` to explicitly enable `.gitignore` filtering (default on; mainly useful in scripts).
+- npm: `bin/dup-code-check.mjs` launcher script (enables cross-platform `dup-code-check` via npm).
+- Core: allow overriding the `git` executable via `DUP_CODE_CHECK_GIT_BIN`.
 - GitHub Actions: CI (Linux/macOS/Windows), docs (GitHub Pages), and release (GitHub Release + npm publish).
 - Docs: bilingual (EN/ZH) with cross-links.
 
@@ -37,7 +39,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Release workflow: retry `cargo publish` for the CLI to tolerate crates.io index propagation delay.
 - Repo links: update GitHub owner / Pages URLs (`omne42`).
 - Metadata: use MIT-only license identifier.
-- Scan pipeline: stream file enumeration to reduce peak memory (avoid collecting full file lists up front).
+- Scan budgets: `maxFiles` now stops scanning once the file-count budget is hit (`skippedBudgetMaxFiles` becomes non-zero).
+- Node installer: `postinstall` builds Rust binary with `cargo build --locked`.
+- Scan pipeline: stream `git ls-files` enumeration when `maxFiles` is set (stop early without collecting full lists).
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
@@ -56,4 +60,5 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - When path prefix stripping fails, output uses `<external:...>/name` to keep paths distinguishable without leaking absolute paths.
 - Ignore unsafe relative paths from `git ls-files` (absolute paths, `..`, etc.) instead of attempting to read them.
 - Scan budgets: keep the Git fast path enabled when `maxFiles` / `maxTotalBytes` are set.
-- Docs: clarify `maxFiles` behavior and `skippedBudgetMaxFiles` meaning.
+- npm install: make the `dup-code-check` bin work on Windows by launching the platform binary from the Node wrapper.
+- Docs: document `maxFiles` stop behavior and `skippedBudgetMaxFiles` semantics.

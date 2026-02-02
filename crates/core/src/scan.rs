@@ -1,6 +1,9 @@
 use std::collections::HashSet;
+use std::ffi::OsString;
 use std::fs;
 use std::io;
+use std::io::BufRead;
+use std::io::BufReader;
 use std::io::Write;
 use std::ops::ControlFlow;
 use std::path::{Component, Path, PathBuf};
@@ -12,6 +15,21 @@ use ignore::WalkBuilder;
 
 use crate::types::{ScanOptions, ScanStats};
 use crate::util::fnv1a64;
+
+fn git_exe() -> OsString {
+    std::env::var_os("DUP_CODE_CHECK_GIT_BIN").unwrap_or_else(|| OsString::from("git"))
+}
+
+fn should_stop_due_to_max_files(options: &ScanOptions, stats: &mut ScanStats) -> bool {
+    let Some(max_files) = options.max_files else {
+        return false;
+    };
+    if stats.scanned_files < max_files as u64 {
+        return false;
+    }
+    stats.skipped_budget_max_files = stats.skipped_budget_max_files.saturating_add(1);
+    true
+}
 
 pub(crate) fn validate_roots(roots: &[PathBuf]) -> io::Result<()> {
     for root in roots {
@@ -59,18 +77,16 @@ pub(crate) fn visit_repo_files<F>(
 where
     F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
 {
+    if options.max_files == Some(0) {
+        stats.skipped_budget_max_files = stats.skipped_budget_max_files.saturating_add(1);
+        return Ok(ControlFlow::Break(()));
+    }
+
     if options.respect_gitignore
         && !options.follow_symlinks
-        && let Some(files) = try_collect_repo_files_via_git(repo, options, stats)?
+        && let Some(flow) = try_visit_repo_files_via_git(repo, options, stats, &mut on_file)?
     {
-        for file in files {
-            stats.candidate_files = stats.candidate_files.saturating_add(1);
-            match on_file(stats, file)? {
-                ControlFlow::Continue(()) => {}
-                ControlFlow::Break(()) => return Ok(ControlFlow::Break(())),
-            }
-        }
-        return Ok(ControlFlow::Continue(()));
+        return Ok(flow);
     }
 
     let ignore_dirs = options.ignore_dirs.clone();
@@ -155,6 +171,21 @@ where
         })
         .build();
 
+    let flush_filter_skips = |stats: &mut ScanStats| {
+        stats.skipped_outside_root = stats
+            .skipped_outside_root
+            .saturating_add(skipped_outside_root.load(Ordering::Relaxed));
+        stats.skipped_not_found = stats
+            .skipped_not_found
+            .saturating_add(skipped_not_found.load(Ordering::Relaxed));
+        stats.skipped_permission_denied = stats
+            .skipped_permission_denied
+            .saturating_add(skipped_permission_denied.load(Ordering::Relaxed));
+        stats.skipped_walk_errors = stats
+            .skipped_walk_errors
+            .saturating_add(skipped_walk_errors.load(Ordering::Relaxed));
+    };
+
     for result in walker {
         let entry = match result {
             Ok(e) => e,
@@ -199,49 +230,40 @@ where
         match on_file(stats, file)? {
             ControlFlow::Continue(()) => {}
             ControlFlow::Break(()) => {
-                stats.skipped_outside_root = stats
-                    .skipped_outside_root
-                    .saturating_add(skipped_outside_root.load(Ordering::Relaxed));
-                stats.skipped_not_found = stats
-                    .skipped_not_found
-                    .saturating_add(skipped_not_found.load(Ordering::Relaxed));
-                stats.skipped_permission_denied = stats
-                    .skipped_permission_denied
-                    .saturating_add(skipped_permission_denied.load(Ordering::Relaxed));
-                stats.skipped_walk_errors = stats
-                    .skipped_walk_errors
-                    .saturating_add(skipped_walk_errors.load(Ordering::Relaxed));
+                flush_filter_skips(stats);
                 return Ok(ControlFlow::Break(()));
             }
         }
+
+        if should_stop_due_to_max_files(options, stats) {
+            flush_filter_skips(stats);
+            return Ok(ControlFlow::Break(()));
+        }
     }
 
-    stats.skipped_outside_root = stats
-        .skipped_outside_root
-        .saturating_add(skipped_outside_root.load(Ordering::Relaxed));
-    stats.skipped_not_found = stats
-        .skipped_not_found
-        .saturating_add(skipped_not_found.load(Ordering::Relaxed));
-    stats.skipped_permission_denied = stats
-        .skipped_permission_denied
-        .saturating_add(skipped_permission_denied.load(Ordering::Relaxed));
-    stats.skipped_walk_errors = stats
-        .skipped_walk_errors
-        .saturating_add(skipped_walk_errors.load(Ordering::Relaxed));
+    flush_filter_skips(stats);
 
     Ok(ControlFlow::Continue(()))
 }
 
-fn try_collect_repo_files_via_git(
+fn try_visit_repo_files_via_git<F>(
     repo: &Repo,
     options: &ScanOptions,
     stats: &mut ScanStats,
-) -> io::Result<Option<Vec<RepoFile>>> {
+    on_file: &mut F,
+) -> io::Result<Option<ControlFlow<()>>>
+where
+    F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
+{
     if !repo.root.join(".git").exists() {
         return Ok(None);
     }
 
-    let output = match Command::new("git")
+    if options.max_files.is_some() {
+        return visit_repo_files_via_git_streaming(repo, options, stats, on_file);
+    }
+
+    let output = match Command::new(git_exe())
         .arg("-C")
         .arg(&repo.root)
         .args([
@@ -251,6 +273,7 @@ fn try_collect_repo_files_via_git(
             "--others",
             "--exclude-standard",
         ])
+        .stderr(Stdio::null())
         .output()
     {
         Ok(out) => out,
@@ -267,11 +290,15 @@ fn try_collect_repo_files_via_git(
         if part.is_empty() {
             continue;
         }
-        rel_paths.push(String::from_utf8_lossy(part).to_string());
+        let Ok(path) = std::str::from_utf8(part) else {
+            // Fall back to the walker on repositories containing non-UTF-8 paths.
+            return Ok(None);
+        };
+        rel_paths.push(path.to_string());
     }
 
     if rel_paths.is_empty() {
-        return Ok(Some(Vec::new()));
+        return Ok(Some(ControlFlow::Continue(())));
     }
 
     let ignored = match git_check_ignore(&repo.root, &rel_paths) {
@@ -279,13 +306,10 @@ fn try_collect_repo_files_via_git(
         Err(_) => return Ok(None),
     };
 
-    let mut out = Vec::new();
     for rel in rel_paths {
         if ignored.contains(&rel) {
             continue;
         }
-
-        let rel = rel.replace('\\', "/");
         if !is_safe_relative_path(&rel) {
             stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
             continue;
@@ -318,15 +342,25 @@ fn try_collect_repo_files_via_git(
             continue;
         }
 
-        out.push(RepoFile {
+        stats.candidate_files = stats.candidate_files.saturating_add(1);
+        let file = RepoFile {
             repo_id: repo.id,
             repo_label: repo.label.clone(),
             root: repo.root.clone(),
             abs_path,
-        });
+        };
+
+        match on_file(stats, file)? {
+            ControlFlow::Continue(()) => {}
+            ControlFlow::Break(()) => return Ok(Some(ControlFlow::Break(()))),
+        }
+
+        if should_stop_due_to_max_files(options, stats) {
+            return Ok(Some(ControlFlow::Break(())));
+        }
     }
 
-    Ok(Some(out))
+    Ok(Some(ControlFlow::Continue(())))
 }
 
 fn is_safe_relative_path(raw: &str) -> bool {
@@ -350,7 +384,7 @@ fn is_safe_relative_path(raw: &str) -> bool {
 }
 
 fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<String>> {
-    let mut child = Command::new("git")
+    let mut child = Command::new(git_exe())
         .arg("-C")
         .arg(root)
         .args(["check-ignore", "-z", "--stdin"])
@@ -387,6 +421,213 @@ fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<Str
         out.insert(String::from_utf8_lossy(part).to_string());
     }
     Ok(out)
+}
+
+fn visit_repo_files_via_git_streaming<F>(
+    repo: &Repo,
+    options: &ScanOptions,
+    stats: &mut ScanStats,
+    on_file: &mut F,
+) -> io::Result<Option<ControlFlow<()>>>
+where
+    F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
+{
+    let mut child = match Command::new(git_exe())
+        .arg("-C")
+        .arg(&repo.root)
+        .args([
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Ok(None),
+    };
+
+    let Some(stdout) = child.stdout.take() else {
+        return Ok(None);
+    };
+
+    // With `maxFiles`, avoid collecting the entire file list. We read paths in small batches,
+    // run a batched `git check-ignore`, and stop as soon as the scan budget is hit.
+    const BATCH_SIZE: usize = 256;
+    let mut batch: Vec<String> = Vec::with_capacity(BATCH_SIZE);
+    let mut reader = BufReader::new(stdout);
+
+    let mut started = false;
+
+    loop {
+        let mut bytes: Vec<u8> = Vec::new();
+        let n = reader.read_until(0, &mut bytes)?;
+        if n == 0 {
+            break;
+        }
+        if bytes.last() == Some(&0) {
+            bytes.pop();
+        }
+        if bytes.is_empty() {
+            continue;
+        }
+
+        let rel = match std::str::from_utf8(&bytes) {
+            Ok(s) => s.to_string(),
+            Err(_) => {
+                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+                continue;
+            }
+        };
+
+        batch.push(rel);
+        if batch.len() < BATCH_SIZE {
+            continue;
+        }
+
+        let flow = match visit_repo_files_via_git_batch(
+            repo,
+            options,
+            stats,
+            on_file,
+            &batch,
+            &mut started,
+        ) {
+            Ok(flow) => flow,
+            Err(err) => {
+                if !started {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Ok(None);
+                }
+                return Err(err);
+            }
+        };
+        batch.clear();
+        match flow {
+            ControlFlow::Continue(()) => {}
+            ControlFlow::Break(()) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Ok(Some(ControlFlow::Break(())));
+            }
+        }
+    }
+
+    if !batch.is_empty() {
+        let flow = match visit_repo_files_via_git_batch(
+            repo,
+            options,
+            stats,
+            on_file,
+            &batch,
+            &mut started,
+        ) {
+            Ok(flow) => flow,
+            Err(err) => {
+                if !started {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Ok(None);
+                }
+                return Err(err);
+            }
+        };
+        match flow {
+            ControlFlow::Continue(()) => {}
+            ControlFlow::Break(()) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Ok(Some(ControlFlow::Break(())));
+            }
+        }
+    }
+
+    let status = child.wait()?;
+    if !status.success() {
+        return Ok(None);
+    }
+
+    Ok(Some(ControlFlow::Continue(())))
+}
+
+fn visit_repo_files_via_git_batch<F>(
+    repo: &Repo,
+    options: &ScanOptions,
+    stats: &mut ScanStats,
+    on_file: &mut F,
+    rel_paths: &[String],
+    started: &mut bool,
+) -> io::Result<ControlFlow<()>>
+where
+    F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
+{
+    if rel_paths.is_empty() {
+        return Ok(ControlFlow::Continue(()));
+    }
+
+    let ignored = git_check_ignore(&repo.root, rel_paths)?;
+
+    for rel in rel_paths {
+        if ignored.contains(rel) {
+            continue;
+        }
+        if !is_safe_relative_path(rel) {
+            stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
+            continue;
+        }
+
+        let mut segs = rel.split('/');
+        segs.next_back();
+        if segs.any(|seg| options.ignore_dirs.contains(seg)) {
+            continue;
+        }
+
+        let abs_path = repo.root.join(rel);
+        let meta = match fs::symlink_metadata(&abs_path) {
+            Ok(m) => m,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                continue;
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                continue;
+            }
+            Err(err) => return Err(err),
+        };
+
+        if meta.file_type().is_symlink() && !options.follow_symlinks {
+            continue;
+        }
+        if !meta.is_file() {
+            continue;
+        }
+
+        *started = true;
+        stats.candidate_files = stats.candidate_files.saturating_add(1);
+        let file = RepoFile {
+            repo_id: repo.id,
+            repo_label: repo.label.clone(),
+            root: repo.root.clone(),
+            abs_path,
+        };
+
+        match on_file(stats, file)? {
+            ControlFlow::Continue(()) => {}
+            ControlFlow::Break(()) => return Ok(ControlFlow::Break(())),
+        }
+
+        if should_stop_due_to_max_files(options, stats) {
+            return Ok(ControlFlow::Break(()));
+        }
+    }
+
+    Ok(ControlFlow::Continue(()))
 }
 
 pub(crate) fn make_rel_path(root: &Path, abs_path: &Path) -> String {
@@ -450,9 +691,8 @@ pub(crate) fn read_repo_file_bytes(
     stats: &mut ScanStats,
 ) -> io::Result<Option<Vec<u8>>> {
     if let Some(max_files) = options.max_files
-        && stats.scanned_files as usize >= max_files
+        && stats.scanned_files >= max_files as u64
     {
-        stats.skipped_budget_max_files = stats.skipped_budget_max_files.saturating_add(1);
         return Ok(None);
     }
 

@@ -59,7 +59,7 @@ dup-code-check --follow-symlinks .
 
 ### `maxFiles` / `--max-files`
 
-最多读取并处理 `n` 个文件；达到上限后，后续候选文件会被**跳过**（不再读取），并在 `scanStats.skippedBudgetMaxFiles` 中体现。
+读取并处理 `n` 个文件后停止扫描；达到上限后会提前结束扫描，`scanStats.skippedBudgetMaxFiles` 会变为非 0。
 
 > `--strict` 模式下，触发 `maxFiles` 会被视为“扫描不完整”，从而退出非 0。
 
@@ -67,7 +67,7 @@ dup-code-check --follow-symlinks .
 
 累计扫描字节数预算：当某个文件会导致 `scannedBytes + fileSize > maxTotalBytes` 时，该文件会被跳过，并在 `scanStats.skippedBudgetMaxTotalBytes` 中体现。
 
-> 这与 `maxFiles` 不同：`maxFiles` 达到上限后会停止继续读取文件；`maxTotalBytes` 会继续扫描，但可能跳过很多文件。
+> 这与 `maxFiles` 不同：`maxFiles` 达到上限后会停止扫描；`maxTotalBytes` 会继续扫描，但可能跳过很多文件。
 
 ### `maxFileSize` / `--max-file-size`
 

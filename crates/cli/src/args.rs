@@ -18,6 +18,7 @@ const HELP_TEXT_EN: &str = concat!(
     "  --strict                Exit non-zero if scan was incomplete\n",
     "  --cross-repo-only       Only report groups spanning >= 2 roots\n",
     "  --no-gitignore          Do not respect .gitignore rules\n",
+    "  --gitignore             Respect .gitignore rules (default: on)\n",
     "  --min-match-len <n>     Code spans: minimum normalized length (default: 50)\n",
     "  --min-token-len <n>     Token-based: minimum token length (default: 50)\n",
     "  --similarity-threshold <f>  Similarity: 0..1 (default: 0.85)\n",
@@ -54,6 +55,7 @@ const HELP_TEXT_ZH: &str = concat!(
     "  --strict                扫描不完整时返回非 0 退出码\n",
     "  --cross-repo-only       仅输出跨 >= 2 个 root 的重复组\n",
     "  --no-gitignore          不尊重 .gitignore 规则\n",
+    "  --gitignore             启用 .gitignore 过滤（默认：开启）\n",
     "  --min-match-len <n>     code spans：最小归一化长度（默认: 50）\n",
     "  --min-token-len <n>     token 检测：最小 token 长度（默认: 50）\n",
     "  --similarity-threshold <f>  相似度阈值：0..1（默认: 0.85）\n",
@@ -310,7 +312,14 @@ pub(crate) fn parse_args(
                 .to_string()
             })?;
             let value = parse_u64_non_negative_safe(localization, "--max-files", raw)?;
-            max_files = Some(value as usize);
+            let value = usize::try_from(value).map_err(|_| {
+                format!(
+                    "--max-files {} {max}",
+                    tr(localization, "must be <=", "必须 <= "),
+                    max = usize::MAX
+                )
+            })?;
+            max_files = Some(value);
             i += 2;
             continue;
         }

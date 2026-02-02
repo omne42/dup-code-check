@@ -14,6 +14,7 @@
 - CLI 国际化：`--localization <en|zh>`（默认：`en`）。
 - 扫描预算：`maxFiles` / `maxTotalBytes`（CLI：`--max-files` / `--max-total-bytes`）。
 - 扫描统计 + 严格模式（`--stats`, `--strict`）。
+- CLI：`--gitignore` 显式启用 `.gitignore` 过滤（默认开启；主要用于脚本）。
 - GitHub Actions：CI（Linux/macOS/Windows）、文档（GitHub Pages）与发布（GitHub Release + npm publish）。
 - 文档：中英双语（EN/ZH），并提供互相跳转链接。
 
@@ -34,17 +35,21 @@
 - 发布 workflow：对 CLI 的 `cargo publish` 增加重试，以容忍 crates.io index 的同步延迟。
 - 仓库链接：更新 GitHub owner / Pages 地址（`omne42`）。
 - 元数据：license 仅使用 MIT（不再是双协议）。
+- 扫描流程：改为流式遍历文件，降低峰值内存（避免预先收集完整文件列表）。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
 - 避免 `git check-ignore` 集成中的 panic；失败时会 fallback。
 - 当前缀剥离失败时避免在结果里泄漏绝对路径。
 - `--follow-symlinks` 现在通过使用 walker path 更可靠。
+- 启用 `--follow-symlinks` 时，跳过解析后位于 root 之外的符号链接目录。
 - token 检测器现在会记录多行字符串 token 的起始行号。
 - CLI 支持 `--` 终止参数解析（允许 root 以 `-` 开头）。
 - 扫描会跳过 `PermissionDenied` 和 walker traversal errors，而不是直接中止。
 - CLI 现在会捕获运行期扫描失败并以退出码 1 退出。
 - 移除 unstable rustfmt 配置，避免 stable toolchain 警告。
 - `--max-report-items` 现在在所有报告 section 中一致生效，并优先保留更大的 group。
+- CLI：`--max-files` 现在会拒绝超过 `usize` 上限的值，而不是截断。
 - CLI 支持 `--no-gitignore` 关闭 `.gitignore` 过滤。
 - 当前缀剥离失败时，输出使用 `<external:...>/name`，以避免泄漏绝对路径同时保持可区分性。
+- `git ls-files` 输出中若出现不安全的相对路径（绝对路径、`..` 等），将跳过而不是尝试读取。

@@ -2,8 +2,11 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::ops::ControlFlow;
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use ignore::WalkBuilder;
 
@@ -47,30 +50,49 @@ pub(crate) fn repo_label(root: &Path, id: usize) -> String {
         .unwrap_or_else(|| format!("repo{id}"))
 }
 
-pub(crate) fn collect_repo_files(
+pub(crate) fn visit_repo_files<F>(
     repo: &Repo,
     options: &ScanOptions,
     stats: &mut ScanStats,
-) -> io::Result<Vec<RepoFile>> {
+    mut on_file: F,
+) -> io::Result<ControlFlow<()>>
+where
+    F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
+{
     if options.respect_gitignore
         && !options.follow_symlinks
+        && options.max_files.is_none()
+        && options.max_total_bytes.is_none()
         && let Some(files) = try_collect_repo_files_via_git(repo, options, stats)?
     {
-        return Ok(files);
+        for file in files {
+            stats.candidate_files = stats.candidate_files.saturating_add(1);
+            match on_file(stats, file)? {
+                ControlFlow::Continue(()) => {}
+                ControlFlow::Break(()) => return Ok(ControlFlow::Break(())),
+            }
+        }
+        return Ok(ControlFlow::Continue(()));
     }
 
-    collect_repo_files_via_walk(repo, options, stats)
-}
-
-fn collect_repo_files_via_walk(
-    repo: &Repo,
-    options: &ScanOptions,
-    stats: &mut ScanStats,
-) -> io::Result<Vec<RepoFile>> {
     let ignore_dirs = options.ignore_dirs.clone();
     let follow_symlinks = options.follow_symlinks;
     let respect_gitignore = options.respect_gitignore;
     let is_git_repo = repo.root.join(".git").exists();
+
+    let canonical_root = if follow_symlinks {
+        Some(repo.root.canonicalize()?)
+    } else {
+        None
+    };
+    let skipped_outside_root = Arc::new(AtomicU64::new(0));
+    let skipped_not_found = Arc::new(AtomicU64::new(0));
+    let skipped_permission_denied = Arc::new(AtomicU64::new(0));
+    let skipped_walk_errors = Arc::new(AtomicU64::new(0));
+    let skipped_outside_root_cloned = Arc::clone(&skipped_outside_root);
+    let skipped_not_found_cloned = Arc::clone(&skipped_not_found);
+    let skipped_permission_denied_cloned = Arc::clone(&skipped_permission_denied);
+    let skipped_walk_errors_cloned = Arc::clone(&skipped_walk_errors);
 
     let mut builder = WalkBuilder::new(&repo.root);
     builder
@@ -97,14 +119,44 @@ fn collect_repo_files_via_walk(
                 return true;
             }
 
-            match entry.file_name().to_str() {
-                Some(name) => !ignore_dirs.contains(name),
-                None => true,
+            if let Some(name) = entry.file_name().to_str()
+                && ignore_dirs.contains(name)
+            {
+                return false;
             }
+
+            if follow_symlinks && entry.path_is_symlink() {
+                let Some(canonical_root) = canonical_root.as_ref() else {
+                    return false;
+                };
+                match entry.path().canonicalize() {
+                    Ok(resolved) => {
+                        if !resolved.starts_with(canonical_root) {
+                            skipped_outside_root_cloned.fetch_add(1, Ordering::Relaxed);
+                            return false;
+                        }
+                    }
+                    Err(err) => {
+                        match err.kind() {
+                            io::ErrorKind::NotFound => {
+                                skipped_not_found_cloned.fetch_add(1, Ordering::Relaxed);
+                            }
+                            io::ErrorKind::PermissionDenied => {
+                                skipped_permission_denied_cloned.fetch_add(1, Ordering::Relaxed);
+                            }
+                            _ => {
+                                skipped_walk_errors_cloned.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                        return false;
+                    }
+                }
+            }
+
+            true
         })
         .build();
 
-    let mut out = Vec::new();
     for result in walker {
         let entry = match result {
             Ok(e) => e,
@@ -138,15 +190,48 @@ fn collect_repo_files_via_walk(
             continue;
         }
 
-        out.push(RepoFile {
+        stats.candidate_files = stats.candidate_files.saturating_add(1);
+        let file = RepoFile {
             repo_id: repo.id,
             repo_label: repo.label.clone(),
             root: repo.root.clone(),
             abs_path: entry.into_path(),
-        });
+        };
+
+        match on_file(stats, file)? {
+            ControlFlow::Continue(()) => {}
+            ControlFlow::Break(()) => {
+                stats.skipped_outside_root = stats
+                    .skipped_outside_root
+                    .saturating_add(skipped_outside_root.load(Ordering::Relaxed));
+                stats.skipped_not_found = stats
+                    .skipped_not_found
+                    .saturating_add(skipped_not_found.load(Ordering::Relaxed));
+                stats.skipped_permission_denied = stats
+                    .skipped_permission_denied
+                    .saturating_add(skipped_permission_denied.load(Ordering::Relaxed));
+                stats.skipped_walk_errors = stats
+                    .skipped_walk_errors
+                    .saturating_add(skipped_walk_errors.load(Ordering::Relaxed));
+                return Ok(ControlFlow::Break(()));
+            }
+        }
     }
 
-    Ok(out)
+    stats.skipped_outside_root = stats
+        .skipped_outside_root
+        .saturating_add(skipped_outside_root.load(Ordering::Relaxed));
+    stats.skipped_not_found = stats
+        .skipped_not_found
+        .saturating_add(skipped_not_found.load(Ordering::Relaxed));
+    stats.skipped_permission_denied = stats
+        .skipped_permission_denied
+        .saturating_add(skipped_permission_denied.load(Ordering::Relaxed));
+    stats.skipped_walk_errors = stats
+        .skipped_walk_errors
+        .saturating_add(skipped_walk_errors.load(Ordering::Relaxed));
+
+    Ok(ControlFlow::Continue(()))
 }
 
 fn try_collect_repo_files_via_git(
@@ -203,6 +288,11 @@ fn try_collect_repo_files_via_git(
         }
 
         let rel = rel.replace('\\', "/");
+        if !is_safe_relative_path(&rel) {
+            stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
+            continue;
+        }
+
         let mut segs = rel.split('/');
         segs.next_back();
         if segs.any(|seg| options.ignore_dirs.contains(seg)) {
@@ -239,6 +329,26 @@ fn try_collect_repo_files_via_git(
     }
 
     Ok(Some(out))
+}
+
+fn is_safe_relative_path(raw: &str) -> bool {
+    if raw.is_empty() {
+        return false;
+    }
+    let path = Path::new(raw);
+    if path.is_absolute() {
+        return false;
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => {}
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => return false,
+        }
+    }
+    true
 }
 
 fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<String>> {

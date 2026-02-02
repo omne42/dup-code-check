@@ -3,7 +3,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use crate::scan::{Repo, collect_repo_files, make_rel_path, repo_label, resolve_read_path};
+use crate::scan::{Repo, make_rel_path, repo_label, resolve_read_path, visit_repo_files};
 use crate::tokenize::{parse_brace_blocks, tokenize_for_dup_detection};
 use crate::types::{DuplicateFile, DuplicateGroup, ScanOptions, ScanStats};
 use crate::util::{
@@ -39,13 +39,6 @@ pub(super) fn scan_text_files_for_report(
         None
     };
 
-    let mut repo_files = Vec::new();
-    for repo in &repos {
-        let files = collect_repo_files(repo, options, stats)?;
-        stats.candidate_files = stats.candidate_files.saturating_add(files.len() as u64);
-        repo_files.extend(files);
-    }
-
     #[derive(Debug)]
     struct FileGroupBuilder {
         content_hash: u64,
@@ -58,121 +51,130 @@ pub(super) fn scan_text_files_for_report(
     let mut file_groups: HashMap<(u64, usize), Vec<FileGroupBuilder>> = HashMap::new();
     let mut files = Vec::new();
 
-    let total_files = repo_files.len();
-    for (idx, repo_file) in repo_files.into_iter().enumerate() {
-        if let Some(max_files) = options.max_files
-            && stats.scanned_files as usize >= max_files
-        {
-            stats.skipped_budget_max_files = stats
-                .skipped_budget_max_files
-                .saturating_add((total_files - idx) as u64);
-            break;
-        }
-
+    for repo in &repos {
         let canonical_root = canonical_roots
             .as_ref()
-            .map(|roots| roots[repo_file.repo_id].as_path());
-        let Some(read_path) =
-            resolve_read_path(&repo_file, canonical_root, options.follow_symlinks, stats)?
-        else {
-            continue;
-        };
+            .map(|roots| roots[repo.id].as_path());
 
-        let metadata = match fs::metadata(&read_path) {
-            Ok(m) => m,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
-                continue;
-            }
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
-                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
-                continue;
-            }
-            Err(err) => return Err(err),
-        };
-        if let Some(max_file_size) = options.max_file_size
-            && metadata.len() > max_file_size
+        if let std::ops::ControlFlow::Break(()) =
+            visit_repo_files(repo, options, stats, |stats, repo_file| {
+                if let Some(max_files) = options.max_files
+                    && stats.scanned_files as usize >= max_files
+                {
+                    stats.skipped_budget_max_files =
+                        stats.skipped_budget_max_files.saturating_add(1);
+                    return Ok(std::ops::ControlFlow::Continue(()));
+                }
+
+                let Some(read_path) =
+                    resolve_read_path(&repo_file, canonical_root, options.follow_symlinks, stats)?
+                else {
+                    return Ok(std::ops::ControlFlow::Continue(()));
+                };
+
+                let metadata = match fs::metadata(&read_path) {
+                    Ok(m) => m,
+                    Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                        stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Continue(()));
+                    }
+                    Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                        stats.skipped_permission_denied =
+                            stats.skipped_permission_denied.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Continue(()));
+                    }
+                    Err(err) => return Err(err),
+                };
+                if let Some(max_file_size) = options.max_file_size
+                    && metadata.len() > max_file_size
+                {
+                    stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
+                    return Ok(std::ops::ControlFlow::Continue(()));
+                }
+                if let Some(max_total_bytes) = options.max_total_bytes
+                    && stats.scanned_bytes.saturating_add(metadata.len()) > max_total_bytes
+                {
+                    stats.skipped_budget_max_total_bytes =
+                        stats.skipped_budget_max_total_bytes.saturating_add(1);
+                    return Ok(std::ops::ControlFlow::Continue(()));
+                }
+
+                let bytes = match fs::read(&read_path) {
+                    Ok(b) => b,
+                    Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                        stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Continue(()));
+                    }
+                    Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                        stats.skipped_permission_denied =
+                            stats.skipped_permission_denied.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Continue(()));
+                    }
+                    Err(err) => return Err(err),
+                };
+                if bytes.contains(&0) {
+                    stats.skipped_binary = stats.skipped_binary.saturating_add(1);
+                    return Ok(std::ops::ControlFlow::Continue(()));
+                }
+                stats.scanned_files = stats.scanned_files.saturating_add(1);
+                stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
+
+                let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
+
+                // 1) File duplicates (whitespace-insensitive)
+                let normalized_ws = normalize_whitespace(&bytes);
+                let content_hash = fnv1a64(&normalized_ws);
+                let key = (content_hash, normalized_ws.len());
+                let bucket = file_groups.entry(key).or_default();
+
+                let file = DuplicateFile {
+                    repo_id: repo_file.repo_id,
+                    repo_label: repo_file.repo_label.clone(),
+                    path: rel_path.clone(),
+                };
+
+                if let Some(existing) = bucket.iter_mut().find(|g| g.sample == normalized_ws) {
+                    existing.repo_ids.insert(file.repo_id);
+                    existing.files.push(file);
+                } else {
+                    let mut repo_ids = HashSet::new();
+                    repo_ids.insert(file.repo_id);
+                    bucket.push(FileGroupBuilder {
+                        content_hash,
+                        normalized_len: normalized_ws.len(),
+                        sample: normalized_ws,
+                        files: vec![file],
+                        repo_ids,
+                    });
+                }
+
+                // 2) Text-based detectors
+                let text = String::from_utf8_lossy(&bytes).to_string();
+                let code_norm = normalize_for_code_spans(&bytes);
+                let line_norm = normalize_lines_for_dup_detection(&text);
+                let tokenized = tokenize_for_dup_detection(&text);
+                let blocks = parse_brace_blocks(&tokenized.tokens, &tokenized.token_lines);
+
+                files.push(ScannedTextFile {
+                    repo_id: repo_file.repo_id,
+                    repo_label: repo_file.repo_label,
+                    path: rel_path,
+                    text,
+                    code_chars: code_norm.chars,
+                    code_char_lines: code_norm.line_map,
+                    line_tokens: line_norm.line_tokens,
+                    line_token_lines: line_norm.line_lines,
+                    line_token_char_lens: line_norm.line_lens,
+                    tokens: tokenized.tokens,
+                    token_lines: tokenized.token_lines,
+                    blocks,
+                });
+
+                Ok(std::ops::ControlFlow::Continue(()))
+            })?
         {
-            stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
-            continue;
+            break;
         }
-        if let Some(max_total_bytes) = options.max_total_bytes
-            && stats.scanned_bytes.saturating_add(metadata.len()) > max_total_bytes
-        {
-            stats.skipped_budget_max_total_bytes =
-                stats.skipped_budget_max_total_bytes.saturating_add(1);
-            continue;
-        }
-
-        let bytes = match fs::read(&read_path) {
-            Ok(b) => b,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
-                continue;
-            }
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
-                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
-                continue;
-            }
-            Err(err) => return Err(err),
-        };
-        if bytes.contains(&0) {
-            stats.skipped_binary = stats.skipped_binary.saturating_add(1);
-            continue;
-        }
-        stats.scanned_files = stats.scanned_files.saturating_add(1);
-        stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
-
-        let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
-
-        // 1) File duplicates (whitespace-insensitive)
-        let normalized_ws = normalize_whitespace(&bytes);
-        let content_hash = fnv1a64(&normalized_ws);
-        let key = (content_hash, normalized_ws.len());
-        let bucket = file_groups.entry(key).or_default();
-
-        let file = DuplicateFile {
-            repo_id: repo_file.repo_id,
-            repo_label: repo_file.repo_label.clone(),
-            path: rel_path.clone(),
-        };
-
-        if let Some(existing) = bucket.iter_mut().find(|g| g.sample == normalized_ws) {
-            existing.repo_ids.insert(file.repo_id);
-            existing.files.push(file);
-        } else {
-            let mut repo_ids = HashSet::new();
-            repo_ids.insert(file.repo_id);
-            bucket.push(FileGroupBuilder {
-                content_hash,
-                normalized_len: normalized_ws.len(),
-                sample: normalized_ws,
-                files: vec![file],
-                repo_ids,
-            });
-        }
-
-        // 2) Text-based detectors
-        let text = String::from_utf8_lossy(&bytes).to_string();
-        let code_norm = normalize_for_code_spans(&bytes);
-        let line_norm = normalize_lines_for_dup_detection(&text);
-        let tokenized = tokenize_for_dup_detection(&text);
-        let blocks = parse_brace_blocks(&tokenized.tokens, &tokenized.token_lines);
-
-        files.push(ScannedTextFile {
-            repo_id: repo_file.repo_id,
-            repo_label: repo_file.repo_label,
-            path: rel_path,
-            text,
-            code_chars: code_norm.chars,
-            code_char_lines: code_norm.line_map,
-            line_tokens: line_norm.line_tokens,
-            line_token_lines: line_norm.line_lines,
-            line_token_char_lens: line_norm.line_lens,
-            tokens: tokenized.tokens,
-            token_lines: tokenized.token_lines,
-            blocks,
-        });
     }
 
     let mut file_duplicates = Vec::new();

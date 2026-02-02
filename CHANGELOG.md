@@ -14,6 +14,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI i18n: `--localization <en|zh>` (default: `en`).
 - Scan budgets: `maxFiles` / `maxTotalBytes` (CLI: `--max-files` / `--max-total-bytes`).
 - Scan stats + strict mode in CLI (`--stats`, `--strict`).
+- CLI: `--gitignore` to explicitly enable `.gitignore` filtering (default on; mainly useful in scripts).
 - GitHub Actions: CI (Linux/macOS/Windows), docs (GitHub Pages), and release (GitHub Release + npm publish).
 - Docs: bilingual (EN/ZH) with cross-links.
 
@@ -34,17 +35,21 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Release workflow: retry `cargo publish` for the CLI to tolerate crates.io index propagation delay.
 - Repo links: update GitHub owner / Pages URLs (`omne42`).
 - Metadata: use MIT-only license identifier.
+- Scan pipeline: stream file enumeration to reduce peak memory (avoid collecting full file lists up front).
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
 - Avoid panics in `git check-ignore` integration; fall back when it fails.
 - Avoid leaking absolute paths in results when path prefix stripping fails.
 - `--follow-symlinks` now works reliably by using the walker path when enabled.
+- When `--follow-symlinks` is enabled, skip symlinked directories that resolve outside the root.
 - Token-based detectors now record the start line for multi-line string tokens.
 - CLI now supports `--` to terminate option parsing (allows roots that start with `-`).
 - Scanning now skips `PermissionDenied` and walker traversal errors instead of aborting.
 - CLI now catches runtime scan failures and exits with code 1.
 - Remove unstable rustfmt config options to avoid warnings on stable toolchains.
 - `--max-report-items` now applies consistently across all report sections and prefers larger groups.
+- CLI: `--max-files` now rejects values that don’t fit into `usize` instead of truncating.
 - CLI now supports `--no-gitignore` to disable `.gitignore` filtering.
 - When path prefix stripping fails, output uses `<external:...>/name` to keep paths distinguishable without leaking absolute paths.
+- Ignore unsafe relative paths from `git ls-files` (absolute paths, `..`, etc.) instead of attempting to read them.

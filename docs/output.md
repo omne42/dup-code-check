@@ -69,7 +69,8 @@ With `--json --stats`:
 
 - `candidateFiles`, `scannedFiles`, `scannedBytes`
 - `skippedNotFound`, `skippedPermissionDenied`, `skippedTooLarge`, `skippedBinary`, `skippedWalkErrors`
-- `skippedBudgetMaxFiles`, `skippedBudgetMaxTotalBytes`
+- `skippedBudgetMaxFiles`: skipped due to `maxFiles` (once the limit is reached, further files are not read)
+- `skippedBudgetMaxTotalBytes`: skipped due to `maxTotalBytes` (reading would exceed the total bytes budget)
 
 ### Text mode
 

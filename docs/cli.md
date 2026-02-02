@@ -83,7 +83,7 @@ See [Output & Report](output.md) for a full field reference.
 
 ### Scan budgets
 
-- `--max-files <n>`: scan at most `n` files (then stop)
+- `--max-files <n>`: read/process at most `n` files (further candidates are skipped; counted in `skippedBudgetMaxFiles`)
 - `--max-total-bytes <n>`: skip files that would exceed total scanned bytes budget
 - `--max-file-size <n>`: skip files larger than `n` bytes (default `10485760` = 10 MiB)
 

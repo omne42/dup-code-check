@@ -23,6 +23,7 @@
 - 开发：released changelog 编辑的 override 环境变量重命名为 `DUP_CODE_CHECK_ALLOW_CHANGELOG_RELEASE_EDIT`。
 - Rust：重构 core/report 与 CLI，拆分为更小的模块（无行为变化）。
 - Rust：通过共享 helper 去重“扫描读取/跳过”的重复逻辑。
+- 测试：增加扫描预算场景下 Git 快路径的回归覆盖。
 - 默认跳过大于 10 MiB 的文件（`DEFAULT_MAX_FILE_SIZE_BYTES`）。
 - fallback scanner 现在通过 `ignore` crate 尊重嵌套 `.gitignore` 规则。
 - CLI 整数参数拒绝非整数（例如 `--max-file-size 1.5`）。

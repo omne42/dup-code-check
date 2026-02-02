@@ -304,6 +304,90 @@ c",
 }
 
 #[test]
+fn git_fast_path_still_used_with_budgets() -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        use std::process::Stdio;
+
+        struct RestorePerm {
+            path: PathBuf,
+        }
+
+        impl Drop for RestorePerm {
+            fn drop(&mut self) {
+                let perms = fs::Permissions::from_mode(0o755);
+                let _ = fs::set_permissions(&self.path, perms);
+            }
+        }
+
+        let root = temp_dir("git_fast_path_budgets");
+        fs::create_dir_all(&root)?;
+
+        let git_ok = std::process::Command::new("git")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success());
+        if !git_ok {
+            return Ok(());
+        }
+
+        let init_ok = std::process::Command::new("git")
+            .arg("init")
+            .current_dir(&root)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success());
+        if !init_ok {
+            return Ok(());
+        }
+
+        fs::write(
+            root.join("a.txt"),
+            "a b
+c",
+        )?;
+        fs::write(root.join("b.txt"), "ab	c")?;
+
+        // Make an unreadable directory; `git ls-files --others` prints a warning but still exits 0.
+        // This makes the walk-based scanner accumulate PermissionDenied, while the git fast path doesn't.
+        let secret_dir = root.join("secret_dir");
+        fs::create_dir_all(&secret_dir)?;
+        let mut perms = fs::metadata(&secret_dir)?.permissions();
+        perms.set_mode(0o000);
+        fs::set_permissions(&secret_dir, perms)?;
+        let _guard = RestorePerm {
+            path: secret_dir.clone(),
+        };
+
+        // `maxFiles`: once limit is hit, remaining candidates are skipped.
+        let options_files = ScanOptions {
+            max_files: Some(1),
+            ..ScanOptions::default()
+        };
+        let outcome_files =
+            crate::find_duplicate_files_with_stats(std::slice::from_ref(&root), &options_files)?;
+        assert_eq!(outcome_files.stats.skipped_permission_denied, 0);
+        assert!(outcome_files.stats.skipped_budget_max_files > 0);
+
+        // `maxTotalBytes`: files that would exceed the budget are skipped.
+        let options_bytes = ScanOptions {
+            max_total_bytes: Some(1),
+            ..ScanOptions::default()
+        };
+        let outcome_bytes =
+            crate::find_duplicate_files_with_stats(std::slice::from_ref(&root), &options_bytes)?;
+        assert_eq!(outcome_bytes.stats.skipped_permission_denied, 0);
+        assert!(outcome_bytes.stats.skipped_budget_max_total_bytes > 0);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn follow_symlinks_does_not_escape_root() -> io::Result<()> {
     #[cfg(unix)]
     {

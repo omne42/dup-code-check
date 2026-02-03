@@ -7,13 +7,49 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 
+function isNodeModulesBinDir(dir) {
+  const norm = dir.replace(/\\/g, '/');
+  return norm.includes('/node_modules/.bin');
+}
+
+function resolveCargoExe() {
+  const pathVar = process.env.PATH ?? '';
+  const sep = process.platform === 'win32' ? ';' : ':';
+  const entries = pathVar.split(sep).filter(Boolean);
+
+  const candidates = process.platform === 'win32' ? ['cargo.exe', 'cargo'] : ['cargo'];
+  for (const dir of entries) {
+    if (isNodeModulesBinDir(dir)) continue;
+    for (const name of candidates) {
+      const exe = path.join(dir, name);
+      try {
+        const st = fs.statSync(exe);
+        if (st.isFile()) return exe;
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return null;
+}
+
 if (process.env.DUP_CODE_CHECK_SKIP_BUILD === '1') {
   process.stdout.write('Skipping Rust binary build (DUP_CODE_CHECK_SKIP_BUILD=1)\n');
   process.exit(0);
 }
 
+const cargoExe = resolveCargoExe();
+if (!cargoExe) {
+  throw new Error(
+    'Rust toolchain is required to build the binary.\n' +
+      'This package intentionally does not execute `cargo` from `node_modules/.bin` (supply-chain hardening).\n' +
+      'Install Rust (https://rustup.rs) and ensure `cargo` is on PATH, then re-run:\n' +
+      '  npm run build\n'
+  );
+}
+
 try {
-  execFileSync('cargo', ['build', '--release', '--locked', '-p', 'dup-code-check'], {
+  execFileSync(cargoExe, ['build', '--release', '--locked', '-p', 'dup-code-check'], {
     cwd: repoRoot,
     stdio: 'inherit'
   });

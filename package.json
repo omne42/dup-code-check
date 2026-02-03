@@ -37,7 +37,7 @@
   ],
   "scripts": {
     "build": "node scripts/build-binary.mjs",
-    "postinstall": "node scripts/build-binary.mjs",
+    "postinstall": "node scripts/postinstall.mjs",
     "prepack": "node scripts/prepack.mjs",
     "check": "node scripts/smoke.mjs",
     "test": "node scripts/smoke.mjs",

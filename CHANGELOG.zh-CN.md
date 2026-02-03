@@ -52,12 +52,13 @@
 - 仓库链接：更新 GitHub owner / Pages 地址（`omne42`）。
 - 元数据：license 仅使用 MIT（不再是双协议）。
 - 扫描预算：`maxFiles` 达到上限后会停止扫描（`skippedBudgetMaxFiles` 会变为非 0）。
-- Node 安装：`postinstall` 使用 `cargo build --locked` 构建 Rust 二进制。
+- Node 安装：全局安装时 `postinstall` 会构建 Rust 二进制；作为工程依赖安装时默认在首次运行时构建（或设置 `DUP_CODE_CHECK_BUILD_ON_INSTALL=1`）。
 - 扫描流程：Git 快路径对 `git ls-files` 做流式遍历（避免收集完整列表；`maxFiles` 可提前停止）。
 - CLI：澄清 `--strict` 语义（仅在“致命跳过”：权限/遍历错误/预算中断/bucket 截断时返回非 0），并增加 smoke 覆盖。
 - CLI：当出现“致命跳过”时，在 stderr 输出一次警告（即使启用了 `--stats`；仅在需要时提示重新运行 `--stats`）。
 - Rust：通过共享内部 helper 去重 code-span（winnowing）与 file-duplicates 分组逻辑，避免漂移。
 - Core：收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（仅允许绝对路径；且要求文件存在）。
+- Core：进一步收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（不允许 symlink；Unix 下必须可执行且不可被其他用户写入）。
 - Core：只有在 `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` 时才会启用 `DUP_CODE_CHECK_GIT_BIN`（显式 opt-in）。
 - Report：默认设置 `maxTotalBytes` 预算（256 MiB）以限制内存占用；可用 `--max-total-bytes` 覆盖。
 - 文档：在 `--help` 与 README 中说明 `--report` 模式默认 `--max-total-bytes` 预算。
@@ -106,6 +107,7 @@
 - npm 构建：当 `bin/dup-code-check.mjs` wrapper 缺失时，提前失败并输出更清晰的错误信息。
 - Git 集成：当 `git check-ignore` 输出包含非 UTF-8 路径时触发回退。
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。
+- npm 构建：查找 `cargo` 时会排除 `node_modules/.bin`（供应链加固）。
 - Node smoke：在决定是否需要重建时额外验证 wrapper 可执行 `--version`。
 - npm 包：包含 `rust-toolchain.toml`，使安装时使用固定的 Rust toolchain。
 - CLI：本地化 `Number.MAX_SAFE_INTEGER` 相关整数参数错误信息。

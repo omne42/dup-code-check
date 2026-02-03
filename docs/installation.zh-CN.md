@@ -2,9 +2,11 @@
 
 [English](installation.md)
 
-`dup-code-check` 是一个 Rust 二进制程序。Node.js 仅作为一种安装方式（npm），安装阶段会从源码编译二进制，因此需要 Rust 工具链。
+`dup-code-check` 是一个 Rust 二进制程序。Node.js 仅作为一种安装方式（npm）。npm 包会在需要时从源码编译二进制（Cargo），因此需要 Rust 工具链。
 
-> 安全提示：npm 的 `postinstall` 会触发原生构建（Cargo），并可能运行依赖的 build script。如果你需要避免执行安装脚本，请使用 `--ignore-scripts` / `npm_config_ignore_scripts=true`。
+默认情况下，作为工程依赖安装会在**首次运行**时编译；全局安装为了避免权限问题，可能会在 `postinstall` 阶段编译。
+
+> 安全提示：编译过程会触发原生构建（Cargo），并可能运行依赖的 build script。根据安装方式不同，这一步可能发生在 `postinstall`（例如全局安装）或首次运行时。如果你需要避免执行安装脚本，请使用 `--ignore-scripts` / `npm_config_ignore_scripts=true`。
 
 ## 方式 A：直接使用 Rust（推荐）
 
@@ -34,9 +36,9 @@ npm i -D dup-code-check
 npx dup-code-check --help
 ```
 
-> 提示：如果你的环境禁用了 npm scripts（例如 `npm_config_ignore_scripts=true`），`postinstall` 不会编译二进制；你需要在项目中手动执行 `npm run build`（在 `node_modules/dup-code-check/` 目录下）或改用 Rust 方式。
+> 提示：如果你希望在安装阶段就构建（工程依赖），可设置 `DUP_CODE_CHECK_BUILD_ON_INSTALL=1`。
 >
-> 提示：如果你希望保留 npm scripts 但跳过 Rust 构建，可以在安装时设置 `DUP_CODE_CHECK_SKIP_BUILD=1`，然后再手动构建。
+> 提示：如果你想禁用构建（安装 + 首次运行），可设置 `DUP_CODE_CHECK_SKIP_BUILD=1`，之后再手动构建。
 
 ## 方式 C：全局安装（适合本机工具）
 
@@ -44,6 +46,8 @@ npx dup-code-check --help
 npm i -g dup-code-check
 dup-code-check --help
 ```
+
+> 提示：全局安装建议保持 npm scripts 开启（`postinstall` 会构建二进制）。
 
 ## 方式 D：从源码开发/贡献（推荐用于改代码）
 

@@ -48,17 +48,25 @@ Requires:
 - Node.js `>= 22`
 - Rust toolchain `1.92.0` (pinned by `rust-toolchain.toml`)
 
-> Note: this package builds the Rust binary during `postinstall`, so Rust is required.
+> Note: this package builds the Rust binary from source (Cargo), so Rust is required.
+> For project installs, the build happens on first run; for global installs, it may run during `postinstall`.
 >
-> Security note: `postinstall` runs a native build (Cargo), which may execute dependency build scripts.
+> Security note: building runs a native build (Cargo), which may execute dependency build scripts.
 >
-> You can also set `DUP_CODE_CHECK_SKIP_BUILD=1` to skip the build during install (then run `npm run build` manually inside `node_modules/dup-code-check/`).
+> You can set `DUP_CODE_CHECK_SKIP_BUILD=1` to disable builds (install + first run), then build manually:
 >
-> To avoid running install scripts, use `npm_config_ignore_scripts=true` and build manually:
+> ```bash
+> cd node_modules/dup-code-check
+> npm run build
+> ```
+>
+> To build during install (project dependency), set `DUP_CODE_CHECK_BUILD_ON_INSTALL=1`.
+>
+> To avoid running install scripts entirely, use `npm_config_ignore_scripts=true`:
 >
 > ```bash
 > npm_config_ignore_scripts=true npm i -D dup-code-check
-> npm run build
+> npx dup-code-check --help
 > ```
 
 ## Quick examples

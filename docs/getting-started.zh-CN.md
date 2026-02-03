@@ -27,13 +27,13 @@ npm run build
 ./bin/dup-code-check --help
 ```
 
-你也可以用 `npx`（会执行 `postinstall` 编译二进制）：
+你也可以用 `npx`（如有需要，会在首次运行时编译二进制）：
 
 ```bash
 npx dup-code-check --help
 ```
 
-> 安全提示：npm 安装会执行 `postinstall`（Cargo 原生构建），并可能运行依赖的 build script。如果你需要避免执行安装脚本，请使用 `--ignore-scripts` / `npm_config_ignore_scripts=true`（见《[安装与构建](installation.zh-CN.md)》）。
+> 安全提示：编译过程会触发原生构建（Cargo），并可能运行依赖的 build script。根据安装方式不同，这一步可能发生在 `postinstall` 或首次运行时。如果你需要避免执行安装脚本，请使用 `--ignore-scripts` / `npm_config_ignore_scripts=true`（见《[安装与构建](installation.zh-CN.md)》）。
 
 ## 2) 扫描一个目录：重复文件（默认）
 

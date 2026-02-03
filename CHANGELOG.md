@@ -52,12 +52,13 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Repo links: update GitHub owner / Pages URLs (`omne42`).
 - Metadata: use MIT-only license identifier.
 - Scan budgets: `maxFiles` now stops scanning once the file-count budget is hit (`skippedBudgetMaxFiles` becomes non-zero).
-- Node installer: `postinstall` builds Rust binary with `cargo build --locked`.
+- Node installer: `postinstall` builds the Rust binary for global installs; project installs build on first run (or set `DUP_CODE_CHECK_BUILD_ON_INSTALL=1`).
 - Scan pipeline: stream `git ls-files` enumeration in the Git fast path (avoid collecting full lists; stop early under `maxFiles`).
 - CLI: clarify `--strict` semantics (fatal skips only: permission/traversal/budget/bucket) and add smoke coverage.
 - CLI: always emit fatal-skip warnings to stderr (even with `--stats`; the `--stats` re-run hint is shown only when needed).
 - Rust: de-duplicate code-span (winnowing) and file-duplicate grouping logic via a shared internal helper.
 - Core: tighten `DUP_CODE_CHECK_GIT_BIN` override validation (absolute path required; must exist and be a file).
+- Core: further tighten `DUP_CODE_CHECK_GIT_BIN` override validation (must not be a symlink; must be executable and not world-writable on Unix).
 - Core: require `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` to honor `DUP_CODE_CHECK_GIT_BIN` (opt-in).
 - Report: set a default `maxTotalBytes` budget (256 MiB) to bound memory use; override via `--max-total-bytes`.
 - Docs: mention the `--report` default `--max-total-bytes` budget in `--help` and `README`.
@@ -106,6 +107,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.
 - Git integration: treat non-UTF-8 output from `git check-ignore` as a fallback trigger.
 - npm build: improve Cargo build failure diagnostics.
+- npm build: resolve `cargo` from PATH excluding `node_modules/.bin` (supply-chain hardening).
 - Node smoke: verify the wrapper can execute `--version` when deciding whether to rebuild.
 - npm package: include `rust-toolchain.toml` so installs use the pinned Rust toolchain.
 - CLI: localize `Number.MAX_SAFE_INTEGER` errors for integer options.

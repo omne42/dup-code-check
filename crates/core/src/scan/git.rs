@@ -65,7 +65,30 @@ pub(super) fn validate_git_bin_override(raw: OsString) -> Option<OsString> {
     if !path.is_absolute() {
         return None;
     }
-    fs::metadata(path).ok().filter(|m| m.is_file()).map(|_| raw)
+
+    let meta = fs::symlink_metadata(path).ok()?;
+    if meta.file_type().is_symlink() {
+        return None;
+    }
+    if !meta.is_file() {
+        return None;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mode = meta.permissions().mode();
+        if mode & 0o111 == 0 {
+            return None;
+        }
+        // Never allow a world-writable executable as an override.
+        if mode & 0o002 != 0 {
+            return None;
+        }
+    }
+
+    Some(raw)
 }
 
 #[cfg(test)]

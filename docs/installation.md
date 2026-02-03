@@ -2,9 +2,11 @@
 
 [中文](installation.zh-CN.md)
 
-`dup-code-check` is a Rust CLI binary. Node.js is only used as an installation option (npm). The current npm package builds the binary from source during install, so Rust is required.
+`dup-code-check` is a Rust CLI binary. Node.js is only used as an installation option (npm). The npm package builds the binary from source when needed (Cargo), so Rust is required.
 
-> Security note: npm `postinstall` runs a native build (Cargo), which may execute dependency build scripts. Use `--ignore-scripts` / `npm_config_ignore_scripts=true` if you need to avoid that.
+By default, project installs build on first run. Global installs may build during `postinstall` to avoid permission issues.
+
+> Security note: building runs a native build (Cargo), which may execute dependency build scripts. Depending on how you install, this may run during `postinstall` (e.g. global installs) or on first run. Use `--ignore-scripts` / `npm_config_ignore_scripts=true` if you need to avoid running install scripts.
 
 ## Option A: Rust (recommended)
 
@@ -34,9 +36,9 @@ After installation:
 npx dup-code-check --help
 ```
 
-> Tip: if your environment disables npm scripts (e.g. `npm_config_ignore_scripts=true`), `postinstall` won’t build the binary. You can run `npm run build` inside `node_modules/dup-code-check/`, or use the Rust option.
+> Tip: to build during install (project dependency), set `DUP_CODE_CHECK_BUILD_ON_INSTALL=1`.
 >
-> Tip: if you want to keep npm scripts enabled but skip the Rust build, set `DUP_CODE_CHECK_SKIP_BUILD=1` during install and build manually later.
+> Tip: to skip builds (install + first run), set `DUP_CODE_CHECK_SKIP_BUILD=1` and build manually later.
 
 ## Option C: Global npm install (local tooling)
 
@@ -44,6 +46,8 @@ npx dup-code-check --help
 npm i -g dup-code-check
 dup-code-check --help
 ```
+
+> Tip: global installs work best with install scripts enabled (`postinstall` builds the binary).
 
 ## Option D: Contribute / develop from source
 

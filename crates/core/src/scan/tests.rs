@@ -105,10 +105,40 @@ fn git_bin_override_validation_is_restrictive() -> io::Result<()> {
 
     let existing = root.join("git");
     fs::write(&existing, "")?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mut perms = fs::metadata(&existing)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&existing, perms)?;
+    }
     assert_eq!(
         git::validate_git_bin_override(existing.as_os_str().to_os_string()),
         Some(existing.as_os_str().to_os_string())
     );
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        let symlink_path = root.join("git_symlink");
+        symlink(&existing, &symlink_path)?;
+        assert_eq!(
+            git::validate_git_bin_override(symlink_path.as_os_str().to_os_string()),
+            None
+        );
+
+        let writable = root.join("git_writable");
+        fs::write(&writable, "")?;
+        let mut perms = fs::metadata(&writable)?.permissions();
+        perms.set_mode(0o777);
+        fs::set_permissions(&writable, perms)?;
+        assert_eq!(
+            git::validate_git_bin_override(writable.as_os_str().to_os_string()),
+            None
+        );
+    }
 
     Ok(())
 }
@@ -120,6 +150,14 @@ fn git_bin_override_requires_opt_in() -> io::Result<()> {
 
     let existing = root.join("git");
     fs::write(&existing, "")?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mut perms = fs::metadata(&existing)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&existing, perms)?;
+    }
     let existing = existing.as_os_str().to_os_string();
 
     // Without explicit opt-in, ignore the override even if it points to an existing file.

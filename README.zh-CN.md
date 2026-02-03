@@ -54,20 +54,29 @@ dup-code-check --help
 
 ### 方式 B：通过 npm 安装（二进制从源码编译）
 
-当前版本会在 `postinstall` 阶段从 Rust 源码编译二进制，因此需要：
+当前版本会从源码编译 Rust 二进制（Cargo），因此需要：
 
 - Node.js `>=22`（参考 Codex 项目）
 - Rust toolchain `1.92.0`（已通过 `rust-toolchain.toml` 固定，参考 Codex 项目）
 
-安全提示：npm 安装会执行 `postinstall`，会触发原生构建（Cargo），并可能运行依赖的 build script。若需要避免执行安装脚本，请使用 `npm_config_ignore_scripts=true`。
+说明：作为工程依赖安装时，通常会在**首次运行**时编译；全局安装时可能会在 `postinstall` 阶段编译。
 
-你也可以设置 `DUP_CODE_CHECK_SKIP_BUILD=1` 来跳过安装阶段的 Rust 构建（随后在 `node_modules/dup-code-check/` 下手动执行 `npm run build`）。
+安全提示：编译过程会触发原生构建（Cargo），并可能运行依赖的 build script。若需要避免执行安装脚本，请使用 `npm_config_ignore_scripts=true`。
+
+你也可以设置 `DUP_CODE_CHECK_SKIP_BUILD=1` 来禁用构建（安装 + 首次运行），然后手动构建：
+
+```bash
+cd node_modules/dup-code-check
+npm run build
+```
+
+如果你希望在安装阶段就构建（工程依赖），可设置 `DUP_CODE_CHECK_BUILD_ON_INSTALL=1`。
 
 如果你希望避免在安装时执行脚本，可以用 `npm_config_ignore_scripts=true` 安装后手动构建：
 
 ```bash
 npm_config_ignore_scripts=true npm i -D dup-code-check
-npm run build
+npx dup-code-check --help
 ```
 
 ## 本地开发

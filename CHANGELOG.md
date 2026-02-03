@@ -35,6 +35,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Invalid roots now fail early instead of producing empty results.
 - Docs: migrate docs site from Honkit to VitePress (with `llms.txt`).
 - Docs: improve `llms.txt` generation order and add a prompt template header.
+- Docs: exclude `README*.md` pages from `llms` bundles.
+- Docs: nav language switch now points to the Chinese home page.
+- npm: align metadata with npm (drop pnpm hints) and avoid shipping `docs/` in the npm package.
 - Docs workflow: skip GitHub Pages deployment when the repository is private.
 - Docs workflow: auto-enable GitHub Pages (Actions) when deploying docs.
 - Release workflow: publish to crates.io on tag releases (and skip when token is missing).
@@ -65,3 +68,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan budgets: keep the Git fast path enabled when `maxFiles` / `maxTotalBytes` are set.
 - npm install: make the `dup-code-check` bin work on Windows by launching the platform binary from the Node wrapper.
 - Docs: document `maxFiles` stop behavior and `skippedBudgetMaxFiles` semantics.
+- CLI: `--version` now respects `--` (treats `--version` after `--` as a root).

@@ -34,6 +34,11 @@ function isMarkdownFile(p) {
   return p.endsWith('.md');
 }
 
+function isReadmeFile(p) {
+  const base = path.basename(p).toLowerCase();
+  return base === 'readme.md' || (base.startsWith('readme.') && base.endsWith('.md'));
+}
+
 function walkDir(dir) {
   const out = [];
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -100,7 +105,7 @@ if (!fs.existsSync(docsRoot)) {
 fs.mkdirSync(publicDir, { recursive: true });
 
 const files = walkDir(docsRoot)
-  .filter((p) => path.basename(p).toLowerCase() !== 'readme.md')
+  .filter((p) => !isReadmeFile(p))
   .map((abs) => ({
     abs,
     rel: relDocPath(abs),

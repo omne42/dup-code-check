@@ -35,6 +35,9 @@
 - 无效 root 现在会尽早失败，而不是输出空结果。
 - 文档：从 Honkit 迁移到 VitePress（并提供 `llms.txt`）。
 - 文档：优化 `llms.txt` 生成顺序，并补充可直接复用的提示词模板。
+- 文档：`llms` 合集中排除 `README*.md` 页面。
+- 文档：导航栏“中文”入口现在指向中文首页。
+- npm：对齐 npm 生态（移除 pnpm 相关提示），并避免在 npm 包中发布 `docs/`。
 - 文档 workflow：当仓库为私有时跳过 GitHub Pages 部署。
 - 文档 workflow：部署文档时自动启用 GitHub Pages（GitHub Actions）。
 - 发布 workflow：在 tag 发布时执行 crates.io 发布（未配置 token 时自动跳过）。
@@ -65,3 +68,4 @@
 - 扫描预算：启用 `maxFiles` / `maxTotalBytes` 时仍保持 Git 快路径（加速 CI 扫描）。
 - npm 安装：通过 Node wrapper 启动平台二进制，使 Windows 上的 `dup-code-check` 可用。
 - 文档：补充 `maxFiles` 停止行为与 `skippedBudgetMaxFiles` 字段语义。
+- CLI：`--version` 现在会尊重 `--`（`--` 之后的 `--version` 会被当作 root 而不是参数）。

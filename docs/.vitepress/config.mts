@@ -20,7 +20,7 @@ export default defineConfig({
     nav: [
       { text: 'Docs', link: '/' },
       { text: 'LLMs', link: '/llms' },
-      { text: '中文', link: '/introduction.zh-CN' },
+      { text: '中文', link: '/index.zh-CN' },
     ],
 
     sidebar: [

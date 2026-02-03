@@ -14,9 +14,17 @@ use crate::text::{
     format_scan_stats, format_text, format_text_code_spans, format_text_report, has_fatal_skips,
 };
 
+fn args_before_dashdash(args: &[String]) -> &[String] {
+    match args.iter().position(|a| a == "--") {
+        Some(pos) => &args[..pos],
+        None => args,
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    if args.iter().any(|a| a == "-V" || a == "--version") {
+    let pre_dashdash = args_before_dashdash(&args);
+    if pre_dashdash.iter().any(|a| a == "-V" || a == "--version") {
         println!("dup-code-check {}", env!("CARGO_PKG_VERSION"));
         return;
     }
@@ -29,7 +37,7 @@ fn main() {
         }
     };
 
-    if args.iter().any(|a| a == "-h" || a == "--help") {
+    if pre_dashdash.iter().any(|a| a == "-h" || a == "--help") {
         print_help(localization);
         return;
     }

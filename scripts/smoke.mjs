@@ -63,8 +63,8 @@ function buildIfNeeded() {
   }
 }
 
-function runCli(args) {
-  return spawnSync(process.execPath, [wrapperPath, ...args], { encoding: 'utf8' });
+function runCli(args, opts = {}) {
+  return spawnSync(process.execPath, [wrapperPath, ...args], { encoding: 'utf8', ...opts });
 }
 
 function runCliJson(args) {
@@ -271,12 +271,28 @@ if (helpEn.status !== 0 || !helpEn.stdout.includes('Usage:')) {
 }
 
 const version = runCli(['--version']);
-if (
-  version.status !== 0 ||
-  !/^dup-code-check\s+\d+\.\d+\.\d+/.test((version.stdout ?? '').trim())
-) {
+const versionLine = (version.stdout ?? '').trim();
+const versionMatch = versionLine.match(/^dup-code-check\s+(\S+)/);
+const semver =
+  /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+if (version.status !== 0 || !versionMatch || !semver.test(versionMatch[1])) {
   process.stderr.write(
     `Unexpected --version output.\nstatus=${version.status}\nstdout:\n${version.stdout}\nstderr:\n${version.stderr}\n`
+  );
+  process.exit(1);
+}
+
+// `--` terminates option parsing; `--version` after `--` must be treated as a root, not a flag.
+const dashdashDir = path.join(tmp, '--version');
+fs.mkdirSync(dashdashDir, { recursive: true });
+const dashdash = runCli(['--', '--version'], { cwd: tmp });
+if (
+  dashdash.status !== 0 ||
+  (dashdash.stdout ?? '').includes('dup-code-check ') ||
+  !((dashdash.stdout ?? '').includes('duplicate groups:'))
+) {
+  process.stderr.write(
+    `Unexpected -- --version behavior.\nstatus=${dashdash.status}\nstdout:\n${dashdash.stdout}\nstderr:\n${dashdash.stderr}\n`
   );
   process.exit(1);
 }

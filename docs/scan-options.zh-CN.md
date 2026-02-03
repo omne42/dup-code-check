@@ -41,7 +41,7 @@ dup-code-check --gitignore .
 注意：
 
 - 即使关闭 `.gitignore`，`ignoreDirs` 仍然生效
-- `.gitignore` 生效的前提是扫描 root 是 Git 仓库或目录中存在 `.gitignore` 规则（具体行为依赖实现细节）
+- 在 Git 仓库内会遵循 `.gitignore`、`.git/info/exclude` 与全局忽略规则
 
 ### `followSymlinks` / `--follow-symlinks`
 

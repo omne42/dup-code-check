@@ -35,6 +35,8 @@ npx dup-code-check --help
 ```
 
 > Tip: if your environment disables npm scripts (e.g. `npm_config_ignore_scripts=true`), `postinstall` won’t build the binary. You can run `npm run build` inside `node_modules/dup-code-check/`, or use the Rust option.
+>
+> Tip: if you want to keep npm scripts enabled but skip the Rust build, set `DUP_CODE_CHECK_SKIP_BUILD=1` during install and build manually later.
 
 ## Option C: Global npm install (local tooling)
 

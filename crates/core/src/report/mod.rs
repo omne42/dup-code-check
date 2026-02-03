@@ -71,9 +71,9 @@ pub fn generate_duplication_report_with_stats(
     let (files, file_duplicates) =
         scan_files::scan_text_files_for_report(roots, options, &mut stats)?;
 
-    let code_span_duplicates = detect::detect_duplicate_code_spans(&files, options);
-    let line_span_duplicates = detect::detect_duplicate_line_spans(&files, options);
-    let token_span_duplicates = detect::detect_duplicate_token_spans(&files, options);
+    let code_span_duplicates = detect::detect_duplicate_code_spans(&files, options, &mut stats);
+    let line_span_duplicates = detect::detect_duplicate_line_spans(&files, options, &mut stats);
+    let token_span_duplicates = detect::detect_duplicate_token_spans(&files, options, &mut stats);
     let block_duplicates = detect::detect_duplicate_blocks(&files, options);
     let ast_subtree_duplicates = detect::detect_duplicate_ast_subtrees(&files, options);
     let similar_blocks_minhash = detect::find_similar_blocks_minhash(&files, options);

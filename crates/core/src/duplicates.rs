@@ -188,6 +188,6 @@ pub fn find_duplicate_code_spans_with_stats(
         })
         .collect();
 
-    let out = detect_duplicate_code_spans_winnowing(&views, options);
+    let out = detect_duplicate_code_spans_winnowing(&views, options, &mut stats);
     Ok(ScanOutcome { result: out, stats })
 }

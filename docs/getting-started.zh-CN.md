@@ -8,7 +8,7 @@
 
 - Rust toolchain `1.92.0`（仓库用 `rust-toolchain.toml` 固定）
 - （可选）Node.js `>= 22`（如果你想用 npm 安装/构建）
-- （可选）Git：默认会尊重 `.gitignore`，并在可用时通过 `git ls-files` 加速文件收集
+- （可选）Git：默认会尊重 `.gitignore`（在 Git 仓库内也会遵循 `.git/info/exclude` / 全局忽略规则），并在可用时通过 `git ls-files` 加速文件收集；如需包含被忽略文件，请用 `--no-gitignore`。
 
 ## 1) 从源码跑 CLI（推荐：最稳定）
 
@@ -59,6 +59,8 @@ dup-code-check --cross-repo-only /repoA /repoB
 
 `--cross-repo-only` 会过滤掉“只在同一个 root 内出现”的重复组。
 
+root 就是你传入的路径；`--cross-repo-only` 需要 2+ 个 root，不会自动按 Git 仓库拆分。
+
 ## 4) 扫描疑似重复代码片段（输出行号范围）
 
 ```bash
@@ -82,5 +84,7 @@ dup-code-check --json --stats --strict .
 - `--json`：结构化输出（机器可读）
 - `--stats`：包含扫描统计信息（JSON 中会附带 `scanStats`；文本模式下会打印到 stderr）
 - `--strict`：如果扫描过程中出现“致命跳过”（例如权限错误、遍历错误、预算打断），退出码为非 0
+
+提示：非致命跳过仍会返回 `0`；文本模式下 `--stats` 写入 stderr，CI 想失败请加 `--strict`。
 
 更完整的输出字段说明见《[输出与报告](output.zh-CN.md)》。

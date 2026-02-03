@@ -29,8 +29,9 @@ npm run docs:serve
   - 连续 `>= 50` 个字符相同视为疑似重复，报告真实行号范围
 - 重复检测报告（`--report`）
   - 行级 / token 级 / block 级 / “AST 子树”级（基于 `{}` 结构）重复
-  - 近似重复（MinHash / SimHash）
+- 近似重复（MinHash / SimHash）
 - 扫描默认会跳过 `.gitignore` 命中的文件
+  - 提示：在 Git 仓库内会遵循 `.gitignore`、`.git/info/exclude` 与全局忽略规则；如需包含被忽略文件，请用 `--no-gitignore`。
 
 ## 安装
 
@@ -58,6 +59,8 @@ dup-code-check --help
 - Rust toolchain `1.92.0`（已通过 `rust-toolchain.toml` 固定，参考 Codex 项目）
 
 安全提示：npm 安装会执行 `postinstall`，会触发原生构建（Cargo），并可能运行依赖的 build script。若需要避免执行安装脚本，请使用 `npm_config_ignore_scripts=true`。
+
+你也可以设置 `DUP_CODE_CHECK_SKIP_BUILD=1` 来跳过安装阶段的 Rust 构建（随后在 `node_modules/dup-code-check/` 下手动执行 `npm run build`）。
 
 如果你希望避免在安装时执行脚本，可以用 `npm_config_ignore_scripts=true` 安装后手动构建：
 

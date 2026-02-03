@@ -6,7 +6,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::*;
 use crate::tokenize::tokenize_for_dup_detection;
 use crate::util::{normalize_for_code_spans, normalize_whitespace};
-use crate::{DEFAULT_MAX_FILE_SIZE_BYTES, find_duplicate_code_spans, find_duplicate_files};
+use crate::{
+    DEFAULT_MAX_FILE_SIZE_BYTES, find_duplicate_code_spans, find_duplicate_code_spans_with_stats,
+    find_duplicate_files,
+};
 
 #[test]
 fn normalize_whitespace_removes_ascii_whitespace() {
@@ -112,6 +115,27 @@ R{snippet}S
         assert_eq!(occ.start_line, 2);
         assert_eq!(occ.end_line, 2);
     }
+    Ok(())
+}
+
+#[test]
+fn scan_stats_counts_bucket_truncation() -> io::Result<()> {
+    let repo_a = temp_dir("bucket_trunc_a");
+    let repo_b = temp_dir("bucket_trunc_b");
+    fs::create_dir_all(&repo_a)?;
+    fs::create_dir_all(&repo_b)?;
+
+    let repeated = "a".repeat(320);
+    fs::write(repo_a.join("a.txt"), &repeated)?;
+    fs::write(repo_b.join("b.txt"), &repeated)?;
+
+    let options = ScanOptions {
+        cross_repo_only: true,
+        ..ScanOptions::default()
+    };
+    let outcome = find_duplicate_code_spans_with_stats(&[repo_a, repo_b], &options)?;
+    assert!(outcome.stats.skipped_bucket_truncated > 0);
+    assert!(!outcome.result.is_empty());
     Ok(())
 }
 

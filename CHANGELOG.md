@@ -61,6 +61,11 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: resolve roots via `canonicalize()` (fail if it fails) to reduce symlink ambiguity.
 - Docs: add a security note that npm `postinstall` runs a native build (Cargo) and may execute dependency build scripts.
 - Docs: add the same `postinstall` security note to Getting Started.
+- Scan stats: record detector bucket truncation as `skippedBucketTruncated`.
+- CLI: `--strict` now treats `outside_root` traversal skips as fatal (scan incomplete).
+- Scan: `ignoreDirs` matching is case-insensitive on Windows (ASCII).
+- Tokenizer: treat `#` as a comment only at line start (after optional whitespace).
+- CI: docs build now runs with `LLMS_STRICT=1`.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
@@ -85,3 +90,6 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan pipeline: when `git check-ignore` fails during streaming, stop scanning (fail closed) instead of continuing without ignore filtering.
 - Scan pipeline: when `git ls-files` outputs non-UTF-8 paths in streaming mode, fall back to the walker before scanning.
 - npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.
+- Git integration: treat non-UTF-8 output from `git check-ignore` as a fallback trigger.
+- npm build: improve Cargo build failure diagnostics.
+- Node smoke: verify the wrapper can execute `--version` when deciding whether to rebuild.

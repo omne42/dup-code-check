@@ -50,6 +50,7 @@ pub struct ScanStats {
     pub skipped_walk_errors: u64,
     pub skipped_budget_max_files: u64,
     pub skipped_budget_max_total_bytes: u64,
+    pub skipped_bucket_truncated: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

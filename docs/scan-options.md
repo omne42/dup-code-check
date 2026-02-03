@@ -41,7 +41,7 @@ dup-code-check --gitignore .
 Notes:
 
 - even when `.gitignore` is disabled, `ignoreDirs` still applies
-- `.gitignore` behavior depends on implementation details (e.g. whether the root is a Git repo)
+- when scanning inside a Git repo, ignore rules include `.gitignore`, `.git/info/exclude`, and global Git ignores
 
 ### `followSymlinks` / `--follow-symlinks`
 

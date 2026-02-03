@@ -66,6 +66,7 @@ cargo build --release -p dup-code-check
 现象：退出码为 `1`，并且 stderr 打印了 scan stats，包含：
 
 - `permission_denied`
+- `outside_root`
 - `walk_errors`
 - `budget_max_files` / `budget_max_total_bytes`
 
@@ -77,7 +78,7 @@ cargo build --release -p dup-code-check
 
 ## 5) `.gitignore` 行为与预期不一致
 
-默认会尊重 `.gitignore`。如果你希望完全扫描（包括被忽略的文件），使用：
+默认会尊重 `.gitignore`。在 Git 仓库内还会遵循 `.git/info/exclude` 与全局忽略规则。如果你希望完全扫描（包括被忽略的文件），使用：
 
 ```bash
 dup-code-check --no-gitignore .

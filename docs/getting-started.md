@@ -8,7 +8,7 @@ Goal: run a scan with minimal setup, and understand the shape of the output.
 
 - Rust toolchain `1.92.0` (pinned by `rust-toolchain.toml`)
 - (Optional) Node.js `>= 22` (only if you want to install/build via npm)
-- (Optional) Git: by default we respect `.gitignore`, and when available we use `git ls-files` to speed up file collection
+- (Optional) Git: by default we respect `.gitignore` (and `.git/info/exclude` / global ignores when in a Git repo), and when available we use `git ls-files` to speed up file collection. Use `--no-gitignore` to include ignored files.
 
 ## 1) Run from source (recommended)
 
@@ -57,6 +57,8 @@ dup-code-check --cross-repo-only /repoA /repoB
 
 `--cross-repo-only` filters out groups that only occur within a single root.
 
+Roots are exactly the paths you pass; `--cross-repo-only` only works with 2+ roots and does not auto-detect Git repos.
+
 ## 4) Suspected duplicate code spans (with line ranges)
 
 ```bash
@@ -80,5 +82,7 @@ dup-code-check --json --stats --strict .
 - `--json`: machine-readable output
 - `--stats`: includes `scanStats` (or prints to stderr in text mode)
 - `--strict`: exits non-zero if the scan was incomplete (e.g. permission errors, traversal errors, budget abort)
+
+Tip: non-fatal skips still exit `0`; use `--stats` (check stderr in text mode) and `--strict` to fail CI on incomplete scans.
 
 For a complete field reference, see [Output & Report](output.md).

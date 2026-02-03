@@ -59,6 +59,7 @@ pub(crate) fn tokenize_for_dup_detection(text: &str) -> TokenizedText {
     let bytes = text.as_bytes();
     let mut i = 0usize;
     let mut line: u32 = 1;
+    let mut at_line_start = true;
 
     let mut tokens = Vec::new();
     let mut token_lines = Vec::new();
@@ -68,12 +69,16 @@ pub(crate) fn tokenize_for_dup_detection(text: &str) -> TokenizedText {
         if b == b'\n' {
             line = line.saturating_add(1);
             i += 1;
+            at_line_start = true;
             continue;
         }
         if b.is_ascii_whitespace() {
             i += 1;
             continue;
         }
+
+        let was_at_line_start = at_line_start;
+        at_line_start = false;
 
         if b == b'/' && i + 1 < bytes.len() && bytes[i + 1] == b'/' {
             i += 2;
@@ -87,6 +92,7 @@ pub(crate) fn tokenize_for_dup_detection(text: &str) -> TokenizedText {
             while i + 1 < bytes.len() {
                 if bytes[i] == b'\n' {
                     line = line.saturating_add(1);
+                    at_line_start = true;
                 }
                 if bytes[i] == b'*' && bytes[i + 1] == b'/' {
                     i += 2;
@@ -96,7 +102,7 @@ pub(crate) fn tokenize_for_dup_detection(text: &str) -> TokenizedText {
             }
             continue;
         }
-        if b == b'#' {
+        if b == b'#' && was_at_line_start {
             i += 1;
             while i < bytes.len() && bytes[i] != b'\n' {
                 i += 1;

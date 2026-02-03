@@ -41,8 +41,11 @@ function newestSourceMtimeMs() {
 
 function buildIfNeeded() {
   if (fs.existsSync(binaryPath)) {
-    const probe = spawnSync(process.execPath, [wrapperPath, '--help'], { encoding: 'utf8' });
-    if (probe.status === 0) {
+    const probeHelp = spawnSync(process.execPath, [wrapperPath, '--help'], { encoding: 'utf8' });
+    const probeVersion = spawnSync(process.execPath, [wrapperPath, '--version'], {
+      encoding: 'utf8'
+    });
+    if (probeHelp.status === 0 && probeVersion.status === 0) {
       const binMtime = newestMtimeMs(binaryPath);
       if (newestSourceMtimeMs() <= binMtime) return;
     }

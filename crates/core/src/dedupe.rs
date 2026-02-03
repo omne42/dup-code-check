@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::types::{DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions};
+use crate::types::{DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanStats};
 use crate::util::{
     NormalizedFileView, SpanGroupBuilder, add_occurrence_view, canonicalize_match, fnv1a64,
     fnv1a64_u32, make_preview, maximal_match, winnowed_fingerprints,
@@ -70,6 +70,7 @@ impl FileDuplicateGrouper {
 pub(crate) fn detect_duplicate_code_spans_winnowing<'a>(
     files: &[NormalizedFileView<'a>],
     options: &ScanOptions,
+    stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
     if files.is_empty() {
         return Vec::new();
@@ -163,8 +164,12 @@ pub(crate) fn detect_duplicate_code_spans_winnowing<'a>(
         if occs.len() <= 1 {
             continue;
         }
-        if occs.len() > MAX_BUCKET {
+        let original_len = occs.len();
+        if original_len > MAX_BUCKET {
             occs = truncate_bucket_by_repo(occs, files, MAX_BUCKET);
+            stats.skipped_bucket_truncated = stats
+                .skipped_bucket_truncated
+                .saturating_add((original_len - occs.len()) as u64);
         }
 
         for i in 0..occs.len() {

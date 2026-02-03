@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::dedupe::detect_duplicate_code_spans_winnowing;
-use crate::types::{DuplicateSpanGroup, DuplicateSpanOccurrence, ScanOptions, SimilarityPair};
+use crate::types::{
+    DuplicateSpanGroup, DuplicateSpanOccurrence, ScanOptions, ScanStats, SimilarityPair,
+};
 use crate::util::{
     NormalizedFileView, SpanGroupBuilder, add_occurrence_view, canonicalize_match, fnv1a64_u32,
     fold_u64_to_u32, maximal_match, winnowed_fingerprints,
@@ -13,6 +15,7 @@ use super::util::{preview_from_lines, sort_span_groups_for_report};
 pub(super) fn detect_duplicate_code_spans(
     files: &[ScannedTextFile],
     options: &ScanOptions,
+    stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
     let min_match_len = options.min_match_len.max(1);
 
@@ -34,7 +37,7 @@ pub(super) fn detect_duplicate_code_spans(
         return Vec::new();
     }
 
-    let mut out = detect_duplicate_code_spans_winnowing(&normalized, options);
+    let mut out = detect_duplicate_code_spans_winnowing(&normalized, options, stats);
     sort_span_groups_for_report(&mut out);
     out.truncate(options.max_report_items);
     out
@@ -43,6 +46,7 @@ pub(super) fn detect_duplicate_code_spans(
 pub(super) fn detect_duplicate_line_spans(
     files: &[ScannedTextFile],
     options: &ScanOptions,
+    stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
     let min_char_len = options.min_match_len.max(1);
 
@@ -86,12 +90,14 @@ pub(super) fn detect_duplicate_line_spans(
             preview_from_lines(file_texts[file_id], start_line, end_line, 120)
         },
         options.max_report_items,
+        stats,
     )
 }
 
 pub(super) fn detect_duplicate_token_spans(
     files: &[ScannedTextFile],
     options: &ScanOptions,
+    stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
     let min_token_len = options.min_token_len.max(1);
     let fingerprint_len = min_token_len.clamp(1, 25);
@@ -127,6 +133,7 @@ pub(super) fn detect_duplicate_token_spans(
             preview_from_lines(file_texts[file_id], start_line, end_line, 120)
         },
         options.max_report_items,
+        stats,
     )
 }
 
@@ -161,22 +168,17 @@ pub(super) fn detect_duplicate_blocks(
                         content_hash,
                         normalized_len: slice.len(),
                         sample: slice.to_vec(),
-                        preview: String::new(),
-                        occurrences: Vec::new(),
-                        occurrence_keys: HashSet::new(),
-                        repo_ids: HashSet::new(),
+                        preview,
+                        occurrences: vec![DuplicateSpanOccurrence {
+                            repo_id: file.repo_id,
+                            repo_label: file.repo_label.clone(),
+                            path: file.path.clone(),
+                            start_line: node.start_line,
+                            end_line: node.end_line,
+                        }],
+                        occurrence_keys: HashSet::from([(file_id, node.start_token)]),
+                        repo_ids: HashSet::from([file.repo_id]),
                     });
-                    let b = bucket.last_mut().expect("just pushed");
-                    b.occurrences.push(DuplicateSpanOccurrence {
-                        repo_id: file.repo_id,
-                        repo_label: file.repo_label.clone(),
-                        path: file.path.clone(),
-                        start_line: node.start_line,
-                        end_line: node.end_line,
-                    });
-                    b.repo_ids.insert(file.repo_id);
-                    b.occurrence_keys.insert((file_id, node.start_token));
-                    b.preview = preview;
                     continue;
                 }
             };
@@ -282,22 +284,17 @@ pub(super) fn detect_duplicate_ast_subtrees(
                             .as_ref()
                             .map(|r| r.repr.clone())
                             .unwrap_or_default(),
-                        preview: String::new(),
-                        occurrences: Vec::new(),
-                        occurrence_keys: HashSet::new(),
-                        repo_ids: HashSet::new(),
+                        preview,
+                        occurrences: vec![DuplicateSpanOccurrence {
+                            repo_id: file.repo_id,
+                            repo_label: file.repo_label.clone(),
+                            path: file.path.clone(),
+                            start_line: node.start_line,
+                            end_line: node.end_line,
+                        }],
+                        occurrence_keys: HashSet::from([(file_id, node.start_token)]),
+                        repo_ids: HashSet::from([file.repo_id]),
                     });
-                    let b = bucket.last_mut().expect("just pushed");
-                    b.occurrences.push(DuplicateSpanOccurrence {
-                        repo_id: file.repo_id,
-                        repo_label: file.repo_label.clone(),
-                        path: file.path.clone(),
-                        start_line: node.start_line,
-                        end_line: node.end_line,
-                    });
-                    b.repo_ids.insert(file.repo_id);
-                    b.occurrence_keys.insert((file_id, node.start_token));
-                    b.preview = preview;
                     continue;
                 }
             };
@@ -332,6 +329,7 @@ fn detect_duplicate_span_groups_with_len_filter<'a>(
     accept_match: impl Fn(usize, usize, usize) -> bool,
     preview_from_occurrence: impl Fn(usize, u32, u32) -> String,
     max_items: usize,
+    stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
     if max_items == 0 {
         return Vec::new();
@@ -422,8 +420,12 @@ fn detect_duplicate_span_groups_with_len_filter<'a>(
         if occs.len() <= 1 {
             continue;
         }
-        if occs.len() > MAX_BUCKET {
+        let original_len = occs.len();
+        if original_len > MAX_BUCKET {
             occs = truncate_bucket_by_repo(occs, files, MAX_BUCKET);
+            stats.skipped_bucket_truncated = stats
+                .skipped_bucket_truncated
+                .saturating_add((original_len - occs.len()) as u64);
         }
 
         for i in 0..occs.len() {
@@ -496,12 +498,13 @@ fn detect_duplicate_span_groups_with_len_filter<'a>(
                     }
                 };
 
-                if builder.occurrences.is_empty()
-                    && let (Some(&start_line), Some(&end_line)) = (
-                        files[file_a].line_map.get(start_a),
-                        files[file_a].line_map.get(start_a + len - 1),
-                    )
-                {
+                if builder.occurrences.is_empty() {
+                    let start_line = files[file_a].line_map.get(start_a).copied().unwrap_or(1);
+                    let end_line = files[file_a]
+                        .line_map
+                        .get(start_a + len - 1)
+                        .copied()
+                        .unwrap_or(start_line);
                     builder.preview = preview_from_occurrence(file_a, start_line, end_line);
                 }
 

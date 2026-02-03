@@ -61,6 +61,11 @@
 - CLI：root 路径使用 `canonicalize()`（失败则报错），降低符号链接歧义。
 - 文档：补充安全提示——npm `postinstall` 会触发原生构建（Cargo），并可能运行依赖的 build script。
 - 文档：在《快速开始》中补齐同样的 `postinstall` 安全提示。
+- 扫描统计：新增 `skippedBucketTruncated`，用于标记检测器 fingerprint bucket 被截断（防爆保护）。
+- CLI：`--strict` 现在会把 `outside_root` 视为“扫描不完整”（遍历跳过），从而退出非 0。
+- 扫描：Windows 下 `ignoreDirs` 按 ASCII 做大小写不敏感匹配。
+- Tokenizer：仅在行首（允许前置空白）把 `#` 视为注释。
+- CI：docs build 默认启用 `LLMS_STRICT=1`。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
@@ -85,3 +90,6 @@
 - 扫描流程：在流式模式下 `git check-ignore` 失败时停止扫描（fail closed），避免在 ignore 失效时继续扫描。
 - 扫描流程：流式模式遇到 `git ls-files` 输出非 UTF-8 路径时，在开始扫描前回退到 walker。
 - npm 构建：当 `bin/dup-code-check.mjs` wrapper 缺失时，提前失败并输出更清晰的错误信息。
+- Git 集成：当 `git check-ignore` 输出包含非 UTF-8 路径时触发回退。
+- npm 构建：Cargo 构建失败时输出更友好的诊断信息。
+- Node smoke：在决定是否需要重建时额外验证 wrapper 可执行 `--version`。

@@ -101,5 +101,5 @@ dup-code-check --report [root ...]
 - `0`：正常完成（即使跳过了 “NotFound/TooLarge/Binary”等非致命情况）
 - `1`：
   - 运行期错误（例如 root 不存在/不是目录、扫描过程异常）
-  - 启用 `--strict` 且出现“致命跳过”：`PermissionDenied` / 遍历错误 / 被预算中断（`maxFiles` / `maxTotalBytes`）
+  - 启用 `--strict` 且出现“致命跳过”：`PermissionDenied` / `outside_root` / 遍历错误 / 被预算中断（`maxFiles` / `maxTotalBytes`）
 - `2`：参数解析错误（未知参数、非整数的整数参数等）

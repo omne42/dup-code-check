@@ -25,7 +25,16 @@ try {
         '  npm run build\n'
     );
   }
-  throw err;
+  const status =
+    err && typeof err === 'object' && 'status' in err && typeof err.status === 'number'
+      ? err.status
+      : 'unknown';
+  throw new Error(
+    'Failed to build Rust binary via Cargo.\n' +
+      `Exit status: ${status}\n` +
+      'Try running this command manually to see full output:\n' +
+      '  cargo build --release --locked -p dup-code-check\n'
+  );
 }
 
 const targetDir = path.join(repoRoot, 'target', 'release');

@@ -69,6 +69,7 @@ Fix:
 Symptoms: exit code `1`, and stderr prints scan stats containing:
 
 - `permission_denied`
+- `outside_root`
 - `walk_errors`
 - `budget_max_files` / `budget_max_total_bytes`
 
@@ -80,7 +81,7 @@ Fix ideas:
 
 ## 5) `.gitignore` behavior differs from expectations
 
-By default `.gitignore` is respected. To fully scan (including ignored files), use:
+By default `.gitignore` is respected. When scanning inside a Git repo, ignore rules include `.gitignore`, `.git/info/exclude`, and global Git ignores. To fully scan (including ignored files), use:
 
 ```bash
 dup-code-check --no-gitignore .

@@ -17,6 +17,7 @@
   - Reports line ranges for occurrences
 - Report mode (`--report`): multiple detectors/levels in one run
 - Respects `.gitignore` by default
+  - Note: in a Git repo, ignore rules include `.gitignore`, `.git/info/exclude`, and global Git ignores. Use `--no-gitignore` to include ignored files.
 
 ## Install
 
@@ -41,9 +42,16 @@ npm i -D dup-code-check
 npx dup-code-check --help
 ```
 
+Requires:
+
+- Node.js `>= 22`
+- Rust toolchain `1.92.0` (pinned by `rust-toolchain.toml`)
+
 > Note: this package builds the Rust binary during `postinstall`, so Rust is required.
 >
 > Security note: `postinstall` runs a native build (Cargo), which may execute dependency build scripts.
+>
+> You can also set `DUP_CODE_CHECK_SKIP_BUILD=1` to skip the build during install (then run `npm run build` manually inside `node_modules/dup-code-check/`).
 >
 > To avoid running install scripts, use `npm_config_ignore_scripts=true` and build manually:
 >

@@ -169,7 +169,7 @@ where
             }
 
             if let Some(name) = entry.file_name().to_str()
-                && ignore_dirs.contains(name)
+                && ignore_dirs_contains(&ignore_dirs, name)
             {
                 return false;
             }
@@ -352,7 +352,7 @@ where
 
         let mut segs = rel.split('/');
         segs.next_back();
-        if segs.any(|seg| options.ignore_dirs.contains(seg)) {
+        if segs.any(|seg| ignore_dirs_contains(&options.ignore_dirs, seg)) {
             continue;
         }
 
@@ -418,6 +418,20 @@ fn is_safe_relative_path(raw: &str) -> bool {
     true
 }
 
+fn ignore_dirs_contains(ignore_dirs: &HashSet<String>, name: &str) -> bool {
+    if ignore_dirs.contains(name) {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        ignore_dirs.iter().any(|d| d.eq_ignore_ascii_case(name))
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<String>> {
     let mut child = Command::new(git_exe())
         .arg("-C")
@@ -453,7 +467,9 @@ fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<Str
         if part.is_empty() {
             continue;
         }
-        out.insert(String::from_utf8_lossy(part).to_string());
+        let path = std::str::from_utf8(part)
+            .map_err(|_| io::Error::other("git check-ignore returned a non-UTF-8 path"))?;
+        out.insert(path.to_string());
     }
     Ok(out)
 }
@@ -640,7 +656,7 @@ where
 
         let mut segs = rel.split('/');
         segs.next_back();
-        if segs.any(|seg| options.ignore_dirs.contains(seg)) {
+        if segs.any(|seg| ignore_dirs_contains(&options.ignore_dirs, seg)) {
             continue;
         }
 

@@ -7,6 +7,7 @@ use crate::json::{
 
 pub(crate) fn has_fatal_skips(stats: &ScanStats) -> bool {
     stats.skipped_permission_denied > 0
+        || stats.skipped_outside_root > 0
         || stats.skipped_walk_errors > 0
         || stats.skipped_budget_max_files > 0
         || stats.skipped_budget_max_total_bytes > 0
@@ -27,6 +28,7 @@ pub(crate) fn format_scan_stats(localization: Localization, stats: &ScanStats) -
         ("binary", stats.skipped_binary),
         ("outside_root", stats.skipped_outside_root),
         ("walk_errors", stats.skipped_walk_errors),
+        ("bucket_truncated", stats.skipped_bucket_truncated),
         ("budget_max_files", stats.skipped_budget_max_files),
         (
             "budget_max_total_bytes",

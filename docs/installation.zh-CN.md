@@ -35,6 +35,8 @@ npx dup-code-check --help
 ```
 
 > 提示：如果你的环境禁用了 npm scripts（例如 `npm_config_ignore_scripts=true`），`postinstall` 不会编译二进制；你需要在项目中手动执行 `npm run build`（在 `node_modules/dup-code-check/` 目录下）或改用 Rust 方式。
+>
+> 提示：如果你希望保留 npm scripts 但跳过 Rust 构建，可以在安装时设置 `DUP_CODE_CHECK_SKIP_BUILD=1`，然后再手动构建。
 
 ## 方式 C：全局安装（适合本机工具）
 

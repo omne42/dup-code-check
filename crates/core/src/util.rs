@@ -214,16 +214,24 @@ pub(crate) fn add_occurrence_view(
     start: usize,
     len: usize,
 ) {
+    if len == 0 {
+        return;
+    }
     if !builder.occurrence_keys.insert((file_id, start)) {
         return;
     }
 
-    let Some(&start_line) = file.line_map.get(start) else {
-        return;
-    };
-    let Some(&end_line) = file.line_map.get(start + len - 1) else {
-        return;
-    };
+    debug_assert_eq!(
+        file.line_map.len(),
+        file.normalized.len(),
+        "line_map and normalized must have the same length"
+    );
+    let start_line = file.line_map.get(start).copied().unwrap_or(1);
+    let end_line = file
+        .line_map
+        .get(start + len - 1)
+        .copied()
+        .unwrap_or(start_line);
 
     builder.repo_ids.insert(file.repo_id);
     builder.occurrences.push(DuplicateSpanOccurrence {

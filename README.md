@@ -5,7 +5,7 @@
 `dup-code-check` is a toolbox for detecting duplicates/similarity in codebases. It ships as a **Rust CLI binary**; Node.js is used as an installation option via npm.
 
 - CI: `.github/workflows/ci.yml`
-- Docs (VitePress): `docs/index.md` (English) / `docs/index.zh-CN.md` (中文)
+- Docs: https://omne42.github.io/dup-code-check/ (VitePress; sources in `docs/`; not shipped in the npm package)
 
 ## What it does (MVP)
 
@@ -57,4 +57,13 @@ dup-code-check .
 dup-code-check --cross-repo-only /repoA /repoB
 dup-code-check --code-spans --cross-repo-only /repoA /repoB
 dup-code-check --json --report .
+```
+
+## Docs
+
+To preview docs locally, clone the repo and run:
+
+```bash
+npm install --ignore-scripts
+npm run docs:serve
 ```

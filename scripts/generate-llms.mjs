@@ -27,27 +27,130 @@ function linkToRelDocs(link) {
   return `${trimmed}.md`;
 }
 
+function stripFrontmatter(markdown) {
+  const match = markdown.match(/^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---\r?\n/);
+  if (!match) return markdown;
+  return markdown.slice(match[0].length);
+}
+
+function extractBalanced(source, startIndex, openChar, closeChar) {
+  let depth = 0;
+  let inString = null;
+  let escape = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let i = startIndex; i < source.length; i += 1) {
+    const ch = source[i];
+    const next = source[i + 1] ?? '';
+
+    if (inLineComment) {
+      if (ch === '\n') inLineComment = false;
+      continue;
+    }
+    if (inBlockComment) {
+      if (ch === '*' && next === '/') {
+        inBlockComment = false;
+        i += 1;
+      }
+      continue;
+    }
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escape = true;
+        continue;
+      }
+      if (ch === inString) {
+        inString = null;
+      }
+      continue;
+    }
+
+    if (ch === '/' && next === '/') {
+      inLineComment = true;
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      inBlockComment = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      inString = ch;
+      continue;
+    }
+
+    if (ch === openChar) {
+      depth += 1;
+      continue;
+    }
+    if (ch === closeChar) {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(startIndex, i + 1);
+      }
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function extractSidebarArrayFromVitepressConfig(text) {
+  const idx = text.indexOf('sidebar');
+  if (idx === -1) return null;
+
+  const colon = text.indexOf(':', idx);
+  if (colon === -1) return null;
+
+  const start = text.indexOf('[', colon);
+  if (start === -1) return null;
+
+  return extractBalanced(text, start, '[', ']');
+}
+
 function loadDocOrderFromVitepressConfig() {
   const configPath = path.join(docsRoot, '.vitepress', 'config.mts');
   try {
     const text = fs.readFileSync(configPath, 'utf8');
-    const links = [];
-    const re = /link:\s*['"]([^'"]+)['"]/g;
-    for (const m of text.matchAll(re)) {
-      const link = m[1];
-      if (typeof link !== 'string' || !link.startsWith('/')) continue;
-      links.push(link);
+    const sidebar = extractSidebarArrayFromVitepressConfig(text);
+    if (!sidebar) return null;
+
+    const english = [];
+    const zh = [];
+    const seenEn = new Set();
+    const seenZh = new Set();
+
+    function add(relDocs) {
+      if (isZh(relDocs)) {
+        if (seenZh.has(relDocs)) return;
+        seenZh.add(relDocs);
+        zh.push(relDocs);
+      } else {
+        if (seenEn.has(relDocs)) return;
+        seenEn.add(relDocs);
+        english.push(relDocs);
+      }
     }
 
-    const out = [];
-    const seen = new Set();
-    for (const link of links) {
+    if (fs.existsSync(path.join(docsRoot, 'index.md'))) add('index.md');
+    if (fs.existsSync(path.join(docsRoot, 'index.zh-CN.md'))) add('index.zh-CN.md');
+
+    const re = /link:\s*['"]([^'"]+)['"]/g;
+    for (const m of sidebar.matchAll(re)) {
+      const link = m[1];
+      if (typeof link !== 'string' || !link.startsWith('/')) continue;
       const relDocs = linkToRelDocs(link);
       if (!relDocs) continue;
-      if (seen.has(relDocs)) continue;
-      seen.add(relDocs);
-      out.push(relDocs);
+      add(relDocs);
     }
+
+    const out = [...english, ...zh];
     return out.length > 0 ? out : null;
   } catch {
     return null;
@@ -138,6 +241,14 @@ if (!fs.existsSync(docsRoot)) {
 fs.mkdirSync(publicDir, { recursive: true });
 
 const docOrder = loadDocOrderFromVitepressConfig();
+const strict = process.env.LLMS_STRICT === '1';
+if (!docOrder) {
+  const msg =
+    'llms: warning: failed to derive ordering from VitePress config; falling back to lexicographic order.\n' +
+    'llms: set LLMS_STRICT=1 to treat this as an error.\n';
+  process.stderr.write(msg);
+  if (strict) process.exit(1);
+}
 const orderIndex = new Map();
 if (docOrder) {
   for (let i = 0; i < docOrder.length; i += 1) {
@@ -173,6 +284,7 @@ if (docOrder) {
     for (const p of missing) {
       process.stderr.write(`- ${p}\n`);
     }
+    if (strict) process.exit(1);
   }
 
   const unknown = files.filter((f) => !orderIndex.has(f.relDocs)).map((f) => f.relDocs);
@@ -184,6 +296,7 @@ if (docOrder) {
     process.stderr.write(
       'llms: those pages will be appended after ordered pages; add them to the sidebar to control ordering.\n'
     );
+    if (strict) process.exit(1);
   }
 }
 
@@ -214,7 +327,7 @@ for (const o of outputs) {
 
   for (const file of files) {
     if (!o.filter(file.relDocs)) continue;
-    const content = fs.readFileSync(file.abs, 'utf8');
+    const content = stripFrontmatter(fs.readFileSync(file.abs, 'utf8'));
     out += '\n';
     out += '---\n';
     out += `source: ${file.rel}\n`;

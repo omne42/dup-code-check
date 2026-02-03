@@ -41,6 +41,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Dev: regenerate `package-lock.json` with `registry.npmjs.org` resolved URLs (avoid `npmmirror`).
 - Docs: derive `llms` bundle ordering from VitePress sidebar config (warn on missing/unlinked pages).
 - Docs: localize the `llms.zh-CN.txt` bundle header.
+- Docs: strip VitePress frontmatter from `llms` bundles.
+- Docs: README now links to the hosted docs and clarifies docs are not shipped in the npm package.
+- Docs: `LLMS_STRICT=1` makes `docs:llms` fail on ordering/sidebar inconsistencies.
 - Docs workflow: skip GitHub Pages deployment when the repository is private.
 - Docs workflow: auto-enable GitHub Pages (Actions) when deploying docs.
 - Release workflow: publish to crates.io on tag releases (and skip when token is missing).

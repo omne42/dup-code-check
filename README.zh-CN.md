@@ -6,10 +6,18 @@
 
 ## 文档
 
-更完整的文档（VitePress）在：
+在线文档（VitePress）：
 
-- `docs/index.zh-CN.md`（中文）
-- `docs/index.md`（English）
+- https://omne42.github.io/dup-code-check/
+
+文档源文件在仓库 `docs/` 目录（npm 包不包含 `docs/`）。
+
+本地预览（需 clone 仓库）：
+
+```bash
+npm install --ignore-scripts
+npm run docs:serve
+```
 
 ## 当前功能（MVP）
 

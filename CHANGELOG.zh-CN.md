@@ -41,6 +41,9 @@
 - 开发：用 `registry.npmjs.org` 重新生成 `package-lock.json`（避免 `npmmirror`）。
 - 文档：`llms` 合集的顺序改为从 VitePress sidebar 配置派生（并对缺失/未挂载页面给出 warning）。
 - 文档：`llms.zh-CN.txt` 的 header 改为中文。
+- 文档：`llms` 合集中移除 VitePress frontmatter（降低噪音）。
+- 文档：README 改为指向线上文档，并说明 npm 包不包含 `docs/`。
+- 文档：支持 `LLMS_STRICT=1`，用于在顺序/sidebar 不一致时让 `docs:llms` 失败。
 - 文档 workflow：当仓库为私有时跳过 GitHub Pages 部署。
 - 文档 workflow：部署文档时自动启用 GitHub Pages（GitHub Actions）。
 - 发布 workflow：在 tag 发布时执行 crates.io 发布（未配置 token 时自动跳过）。

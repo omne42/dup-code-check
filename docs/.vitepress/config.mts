@@ -18,7 +18,8 @@ export default defineConfig({
 
   themeConfig: {
     nav: [
-      { text: 'Docs', link: '/introduction' },
+      { text: 'Docs', link: '/' },
+      { text: 'LLMs', link: '/llms' },
       { text: '中文', link: '/introduction.zh-CN' },
     ],
 
@@ -27,6 +28,7 @@ export default defineConfig({
         text: 'English',
         items: [
           { text: 'Introduction', link: '/introduction' },
+          { text: 'LLM Bundle', link: '/llms' },
           { text: 'Getting Started', link: '/getting-started' },
           { text: 'Installation & Build', link: '/installation' },
           { text: 'CLI Usage', link: '/cli' },
@@ -48,6 +50,7 @@ export default defineConfig({
         text: '中文',
         items: [
           { text: '介绍', link: '/introduction.zh-CN' },
+          { text: 'LLM 文档包', link: '/llms.zh-CN' },
           { text: '快速开始', link: '/getting-started.zh-CN' },
           { text: '安装与构建', link: '/installation.zh-CN' },
           { text: 'CLI 使用', link: '/cli.zh-CN' },
@@ -82,4 +85,3 @@ export default defineConfig({
     },
   },
 });
-

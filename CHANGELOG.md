@@ -12,6 +12,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Initial scaffolding.
 - Rust CLI binary: `dup-code-check`.
 - CLI i18n: `--localization <en|zh>` (default: `en`).
+- CLI: `--version` / `-V`.
 - Scan budgets: `maxFiles` / `maxTotalBytes` (CLI: `--max-files` / `--max-total-bytes`).
 - Scan stats + strict mode in CLI (`--stats`, `--strict`).
 - CLI: `--gitignore` to explicitly enable `.gitignore` filtering (default on; mainly useful in scripts).
@@ -19,6 +20,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Core: allow overriding the `git` executable via `DUP_CODE_CHECK_GIT_BIN`.
 - GitHub Actions: CI (Linux/macOS/Windows), docs (GitHub Pages), and release (GitHub Release + npm publish).
 - Docs: bilingual (EN/ZH) with cross-links.
+- Docs: add `/llms.en.txt` + `/llms.zh-CN.txt` bundles and an `LLMs` docs page.
 
 ### Changed
 - Rename project: `dup-check` → `dup-code-check`.
@@ -32,6 +34,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - `--report` memory usage reduced by avoiding large intermediate clones.
 - Invalid roots now fail early instead of producing empty results.
 - Docs: migrate docs site from Honkit to VitePress (with `llms.txt`).
+- Docs: improve `llms.txt` generation order and add a prompt template header.
 - Docs workflow: skip GitHub Pages deployment when the repository is private.
 - Docs workflow: auto-enable GitHub Pages (Actions) when deploying docs.
 - Release workflow: publish to crates.io on tag releases (and skip when token is missing).

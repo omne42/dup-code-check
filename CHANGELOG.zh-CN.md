@@ -12,6 +12,7 @@
 - 初始脚手架。
 - Rust CLI 二进制：`dup-code-check`。
 - CLI 国际化：`--localization <en|zh>`（默认：`en`）。
+- CLI：`--version` / `-V`。
 - 扫描预算：`maxFiles` / `maxTotalBytes`（CLI：`--max-files` / `--max-total-bytes`）。
 - 扫描统计 + 严格模式（`--stats`, `--strict`）。
 - CLI：`--gitignore` 显式启用 `.gitignore` 过滤（默认开启；主要用于脚本）。
@@ -19,6 +20,7 @@
 - Core：支持通过 `DUP_CODE_CHECK_GIT_BIN` 覆盖 `git` 可执行文件路径。
 - GitHub Actions：CI（Linux/macOS/Windows）、文档（GitHub Pages）与发布（GitHub Release + npm publish）。
 - 文档：中英双语（EN/ZH），并提供互相跳转链接。
+- 文档：新增 `/llms.en.txt` + `/llms.zh-CN.txt` 合集，并补充 `LLMs` 文档页。
 
 ### Changed
 - 项目重命名：`dup-check` → `dup-code-check`。
@@ -32,6 +34,7 @@
 - `--report` 通过避免大对象中间 clone 降低内存占用。
 - 无效 root 现在会尽早失败，而不是输出空结果。
 - 文档：从 Honkit 迁移到 VitePress（并提供 `llms.txt`）。
+- 文档：优化 `llms.txt` 生成顺序，并补充可直接复用的提示词模板。
 - 文档 workflow：当仓库为私有时跳过 GitHub Pages 部署。
 - 文档 workflow：部署文档时自动启用 GitHub Pages（GitHub Actions）。
 - 发布 workflow：在 tag 发布时执行 crates.io 发布（未配置 token 时自动跳过）。

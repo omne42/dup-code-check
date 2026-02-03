@@ -16,6 +16,10 @@ use crate::text::{
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
+    if args.iter().any(|a| a == "-V" || a == "--version") {
+        println!("dup-code-check {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
     let localization = match detect_localization(&args) {
         Ok(localization) => localization,
         Err(message) => {

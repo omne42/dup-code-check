@@ -33,5 +33,10 @@ Start with the [Introduction](/introduction) to understand what `dup-code-check`
 
 ## LLM bundle (`llms.txt`)
 
-This docs site publishes `llms.txt` (plain text) at `/llms.txt`, similar to modern docs sites.
+This docs site publishes a plain-text docs bundle, similar to modern docs sites (e.g. the AI SDK):
 
+- `/llms.txt` (EN + 中文)
+- `/llms.en.txt` (English only)
+- `/llms.zh-CN.txt` (中文 only)
+
+See [LLM Bundle](/llms) for usage examples.

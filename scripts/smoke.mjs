@@ -270,6 +270,17 @@ if (helpEn.status !== 0 || !helpEn.stdout.includes('Usage:')) {
   process.exit(1);
 }
 
+const version = runCli(['--version']);
+if (
+  version.status !== 0 ||
+  !/^dup-code-check\s+\d+\.\d+\.\d+/.test((version.stdout ?? '').trim())
+) {
+  process.stderr.write(
+    `Unexpected --version output.\nstatus=${version.status}\nstdout:\n${version.stdout}\nstderr:\n${version.stderr}\n`
+  );
+  process.exit(1);
+}
+
 const helpZh = runCli(['--localization', 'zh', '--help']);
 if (helpZh.status !== 0 || !helpZh.stdout.includes('用法:')) {
   process.stderr.write(

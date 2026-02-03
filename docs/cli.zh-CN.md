@@ -94,6 +94,7 @@ dup-code-check --report [root ...]
 ### 帮助
 
 - `-h, --help`：显示帮助
+- `-V, --version`：显示版本
 
 ## 退出码（Exit Codes）
 

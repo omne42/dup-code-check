@@ -9,7 +9,7 @@ dist/
 docs/_book/
 docs/.vitepress/cache/
 docs/.vitepress/.temp/
-docs/public/llms.txt
+docs/public/llms*.txt
 
 # Built binaries
 bin/dup-code-check

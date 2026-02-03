@@ -29,6 +29,7 @@ const HELP_TEXT_EN: &str = concat!(
     "  --max-file-size <n>     Skip files larger than n bytes (default: 10485760)\n",
     "  --ignore-dir <name>     Add an ignored directory name (repeatable)\n",
     "  --follow-symlinks       Follow symlinks (within each root; default: off)\n",
+    "  -V, --version           Show version\n",
     "  -h, --help              Show help\n",
     "\n",
     "Examples:\n",
@@ -66,6 +67,7 @@ const HELP_TEXT_ZH: &str = concat!(
     "  --max-file-size <n>     跳过大于 n 字节的文件（默认: 10485760）\n",
     "  --ignore-dir <name>     忽略目录名（可重复）\n",
     "  --follow-symlinks       跟随符号链接（仅限 root 内；默认: 关闭）\n",
+    "  -V, --version           显示版本\n",
     "  -h, --help              显示帮助\n",
     "\n",
     "示例:\n",
@@ -443,6 +445,10 @@ pub(crate) fn parse_args(
             continue;
         }
         if arg == "-h" || arg == "--help" {
+            i += 1;
+            continue;
+        }
+        if arg == "-V" || arg == "--version" {
             i += 1;
             continue;
         }

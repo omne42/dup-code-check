@@ -50,4 +50,10 @@ npm run docs:serve
 
 ## 面向 LLM 的 `llms.txt`
 
-在执行 `docs:build` / `docs:serve` 时，会生成 `/llms.txt`（纯文本的文档合集）。
+在执行 `docs:build` / `docs:serve` 时，会生成纯文本的文档合集：
+
+- `/llms.txt`（EN + 中文）
+- `/llms.en.txt`（仅英文）
+- `/llms.zh-CN.txt`（仅中文）
+
+用法示例见《[面向 LLM 的文档包](llms.zh-CN.md)》。

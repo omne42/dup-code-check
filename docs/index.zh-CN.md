@@ -33,5 +33,10 @@ features:
 
 ## 面向 LLM 的 `llms.txt`
 
-本站会在 `/llms.txt` 提供一份纯文本的文档合集，方便离线阅读/LLM 上下文注入。
+本站会提供一份纯文本的文档合集（参考一些现代文档站点的做法，比如 AI SDK）：
 
+- `/llms.txt`（EN + 中文）
+- `/llms.en.txt`（仅英文）
+- `/llms.zh-CN.txt`（仅中文）
+
+用法示例见《[面向 LLM 的文档包](/llms.zh-CN)》。

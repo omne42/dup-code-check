@@ -42,4 +42,10 @@ npm run docs:serve
 
 ## LLM bundle (`llms.txt`)
 
-This docs site generates `llms.txt` at `/llms.txt` during `docs:build` / `docs:serve`.
+This docs site generates plain-text bundles during `docs:build` / `docs:serve`:
+
+- `/llms.txt` (EN + 中文)
+- `/llms.en.txt` (English only)
+- `/llms.zh-CN.txt` (中文 only)
+
+See [LLM Bundle](llms.md) for usage examples.

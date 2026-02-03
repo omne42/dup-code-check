@@ -94,6 +94,7 @@ See [Output & Report](output.md) for a full field reference.
 ### Help
 
 - `-h, --help`: show help
+- `-V, --version`: show version
 
 ## Exit codes
 

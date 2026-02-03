@@ -26,19 +26,24 @@ pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &Scan
         "警告：扫描不完整（致命跳过）：\n",
     ));
 
-    let push_item =
-        |out: &mut String, key: &str, value: u64, hint_en: &'static str, hint_zh: &'static str| {
-            if value == 0 {
-                return;
-            }
-            out.push_str(&format!(
-                "- {key}={value}: {}\n",
-                tr(localization, hint_en, hint_zh)
-            ));
-        };
+    let push_item = |out: &mut String,
+                     key_camel: &str,
+                     key_snake: &str,
+                     value: u64,
+                     hint_en: &'static str,
+                     hint_zh: &'static str| {
+        if value == 0 {
+            return;
+        }
+        out.push_str(&format!(
+            "- {key_camel}={value} ({key_snake}): {}\n",
+            tr(localization, hint_en, hint_zh)
+        ));
+    };
 
     push_item(
         &mut out,
+        "skippedPermissionDenied",
         "permission_denied",
         stats.skipped_permission_denied,
         "some files could not be read; check permissions.",
@@ -46,6 +51,7 @@ pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &Scan
     );
     push_item(
         &mut out,
+        "skippedOutsideRoot",
         "outside_root",
         stats.skipped_outside_root,
         "some symlink targets resolved outside roots; consider disabling --follow-symlinks or fixing symlinks.",
@@ -53,6 +59,7 @@ pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &Scan
     );
     push_item(
         &mut out,
+        "skippedWalkErrors",
         "walk_errors",
         stats.skipped_walk_errors,
         "filesystem traversal/read errors occurred; check the underlying errors.",
@@ -60,6 +67,7 @@ pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &Scan
     );
     push_item(
         &mut out,
+        "skippedBucketTruncated",
         "bucket_truncated",
         stats.skipped_bucket_truncated,
         "high-frequency fingerprints were truncated; consider increasing --min-match-len/--min-token-len or using --ignore-dir to skip generated/vendor dirs.",
@@ -67,6 +75,7 @@ pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &Scan
     );
     push_item(
         &mut out,
+        "skippedBudgetMaxFiles",
         "budget_max_files",
         stats.skipped_budget_max_files,
         "hit --max-files; increase the budget or remove the limit.",
@@ -74,6 +83,7 @@ pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &Scan
     );
     push_item(
         &mut out,
+        "skippedBudgetMaxTotalBytes",
         "budget_max_total_bytes",
         stats.skipped_budget_max_total_bytes,
         "hit --max-total-bytes; increase the budget or remove the limit.",
@@ -309,7 +319,8 @@ mod tests {
             ..ScanStats::default()
         };
         let msg = format_fatal_skip_warning(Localization::En, &stats);
-        assert!(msg.contains("bucket_truncated=3"));
+        assert!(msg.contains("skippedBucketTruncated=3"));
+        assert!(msg.contains("(bucket_truncated)"));
         assert!(msg.contains("--ignore-dir"));
         assert!(msg.contains("--stats"));
     }
@@ -321,7 +332,8 @@ mod tests {
             ..ScanStats::default()
         };
         let msg = format_fatal_skip_warning(Localization::Zh, &stats);
-        assert!(msg.contains("budget_max_files=1"));
+        assert!(msg.contains("skippedBudgetMaxFiles=1"));
+        assert!(msg.contains("(budget_max_files)"));
         assert!(msg.contains("请使用 --stats"));
     }
 }

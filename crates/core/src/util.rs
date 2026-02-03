@@ -42,6 +42,8 @@ pub(crate) struct WhitespaceInsensitiveFingerprint {
     pub(crate) content_hash: u64,
     pub(crate) content_hash2: u64,
     pub(crate) normalized_len: usize,
+    pub(crate) prefix: [u8; 16],
+    pub(crate) suffix: [u8; 16],
 }
 
 #[cfg(test)]
@@ -59,27 +61,54 @@ pub(crate) fn whitespace_insensitive_fingerprint(bytes: &[u8]) -> WhitespaceInse
     const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
     const FNV_PRIME: u64 = 0x100000001b3;
     const BASE: u64 = 911382323;
+    const SAMPLE: usize = 16;
 
     let mut normalized_len = 0usize;
     let mut content_hash = FNV_OFFSET_BASIS;
     let mut content_hash2 = 0u64;
 
+    let mut prefix = [0u8; SAMPLE];
+    let mut prefix_len = 0usize;
+    let mut suffix_ring = [0u8; SAMPLE];
+    let mut suffix_pos = 0usize;
+
     for &b in bytes {
         if b.is_ascii_whitespace() {
             continue;
         }
+
         normalized_len = normalized_len.saturating_add(1);
         content_hash ^= u64::from(b);
         content_hash = content_hash.wrapping_mul(FNV_PRIME);
         content_hash2 = content_hash2
             .wrapping_mul(BASE)
             .wrapping_add(u64::from(b).wrapping_add(1));
+
+        if prefix_len < SAMPLE {
+            prefix[prefix_len] = b;
+            prefix_len += 1;
+        }
+        suffix_ring[suffix_pos] = b;
+        suffix_pos = (suffix_pos + 1) % SAMPLE;
+    }
+
+    let mut suffix = [0u8; SAMPLE];
+    let suffix_len = normalized_len.min(SAMPLE);
+    if suffix_len < SAMPLE {
+        suffix[..suffix_len].copy_from_slice(&suffix_ring[..suffix_len]);
+    } else {
+        // `suffix_pos` points to the oldest element in the ring buffer.
+        for (i, s) in suffix.iter_mut().enumerate() {
+            *s = suffix_ring[(suffix_pos + i) % SAMPLE];
+        }
     }
 
     WhitespaceInsensitiveFingerprint {
         content_hash,
         content_hash2,
         normalized_len,
+        prefix,
+        suffix,
     }
 }
 
@@ -303,5 +332,13 @@ mod tests {
         let fp = whitespace_insensitive_fingerprint(bytes);
         assert_eq!(fp.content_hash, expected_hash);
         assert_eq!(fp.normalized_len, normalized.len());
+    }
+
+    #[test]
+    fn fingerprint_includes_prefix_and_suffix_samples() {
+        let bytes = b"a b c d e f g h i j k l m n o p q r";
+        let fp = whitespace_insensitive_fingerprint(bytes);
+        assert_eq!(fp.prefix, *b"abcdefghijklmnop");
+        assert_eq!(fp.suffix, *b"cdefghijklmnopqr");
     }
 }

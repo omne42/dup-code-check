@@ -14,13 +14,19 @@ struct FileGroupBuilder {
 
 #[derive(Debug, Default)]
 pub(crate) struct FileDuplicateGrouper {
-    groups: HashMap<(u64, usize, u64), FileGroupBuilder>,
+    groups: HashMap<(u64, usize, u64, [u8; 16], [u8; 16]), FileGroupBuilder>,
 }
 
 impl FileDuplicateGrouper {
     pub(crate) fn push_bytes(&mut self, bytes: &[u8], file: DuplicateFile) {
         let fp = whitespace_insensitive_fingerprint(bytes);
-        let key = (fp.content_hash, fp.normalized_len, fp.content_hash2);
+        let key = (
+            fp.content_hash,
+            fp.normalized_len,
+            fp.content_hash2,
+            fp.prefix,
+            fp.suffix,
+        );
 
         match self.groups.get_mut(&key) {
             Some(existing) => {

@@ -107,3 +107,5 @@
 - npm 包：包含 `rust-toolchain.toml`，使安装时使用固定的 Rust toolchain。
 - CLI：本地化 `Number.MAX_SAFE_INTEGER` 相关整数参数错误信息。
 - CLI：当未启用 `--stats` 且出现致命跳过时，warning 会输出原因摘要与可操作建议。
+- CLI：致命跳过 warning 现在会包含与 JSON `scanStats` 对齐的 key（camelCase），并附带 snake_case 别名。
+- Core：为降低哈希碰撞导致的重复文件误分组风险，fingerprint 额外加入 prefix/suffix 样本。

@@ -107,3 +107,5 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - npm package: include `rust-toolchain.toml` so installs use the pinned Rust toolchain.
 - CLI: localize `Number.MAX_SAFE_INTEGER` errors for integer options.
 - CLI: improve fatal-skip warnings with a reason summary and actionable hints when `--stats` is not enabled.
+- CLI: fatal-skip warnings now include JSON-compatible `scanStats` keys (camelCase), with snake_case aliases.
+- Core: reduce the risk of false file-duplicate grouping due to hash collisions by adding prefix/suffix samples to fingerprints.

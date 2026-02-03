@@ -326,7 +326,9 @@ where
                     return Ok(None);
                 }
                 stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
-                continue;
+                let _ = child.kill();
+                let _ = child.wait();
+                return Ok(None);
             }
         };
 

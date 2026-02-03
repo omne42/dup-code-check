@@ -101,8 +101,8 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - npm install: make the `dup-code-check` bin work on Windows by launching the platform binary from the Node wrapper.
 - Docs: document `maxFiles` stop behavior and `skippedBudgetMaxFiles` semantics.
 - CLI: `--version` now respects `--` (treats `--version` after `--` as a root).
-- Scan pipeline: when `git check-ignore` fails during streaming, stop scanning (fail closed) instead of continuing without ignore filtering.
-- Scan pipeline: when `git ls-files` outputs non-UTF-8 paths in streaming mode, fall back to the walker before scanning.
+- Scan pipeline: when `git check-ignore` fails during streaming, fall back to the walker (fail closed) instead of continuing without ignore filtering.
+- Scan pipeline: when `git ls-files` outputs non-UTF-8 paths in streaming mode, fall back to the walker (even after scanning has started).
 - npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.
 - Git integration: treat non-UTF-8 output from `git check-ignore` as a fallback trigger.
 - npm build: improve Cargo build failure diagnostics.
@@ -113,3 +113,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: fatal-skip warnings now include JSON-compatible `scanStats` keys (camelCase), with snake_case aliases.
 - Core: reduce the risk of false file-duplicate grouping due to hash collisions by adding prefix/suffix samples to fingerprints.
 - Scan budgets: binary files no longer bypass `maxFiles` / `maxTotalBytes`, and binary detection avoids reading entire binaries.
+- Report: avoid panics when truncating previews containing non-ASCII characters.

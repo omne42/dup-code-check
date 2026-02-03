@@ -101,8 +101,8 @@
 - npm 安装：通过 Node wrapper 启动平台二进制，使 Windows 上的 `dup-code-check` 可用。
 - 文档：补充 `maxFiles` 停止行为与 `skippedBudgetMaxFiles` 字段语义。
 - CLI：`--version` 现在会尊重 `--`（`--` 之后的 `--version` 会被当作 root 而不是参数）。
-- 扫描流程：在流式模式下 `git check-ignore` 失败时停止扫描（fail closed），避免在 ignore 失效时继续扫描。
-- 扫描流程：流式模式遇到 `git ls-files` 输出非 UTF-8 路径时，在开始扫描前回退到 walker。
+- 扫描流程：在流式模式下 `git check-ignore` 失败时回退到 walker（fail closed），避免在 ignore 失效时继续扫描。
+- 扫描流程：流式模式遇到 `git ls-files` 输出非 UTF-8 路径时回退到 walker（包括扫描已开始的情况）。
 - npm 构建：当 `bin/dup-code-check.mjs` wrapper 缺失时，提前失败并输出更清晰的错误信息。
 - Git 集成：当 `git check-ignore` 输出包含非 UTF-8 路径时触发回退。
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。
@@ -113,3 +113,4 @@
 - CLI：致命跳过 warning 现在会包含与 JSON `scanStats` 对齐的 key（camelCase），并附带 snake_case 别名。
 - Core：为降低哈希碰撞导致的重复文件误分组风险，fingerprint 额外加入 prefix/suffix 样本。
 - 扫描预算：二进制文件不会再绕过 `maxFiles` / `maxTotalBytes`，且二进制检测会避免读完整文件。
+- Report：截断包含非 ASCII 字符的 preview 时不再 panic。

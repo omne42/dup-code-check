@@ -8,6 +8,18 @@ use crate::types::{DuplicateGroup, DuplicateSpanGroup};
 
 use super::ScannedTextFile;
 
+fn truncate_to_char_boundary(s: &mut String, max_bytes: usize) {
+    if s.len() <= max_bytes {
+        return;
+    }
+
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s.truncate(end);
+}
+
 fn preview_from_file_lines(
     path: &Path,
     start_line: u32,
@@ -52,7 +64,7 @@ fn preview_from_file_lines(
             }
             out.push_str(std::string::String::from_utf8_lossy(slice).as_ref());
             if out.len() >= max_chars {
-                out.truncate(max_chars);
+                truncate_to_char_boundary(&mut out, max_chars);
                 break;
             }
         }
@@ -113,4 +125,24 @@ pub(super) fn sort_span_groups_for_report(groups: &mut [DuplicateSpanGroup]) {
             .then_with(|| b.normalized_len.cmp(&a.normalized_len))
             .then_with(|| a.content_hash.cmp(&b.content_hash))
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncate_to_char_boundary_never_panics() {
+        let mut s = "你好abc".to_string();
+        truncate_to_char_boundary(&mut s, 1);
+        assert!(s.is_empty());
+
+        let mut s = "你好abc".to_string();
+        truncate_to_char_boundary(&mut s, 3);
+        assert_eq!(s, "你");
+
+        let mut s = "你好abc".to_string();
+        truncate_to_char_boundary(&mut s, 4);
+        assert_eq!(s, "你");
+    }
 }

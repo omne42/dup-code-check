@@ -199,6 +199,69 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Res
 }
 
 #[test]
+fn git_streaming_non_utf8_path_falls_back_to_walker_after_scanning_started() -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        const FILES: usize = 600;
+
+        let root = temp_dir("git_streaming_non_utf8_mid_fallback");
+        let git_dir = root.join(".git");
+        fs::create_dir_all(&git_dir)?;
+
+        for idx in 0..FILES {
+            let name = format!("f{idx:04}.txt");
+            fs::write(root.join(&name), "x")?;
+        }
+
+        let count_path = git_dir.join("check_ignore_count.txt");
+        let fake_git_path = git_dir.join("fake_git.sh");
+        fs::write(
+            &fake_git_path,
+            fake_git_script_non_utf8_after_started(&root, &count_path, FILES),
+        )?;
+        let mut perms = fs::metadata(&fake_git_path)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&fake_git_path, perms)?;
+
+        let repo = Repo {
+            id: 0,
+            root: root.clone(),
+            label: "test".to_string(),
+        };
+        let options = ScanOptions {
+            max_files: Some(FILES + 10),
+            ..ScanOptions::default()
+        };
+
+        let mut stats = ScanStats::default();
+        let mut visited: Vec<String> = Vec::new();
+        let flow = git::with_test_git_exe(&fake_git_path, || {
+            visit_repo_files(&repo, &options, &mut stats, |stats, file| {
+                stats.scanned_files = stats.scanned_files.saturating_add(1);
+                visited.push(make_rel_path(&root, &file.abs_path));
+                Ok(ControlFlow::Continue(()))
+            })
+        })?;
+
+        assert_eq!(flow, ControlFlow::Continue(()));
+        assert_eq!(stats.skipped_walk_errors, 1);
+        assert_eq!(stats.candidate_files, FILES as u64);
+        assert_eq!(visited.len(), FILES);
+
+        let count: usize = fs::read_to_string(&count_path)
+            .unwrap_or_default()
+            .trim()
+            .parse()
+            .unwrap_or(0);
+        assert_eq!(count, 1);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn read_repo_file_bytes_counts_binary_reads_in_scan_stats() -> io::Result<()> {
     let root = temp_dir("read_repo_file_bytes_binary_counts");
     fs::create_dir_all(&root)?;
@@ -312,6 +375,63 @@ if [ "$repo" = "$target_repo" ]; then
       # Output a non-UTF-8 path to force the streaming scanner to fall back to the walker.
       printf '\377\0'
       exit 0
+      ;;
+  esac
+fi
+
+exit 2
+"#
+    )
+}
+
+fn fake_git_script_non_utf8_after_started(repo: &Path, count_file: &Path, files: usize) -> String {
+    let repo = sh_single_quote(repo.to_string_lossy().as_ref());
+    let count_file = sh_single_quote(count_file.to_string_lossy().as_ref());
+    format!(
+        r#"#!/bin/sh
+set -eu
+
+repo=""
+if [ "${{1:-}}" = "-C" ]; then
+  repo="${{2:-}}"
+  shift 2
+fi
+
+cmd="${{1:-}}"
+if [ -z "$cmd" ]; then
+  exit 2
+fi
+shift
+
+target_repo={repo}
+count_file={count_file}
+files={files}
+
+if [ "$repo" = "$target_repo" ]; then
+  case "$cmd" in
+    ls-files)
+      i=0
+      while [ "$i" -lt "$files" ]; do
+        if [ "$i" -eq 300 ]; then
+          printf '\377.txt\0'
+        fi
+        printf 'f%04d.txt\0' "$i"
+        i=$((i+1))
+      done
+      exit 0
+      ;;
+    check-ignore)
+      n=0
+      if [ -f "$count_file" ]; then
+        n="$(cat "$count_file" 2>/dev/null || true)"
+      fi
+      case "$n" in
+        ''|*[!0-9]*) n=0 ;;
+      esac
+      n=$((n+1))
+      echo "$n" > "$count_file"
+      cat >/dev/null
+      exit 1
       ;;
   esac
 fi

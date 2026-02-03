@@ -25,13 +25,15 @@ where
         return Ok(ControlFlow::Break(()));
     }
 
-    let mut visited: HashSet<PathBuf> = HashSet::new();
+    let mut visited: Option<HashSet<PathBuf>> = None;
 
     if options.respect_gitignore
         && !options.follow_symlinks
         && let Some(flow) = {
             let mut on_git_file = |stats: &mut ScanStats, file: RepoFile| {
-                visited.insert(file.abs_path.clone());
+                visited
+                    .get_or_insert_with(HashSet::new)
+                    .insert(file.abs_path.clone());
                 on_file_cb(stats, file)
             };
             super::git::try_visit_repo_files_via_git(repo, options, stats, &mut on_git_file)?
@@ -171,10 +173,11 @@ where
         }
 
         let abs_path = entry.into_path();
-        if visited.contains(&abs_path) {
+        if let Some(set) = visited.as_ref()
+            && set.contains(&abs_path)
+        {
             continue;
         }
-        visited.insert(abs_path.clone());
 
         stats.candidate_files = stats.candidate_files.saturating_add(1);
         let file = RepoFile {

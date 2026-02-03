@@ -17,7 +17,55 @@ use crate::types::{ScanOptions, ScanStats};
 use crate::util::fnv1a64;
 
 fn git_exe() -> OsString {
-    std::env::var_os("DUP_CODE_CHECK_GIT_BIN").unwrap_or_else(|| OsString::from("git"))
+    #[cfg(test)]
+    if let Some(exe) = TEST_GIT_EXE_OVERRIDE.with(|exe| exe.borrow().clone()) {
+        return exe;
+    }
+
+    std::env::var_os("DUP_CODE_CHECK_GIT_BIN")
+        .and_then(validate_git_bin_override)
+        .unwrap_or_else(|| OsString::from("git"))
+}
+
+fn validate_git_bin_override(raw: OsString) -> Option<OsString> {
+    if raw.to_string_lossy().is_empty() {
+        return None;
+    }
+
+    let path = Path::new(&raw);
+    if path.is_absolute() {
+        return fs::metadata(path).ok().filter(|m| m.is_file()).map(|_| raw);
+    }
+
+    // Command name: disallow whitespace and path separators to reduce misuse.
+    let s = raw.to_string_lossy();
+    if s.chars()
+        .any(|c| c.is_whitespace() || c == '/' || c == '\\')
+    {
+        return None;
+    }
+
+    let mut components = path.components();
+    match (components.next(), components.next()) {
+        (Some(Component::Normal(_)), None) => Some(raw),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_GIT_EXE_OVERRIDE: std::cell::RefCell<Option<OsString>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn with_test_git_exe<R>(exe: &Path, f: impl FnOnce() -> R) -> R {
+    TEST_GIT_EXE_OVERRIDE.with(|slot| {
+        let prev = slot.replace(Some(exe.as_os_str().to_os_string()));
+        let out = f();
+        slot.replace(prev);
+        out
+    })
 }
 
 fn should_stop_due_to_max_files(options: &ScanOptions, stats: &mut ScanStats) -> bool {
@@ -462,6 +510,7 @@ where
     let mut reader = BufReader::new(stdout);
 
     let mut started = false;
+    let mut check_ignore_ok = true;
 
     loop {
         let mut bytes: Vec<u8> = Vec::new();
@@ -496,6 +545,7 @@ where
             on_file,
             &batch,
             &mut started,
+            &mut check_ignore_ok,
         ) {
             Ok(flow) => flow,
             Err(err) => {
@@ -526,6 +576,7 @@ where
             on_file,
             &batch,
             &mut started,
+            &mut check_ignore_ok,
         ) {
             Ok(flow) => flow,
             Err(err) => {
@@ -562,6 +613,7 @@ fn visit_repo_files_via_git_batch<F>(
     on_file: &mut F,
     rel_paths: &[String],
     started: &mut bool,
+    check_ignore_ok: &mut bool,
 ) -> io::Result<ControlFlow<()>>
 where
     F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
@@ -570,7 +622,18 @@ where
         return Ok(ControlFlow::Continue(()));
     }
 
-    let ignored = git_check_ignore(&repo.root, rel_paths)?;
+    let ignored = if *check_ignore_ok {
+        match git_check_ignore(&repo.root, rel_paths) {
+            Ok(ignored) => ignored,
+            Err(_) => {
+                *check_ignore_ok = false;
+                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+                HashSet::new()
+            }
+        }
+    } else {
+        HashSet::new()
+    };
 
     for rel in rel_paths {
         if ignored.contains(rel) {
@@ -752,4 +815,189 @@ pub(crate) fn read_repo_file_bytes(
     stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
 
     Ok(Some(bytes))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::fs;
+    use std::io;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn git_streaming_check_ignore_failure_degrades_without_double_scan() -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            use std::collections::HashSet;
+            use std::os::unix::fs::PermissionsExt;
+
+            const FILES: usize = 600;
+
+            let root = temp_dir("git_streaming_check_ignore_failure");
+            fs::create_dir_all(root.join(".git"))?;
+
+            let mut rels = Vec::with_capacity(FILES);
+            for idx in 0..FILES {
+                let name = format!("f{idx:04}.txt");
+                fs::write(root.join(&name), "x")?;
+                rels.push(name);
+            }
+
+            let list_path = root.join("filelist.txt");
+            fs::write(&list_path, rels.join("\n"))?;
+            let count_path = root.join("check_ignore_count.txt");
+
+            let fake_git_path = root.join("fake_git.sh");
+            fs::write(
+                &fake_git_path,
+                fake_git_script(&root, &list_path, &count_path),
+            )?;
+            let mut perms = fs::metadata(&fake_git_path)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&fake_git_path, perms)?;
+
+            let repo = Repo {
+                id: 0,
+                root: root.clone(),
+                label: "test".to_string(),
+            };
+            let options = ScanOptions {
+                max_files: Some(FILES + 10),
+                ..ScanOptions::default()
+            };
+
+            let mut stats = ScanStats::default();
+            let mut visited: Vec<String> = Vec::new();
+            let flow = with_test_git_exe(&fake_git_path, || {
+                visit_repo_files(&repo, &options, &mut stats, |stats, file| {
+                    stats.scanned_files = stats.scanned_files.saturating_add(1);
+                    visited.push(make_rel_path(&root, &file.abs_path));
+                    Ok(ControlFlow::Continue(()))
+                })
+            })?;
+
+            assert_eq!(flow, ControlFlow::Continue(()));
+            assert_eq!(visited.len(), FILES);
+            let unique: HashSet<&str> = visited.iter().map(String::as_str).collect();
+            assert_eq!(unique.len(), FILES);
+            assert_eq!(stats.candidate_files, FILES as u64);
+            assert_eq!(stats.skipped_walk_errors, 1);
+
+            // 1st batch: check-ignore -> exit 1 (no ignores), 2nd batch: exit 2 (failure),
+            // later batches should stop calling check-ignore.
+            let count: usize = fs::read_to_string(&count_path)
+                .unwrap_or_default()
+                .trim()
+                .parse()
+                .unwrap_or(0);
+            assert_eq!(count, 2);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn git_bin_override_validation_is_restrictive() -> io::Result<()> {
+        assert_eq!(
+            validate_git_bin_override(OsString::from("git")),
+            Some(OsString::from("git"))
+        );
+        assert_eq!(validate_git_bin_override(OsString::from("git/")), None);
+        assert_eq!(validate_git_bin_override(OsString::from("bin/git")), None);
+        assert_eq!(
+            validate_git_bin_override(OsString::from("git --version")),
+            None
+        );
+        assert_eq!(validate_git_bin_override(OsString::from("")), None);
+
+        let root = temp_dir("git_bin_override_validation");
+        fs::create_dir_all(&root)?;
+        let missing = root.join("missing_git");
+        assert_eq!(
+            validate_git_bin_override(missing.as_os_str().to_os_string()),
+            None
+        );
+
+        let existing = root.join("git");
+        fs::write(&existing, "")?;
+        assert_eq!(
+            validate_git_bin_override(existing.as_os_str().to_os_string()),
+            Some(existing.as_os_str().to_os_string())
+        );
+
+        Ok(())
+    }
+
+    fn fake_git_script(repo: &Path, list: &Path, count_file: &Path) -> String {
+        let repo = sh_single_quote(repo.to_string_lossy().as_ref());
+        let list = sh_single_quote(list.to_string_lossy().as_ref());
+        let count_file = sh_single_quote(count_file.to_string_lossy().as_ref());
+        format!(
+            r#"#!/bin/sh
+set -eu
+
+repo=""
+if [ "${{1:-}}" = "-C" ]; then
+  repo="${{2:-}}"
+  shift 2
+fi
+
+cmd="${{1:-}}"
+if [ -z "$cmd" ]; then
+  exit 2
+fi
+shift
+
+target_repo={repo}
+file_list={list}
+count_file={count_file}
+
+if [ "$repo" = "$target_repo" ]; then
+  case "$cmd" in
+    ls-files)
+      while IFS= read -r line || [ -n "$line" ]; do
+        printf '%s\0' "$line"
+      done < "$file_list"
+      exit 0
+      ;;
+    check-ignore)
+      n=0
+      if [ -f "$count_file" ]; then
+        n="$(cat "$count_file" 2>/dev/null || true)"
+      fi
+      case "$n" in
+        ''|*[!0-9]*) n=0 ;;
+      esac
+      n=$((n+1))
+      echo "$n" > "$count_file"
+      cat >/dev/null
+      if [ "$n" -ge 2 ]; then
+        exit 2
+      fi
+      exit 1
+      ;;
+  esac
+fi
+
+if [ -n "$repo" ]; then
+  exec git -C "$repo" "$cmd" "$@"
+fi
+exec git "$cmd" "$@"
+"#
+        )
+    }
+
+    fn sh_single_quote(s: &str) -> String {
+        let escaped = s.replace('\'', r#"'"'"'"#);
+        format!("'{escaped}'")
+    }
+
+    fn temp_dir(suffix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be monotonic")
+            .as_nanos();
+        std::env::temp_dir().join(format!("dup-code-check-core-{suffix}-{nanos}"))
+    }
 }

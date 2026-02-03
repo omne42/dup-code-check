@@ -4,6 +4,8 @@
 
 `dup-code-check` is a Rust CLI binary. Node.js is only used as an installation option (npm). The current npm package builds the binary from source during install, so Rust is required.
 
+> Security note: npm `postinstall` runs a native build (Cargo), which may execute dependency build scripts. Use `--ignore-scripts` / `npm_config_ignore_scripts=true` if you need to avoid that.
+
 ## Option A: Rust (recommended)
 
 From the repo root:

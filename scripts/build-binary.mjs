@@ -38,6 +38,16 @@ if (!fs.existsSync(builtPath)) {
 const outDir = path.join(repoRoot, 'bin');
 fs.mkdirSync(outDir, { recursive: true });
 
+const wrapperPath = path.join(outDir, 'dup-code-check.mjs');
+if (!fs.existsSync(wrapperPath)) {
+  throw new Error(
+    `Node wrapper script was not found at ${wrapperPath}.\n` +
+      'This repository should contain bin/dup-code-check.mjs.\n' +
+      'Restore it and re-run:\n' +
+      '  npm run build\n'
+  );
+}
+
 const outPath = path.join(outDir, builtFile);
 fs.copyFileSync(builtPath, outPath);
 if (process.platform !== 'win32') {

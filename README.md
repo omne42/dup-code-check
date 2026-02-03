@@ -43,6 +43,8 @@ npx dup-code-check --help
 
 > Note: this package builds the Rust binary during `postinstall`, so Rust is required.
 >
+> Security note: `postinstall` runs a native build (Cargo), which may execute dependency build scripts.
+>
 > To avoid running install scripts, use `npm_config_ignore_scripts=true` and build manually:
 >
 > ```bash

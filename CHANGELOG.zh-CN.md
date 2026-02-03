@@ -54,6 +54,11 @@
 - 扫描预算：`maxFiles` 达到上限后会停止扫描（`skippedBudgetMaxFiles` 会变为非 0）。
 - Node 安装：`postinstall` 使用 `cargo build --locked` 构建 Rust 二进制。
 - 扫描流程：当设置 `maxFiles` 时，对 `git ls-files` 做流式遍历（提前停止，避免收集完整列表）。
+- CLI：澄清 `--strict` 语义（仅在“致命跳过”：权限/遍历错误/预算中断时返回非 0），并增加 smoke 覆盖。
+- Rust：通过共享内部 helper 去重 code-span（winnowing）与 file-duplicates 分组逻辑，避免漂移。
+- Core：收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（拒绝路径/空白；若为绝对路径则要求文件存在）。
+- CLI：root 路径 best-effort `canonicalize()`，降低符号链接歧义。
+- 文档：补充安全提示——npm `postinstall` 会触发原生构建（Cargo），并可能运行依赖的 build script。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
@@ -75,3 +80,5 @@
 - npm 安装：通过 Node wrapper 启动平台二进制，使 Windows 上的 `dup-code-check` 可用。
 - 文档：补充 `maxFiles` 停止行为与 `skippedBudgetMaxFiles` 字段语义。
 - CLI：`--version` 现在会尊重 `--`（`--` 之后的 `--version` 会被当作 root 而不是参数）。
+- 扫描流程：在流式模式下 `git check-ignore` 失败时不再中断扫描，改为降级继续（并记录一次遍历错误）。
+- npm 构建：当 `bin/dup-code-check.mjs` wrapper 缺失时，提前失败并输出更清晰的错误信息。

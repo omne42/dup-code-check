@@ -4,6 +4,8 @@
 
 `dup-code-check` 是一个 Rust 二进制程序。Node.js 仅作为一种安装方式（npm），安装阶段会从源码编译二进制，因此需要 Rust 工具链。
 
+> 安全提示：npm 的 `postinstall` 会触发原生构建（Cargo），并可能运行依赖的 build script。如果你需要避免执行安装脚本，请使用 `--ignore-scripts` / `npm_config_ignore_scripts=true`。
+
 ## 方式 A：直接使用 Rust（推荐）
 
 在仓库根目录：

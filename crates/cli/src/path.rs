@@ -1,4 +1,5 @@
 use std::env;
+use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
@@ -8,7 +9,11 @@ pub(crate) fn resolve_path(p: &Path) -> io::Result<PathBuf> {
     } else {
         env::current_dir()?
     };
-    Ok(normalize_path(&base.join(p)))
+    let normalized = normalize_path(&base.join(p));
+    match fs::canonicalize(&normalized) {
+        Ok(canonical) => Ok(canonical),
+        Err(_) => Ok(normalized),
+    }
 }
 
 fn normalize_path(path: &Path) -> PathBuf {

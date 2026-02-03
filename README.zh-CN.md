@@ -57,6 +57,8 @@ dup-code-check --help
 - Node.js `>=22`（参考 Codex 项目）
 - Rust toolchain `1.92.0`（已通过 `rust-toolchain.toml` 固定，参考 Codex 项目）
 
+安全提示：npm 安装会执行 `postinstall`，会触发原生构建（Cargo），并可能运行依赖的 build script。若需要避免执行安装脚本，请使用 `npm_config_ignore_scripts=true`。
+
 如果你希望避免在安装时执行脚本，可以用 `npm_config_ignore_scripts=true` 安装后手动构建：
 
 ```bash

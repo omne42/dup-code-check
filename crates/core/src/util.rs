@@ -207,34 +207,6 @@ pub(crate) fn canonicalize_match(
     }
 }
 
-pub(crate) fn add_occurrence(
-    builder: &mut SpanGroupBuilder,
-    file: &NormalizedFile,
-    file_id: usize,
-    start: usize,
-    len: usize,
-) {
-    if !builder.occurrence_keys.insert((file_id, start)) {
-        return;
-    }
-
-    let Some(&start_line) = file.line_map.get(start) else {
-        return;
-    };
-    let Some(&end_line) = file.line_map.get(start + len - 1) else {
-        return;
-    };
-
-    builder.repo_ids.insert(file.repo_id);
-    builder.occurrences.push(DuplicateSpanOccurrence {
-        repo_id: file.repo_id,
-        repo_label: file.repo_label.clone(),
-        path: file.rel_path.clone(),
-        start_line,
-        end_line,
-    });
-}
-
 pub(crate) fn add_occurrence_view(
     builder: &mut SpanGroupBuilder,
     file: &NormalizedFileView<'_>,

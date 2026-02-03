@@ -1,13 +1,11 @@
-use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::PathBuf;
 
+use crate::dedupe::FileDuplicateGrouper;
 use crate::scan::{Repo, make_rel_path, read_repo_file_bytes, repo_label, visit_repo_files};
 use crate::tokenize::{parse_brace_blocks, tokenize_for_dup_detection};
 use crate::types::{DuplicateFile, DuplicateGroup, ScanOptions, ScanStats};
-use crate::util::{
-    fnv1a64, fnv1a64_u32, fold_u64_to_u32, normalize_for_code_spans, normalize_whitespace,
-};
+use crate::util::{fnv1a64_u32, fold_u64_to_u32, normalize_for_code_spans, normalize_whitespace};
 
 use super::ScannedTextFile;
 use super::util::sort_duplicate_groups_for_report;
@@ -38,16 +36,7 @@ pub(super) fn scan_text_files_for_report(
         None
     };
 
-    #[derive(Debug)]
-    struct FileGroupBuilder {
-        content_hash: u64,
-        normalized_len: usize,
-        sample: Vec<u8>,
-        files: Vec<DuplicateFile>,
-        repo_ids: HashSet<usize>,
-    }
-
-    let mut file_groups: HashMap<(u64, usize), Vec<FileGroupBuilder>> = HashMap::new();
+    let mut file_groups = FileDuplicateGrouper::default();
     let mut files = Vec::new();
 
     for repo in &repos {
@@ -66,30 +55,12 @@ pub(super) fn scan_text_files_for_report(
 
                 // 1) File duplicates (whitespace-insensitive)
                 let normalized_ws = normalize_whitespace(&bytes);
-                let content_hash = fnv1a64(&normalized_ws);
-                let key = (content_hash, normalized_ws.len());
-                let bucket = file_groups.entry(key).or_default();
-
                 let file = DuplicateFile {
                     repo_id: repo_file.repo_id,
                     repo_label: repo_file.repo_label.clone(),
                     path: rel_path.clone(),
                 };
-
-                if let Some(existing) = bucket.iter_mut().find(|g| g.sample == normalized_ws) {
-                    existing.repo_ids.insert(file.repo_id);
-                    existing.files.push(file);
-                } else {
-                    let mut repo_ids = HashSet::new();
-                    repo_ids.insert(file.repo_id);
-                    bucket.push(FileGroupBuilder {
-                        content_hash,
-                        normalized_len: normalized_ws.len(),
-                        sample: normalized_ws,
-                        files: vec![file],
-                        repo_ids,
-                    });
-                }
+                file_groups.push(normalized_ws, file);
 
                 // 2) Text-based detectors
                 let text = String::from_utf8_lossy(&bytes).to_string();
@@ -120,25 +91,7 @@ pub(super) fn scan_text_files_for_report(
         }
     }
 
-    let mut file_duplicates = Vec::new();
-    for builders in file_groups.into_values() {
-        for builder in builders {
-            if builder.files.len() <= 1 {
-                continue;
-            }
-            if options.cross_repo_only && builder.repo_ids.len() < 2 {
-                continue;
-            }
-
-            let mut files = builder.files;
-            files.sort_by(|a, b| (a.repo_id, &a.path).cmp(&(b.repo_id, &b.path)));
-            file_duplicates.push(DuplicateGroup {
-                content_hash: builder.content_hash,
-                normalized_len: builder.normalized_len,
-                files,
-            });
-        }
-    }
+    let mut file_duplicates = file_groups.into_groups(options.cross_repo_only);
 
     sort_duplicate_groups_for_report(&mut file_duplicates);
     file_duplicates.truncate(options.max_report_items);

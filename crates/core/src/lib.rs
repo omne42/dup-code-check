@@ -1,3 +1,4 @@
+mod dedupe;
 mod duplicates;
 mod report;
 mod scan;

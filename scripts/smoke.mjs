@@ -125,6 +125,8 @@ if (
   process.exit(1);
 }
 
+expectExitCode('strict ok', ['--strict', '--cross-repo-only', repoA, repoB], 0);
+
 const limited = runCliJson([
   '--stats',
   '--cross-repo-only',
@@ -144,6 +146,12 @@ if (
   );
   process.exit(1);
 }
+
+expectExitCode(
+  'strict maxFiles',
+  ['--strict', '--cross-repo-only', '--max-files', '1', repoA, repoB],
+  1
+);
 
 const bigSize = 10 * 1024 * 1024 + 1;
 const big = Buffer.alloc(bigSize, 'a');

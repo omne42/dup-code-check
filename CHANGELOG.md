@@ -54,6 +54,11 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan budgets: `maxFiles` now stops scanning once the file-count budget is hit (`skippedBudgetMaxFiles` becomes non-zero).
 - Node installer: `postinstall` builds Rust binary with `cargo build --locked`.
 - Scan pipeline: stream `git ls-files` enumeration when `maxFiles` is set (stop early without collecting full lists).
+- CLI: clarify `--strict` semantics (fatal skips only: permission/traversal/budget abort) and add smoke coverage.
+- Rust: de-duplicate code-span (winnowing) and file-duplicate grouping logic via a shared internal helper.
+- Core: tighten `DUP_CODE_CHECK_GIT_BIN` override validation (reject paths/whitespace; require an existing absolute path when provided).
+- CLI: resolve roots via best-effort `canonicalize()` to reduce symlink ambiguity.
+- Docs: add a security note that npm `postinstall` runs a native build (Cargo) and may execute dependency build scripts.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
@@ -75,3 +80,5 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - npm install: make the `dup-code-check` bin work on Windows by launching the platform binary from the Node wrapper.
 - Docs: document `maxFiles` stop behavior and `skippedBudgetMaxFiles` semantics.
 - CLI: `--version` now respects `--` (treats `--version` after `--` as a root).
+- Scan pipeline: when `git check-ignore` fails during streaming, degrade gracefully and continue scanning (recording a traversal error).
+- npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.

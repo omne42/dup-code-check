@@ -9,27 +9,6 @@ const publicDir = path.join(docsRoot, 'public');
 
 const EXCLUDED_DIRS = new Set(['_book', '.vitepress', 'public']);
 
-const DOC_ORDER = [
-  'index.md',
-  'introduction.md',
-  'llms.md',
-  'getting-started.md',
-  'installation.md',
-  'cli.md',
-  'scan-options.md',
-  'detectors.md',
-  'output.md',
-  'ci.md',
-  'performance.md',
-  'architecture.md',
-  'development.md',
-  'contributing.md',
-  'troubleshooting.md',
-  'faq.md',
-  'roadmap.md',
-  'competitors.md',
-];
-
 function isMarkdownFile(p) {
   return p.endsWith('.md');
 }
@@ -37,6 +16,42 @@ function isMarkdownFile(p) {
 function isReadmeFile(p) {
   const base = path.basename(p).toLowerCase();
   return base === 'readme.md' || (base.startsWith('readme.') && base.endsWith('.md'));
+}
+
+function linkToRelDocs(link) {
+  if (link === '/') return 'index.md';
+  const cleaned = link.split(/[?#]/)[0];
+  const trimmed = cleaned.replace(/^\/+/, '').replace(/\/+$/, '');
+  if (!trimmed) return null;
+  if (trimmed.includes('://')) return null;
+  return `${trimmed}.md`;
+}
+
+function loadDocOrderFromVitepressConfig() {
+  const configPath = path.join(docsRoot, '.vitepress', 'config.mts');
+  try {
+    const text = fs.readFileSync(configPath, 'utf8');
+    const links = [];
+    const re = /link:\s*['"]([^'"]+)['"]/g;
+    for (const m of text.matchAll(re)) {
+      const link = m[1];
+      if (typeof link !== 'string' || !link.startsWith('/')) continue;
+      links.push(link);
+    }
+
+    const out = [];
+    const seen = new Set();
+    for (const link of links) {
+      const relDocs = linkToRelDocs(link);
+      if (!relDocs) continue;
+      if (seen.has(relDocs)) continue;
+      seen.add(relDocs);
+      out.push(relDocs);
+    }
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
 }
 
 function walkDir(dir) {
@@ -67,42 +82,68 @@ function isZh(relDocs) {
   return relDocs.endsWith('.zh-CN.md');
 }
 
-function orderKey(relDocs) {
-  const base = relDocs.replace(/\.zh-CN\.md$/, '.md');
-  const idx = DOC_ORDER.indexOf(base);
-  return idx === -1 ? Number.POSITIVE_INFINITY : idx;
-}
-
-function header(bundleLabel) {
+function header(bundleLabel, lang) {
   let out = '';
-  out += '# dup-code-check docs (llms bundle)\n';
-  out += '\n';
-  out +=
-    'This file is an automatically generated, plain-text bundle of the documentation.\n' +
-    'It is intended for LLM context ingestion and offline reading.\n';
-  out += '\n';
-  out += `Bundle: ${bundleLabel}\n`;
-  out += `Generated: ${new Date().toISOString()}\n`;
-  out += '\n';
-  out += 'Example prompt format:\n';
-  out += '\n';
-  out += '```text\n';
-  out += 'Documentation:\n';
-  out += '{paste documentation here}\n';
-  out += '---\n';
-  out += 'Based on the above documentation, answer the following:\n';
-  out += '{your question}\n';
-  out += '```\n';
-  out += '\n';
+  if (lang === 'zh') {
+    out += '# dup-code-check 文档（llms 合集）\n';
+    out += '\n';
+    out += '本文件为自动生成的纯文本文档合集，用于离线阅读或 LLM 上下文注入。\n';
+    out += '\n';
+    out += `合集: ${bundleLabel}\n`;
+    out += `生成时间: ${new Date().toISOString()}\n`;
+    out += '\n';
+    out += '提示词模板:\n';
+    out += '\n';
+    out += '```text\n';
+    out += '文档:\n';
+    out += '{把文档内容粘贴到这里}\n';
+    out += '---\n';
+    out += '基于上述文档，回答下面的问题：\n';
+    out += '{你的问题}\n';
+    out += '```\n';
+    out += '\n';
+  } else {
+    out += '# dup-code-check docs (llms bundle)\n';
+    out += '\n';
+    out +=
+      'This file is an automatically generated, plain-text bundle of the documentation.\n' +
+      'It is intended for LLM context ingestion and offline reading.\n';
+    out += '\n';
+    out += `Bundle: ${bundleLabel}\n`;
+    out += `Generated: ${new Date().toISOString()}\n`;
+    out += '\n';
+    out += 'Example prompt format:\n';
+    out += '\n';
+    out += '```text\n';
+    out += 'Documentation:\n';
+    out += '{paste documentation here}\n';
+    out += '---\n';
+    out += 'Based on the above documentation, answer the following:\n';
+    out += '{your question}\n';
+    out += '```\n';
+    out += '\n';
+  }
   return out;
 }
 
 if (!fs.existsSync(docsRoot)) {
-  process.stderr.write(`docs root not found: ${docsRoot}\n`);
+  process.stderr.write(
+    `docs root not found: ${docsRoot}\n` +
+      'This script is intended to run from the git repository.\n' +
+      'If you installed dup-code-check from npm, the docs site is not shipped in the package.\n'
+  );
   process.exit(1);
 }
 
 fs.mkdirSync(publicDir, { recursive: true });
+
+const docOrder = loadDocOrderFromVitepressConfig();
+const orderIndex = new Map();
+if (docOrder) {
+  for (let i = 0; i < docOrder.length; i += 1) {
+    orderIndex.set(docOrder[i], i);
+  }
+}
 
 const files = walkDir(docsRoot)
   .filter((p) => !isReadmeFile(p))
@@ -115,33 +156,61 @@ const files = walkDir(docsRoot)
     const lang = Number(isZh(a.relDocs)) - Number(isZh(b.relDocs));
     if (lang !== 0) return lang;
 
-    const order = orderKey(a.relDocs) - orderKey(b.relDocs);
+    const orderA = orderIndex.get(a.relDocs) ?? Number.POSITIVE_INFINITY;
+    const orderB = orderIndex.get(b.relDocs) ?? Number.POSITIVE_INFINITY;
+    const order = orderA - orderB;
     if (order !== 0) return order;
 
     return a.rel.localeCompare(b.rel);
   });
 
+if (docOrder) {
+  const known = new Set(files.map((f) => f.relDocs));
+
+  const missing = docOrder.filter((p) => !known.has(p));
+  if (missing.length > 0) {
+    process.stderr.write('llms: warning: docs sidebar references missing pages:\n');
+    for (const p of missing) {
+      process.stderr.write(`- ${p}\n`);
+    }
+  }
+
+  const unknown = files.filter((f) => !orderIndex.has(f.relDocs)).map((f) => f.relDocs);
+  if (unknown.length > 0) {
+    process.stderr.write('llms: warning: docs pages not referenced in VitePress sidebar:\n');
+    for (const p of unknown) {
+      process.stderr.write(`- ${p}\n`);
+    }
+    process.stderr.write(
+      'llms: those pages will be appended after ordered pages; add them to the sidebar to control ordering.\n'
+    );
+  }
+}
+
 const outputs = [
   {
     filename: 'llms.txt',
     bundleLabel: 'Combined (EN + 中文)',
+    lang: 'en',
     filter: () => true,
   },
   {
     filename: 'llms.en.txt',
     bundleLabel: 'English only',
+    lang: 'en',
     filter: (relDocs) => !isZh(relDocs),
   },
   {
     filename: 'llms.zh-CN.txt',
     bundleLabel: '中文 only',
+    lang: 'zh',
     filter: (relDocs) => isZh(relDocs),
   },
 ];
 
 for (const o of outputs) {
   const outPath = path.join(publicDir, o.filename);
-  let out = header(o.bundleLabel);
+  let out = header(o.bundleLabel, o.lang);
 
   for (const file of files) {
     if (!o.filter(file.relDocs)) continue;

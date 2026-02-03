@@ -38,6 +38,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Docs: exclude `README*.md` pages from `llms` bundles.
 - Docs: nav language switch now points to the Chinese home page.
 - npm: align metadata with npm (drop pnpm hints) and avoid shipping `docs/` in the npm package.
+- Dev: regenerate `package-lock.json` with `registry.npmjs.org` resolved URLs (avoid `npmmirror`).
+- Docs: derive `llms` bundle ordering from VitePress sidebar config (warn on missing/unlinked pages).
+- Docs: localize the `llms.zh-CN.txt` bundle header.
 - Docs workflow: skip GitHub Pages deployment when the repository is private.
 - Docs workflow: auto-enable GitHub Pages (Actions) when deploying docs.
 - Release workflow: publish to crates.io on tag releases (and skip when token is missing).

@@ -38,6 +38,9 @@
 - 文档：`llms` 合集中排除 `README*.md` 页面。
 - 文档：导航栏“中文”入口现在指向中文首页。
 - npm：对齐 npm 生态（移除 pnpm 相关提示），并避免在 npm 包中发布 `docs/`。
+- 开发：用 `registry.npmjs.org` 重新生成 `package-lock.json`（避免 `npmmirror`）。
+- 文档：`llms` 合集的顺序改为从 VitePress sidebar 配置派生（并对缺失/未挂载页面给出 warning）。
+- 文档：`llms.zh-CN.txt` 的 header 改为中文。
 - 文档 workflow：当仓库为私有时跳过 GitHub Pages 部署。
 - 文档 workflow：部署文档时自动启用 GitHub Pages（GitHub Actions）。
 - 发布 workflow：在 tag 发布时执行 crates.io 发布（未配置 token 时自动跳过）。

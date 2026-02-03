@@ -95,3 +95,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Git integration: treat non-UTF-8 output from `git check-ignore` as a fallback trigger.
 - npm build: improve Cargo build failure diagnostics.
 - Node smoke: verify the wrapper can execute `--version` when deciding whether to rebuild.
+- npm package: include `rust-toolchain.toml` so installs use the pinned Rust toolchain.

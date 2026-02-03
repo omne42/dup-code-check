@@ -95,3 +95,4 @@
 - Git 集成：当 `git check-ignore` 输出包含非 UTF-8 路径时触发回退。
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。
 - Node smoke：在决定是否需要重建时额外验证 wrapper 可执行 `--version`。
+- npm 包：包含 `rust-toolchain.toml`，使安装时使用固定的 Rust toolchain。

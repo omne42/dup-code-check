@@ -28,6 +28,7 @@
     "scripts/",
     "Cargo.lock",
     "Cargo.toml",
+    "rust-toolchain.toml",
     "README.md",
     "README.zh-CN.md",
     "CHANGELOG.md",

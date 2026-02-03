@@ -14,7 +14,11 @@ pub(crate) fn has_fatal_skips(stats: &ScanStats) -> bool {
         || stats.skipped_budget_max_total_bytes > 0
 }
 
-pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &ScanStats) -> String {
+pub(crate) fn format_fatal_skip_warning(
+    localization: Localization,
+    stats: &ScanStats,
+    has_stats: bool,
+) -> String {
     if !has_fatal_skips(stats) {
         return String::new();
     }
@@ -90,11 +94,13 @@ pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &Scan
         "触发 --max-total-bytes 预算；请提高预算或移除限制。",
     );
 
-    out.push_str(tr(
-        localization,
-        "Re-run with --stats for full details.\n",
-        "请使用 --stats 重新运行以查看完整统计。\n",
-    ));
+    if !has_stats {
+        out.push_str(tr(
+            localization,
+            "Re-run with --stats for full details.\n",
+            "请使用 --stats 重新运行以查看完整统计。\n",
+        ));
+    }
 
     out
 }
@@ -318,7 +324,7 @@ mod tests {
             skipped_bucket_truncated: 3,
             ..ScanStats::default()
         };
-        let msg = format_fatal_skip_warning(Localization::En, &stats);
+        let msg = format_fatal_skip_warning(Localization::En, &stats, false);
         assert!(msg.contains("skippedBucketTruncated=3"));
         assert!(msg.contains("(bucket_truncated)"));
         assert!(msg.contains("--ignore-dir"));
@@ -331,7 +337,7 @@ mod tests {
             skipped_budget_max_files: 1,
             ..ScanStats::default()
         };
-        let msg = format_fatal_skip_warning(Localization::Zh, &stats);
+        let msg = format_fatal_skip_warning(Localization::Zh, &stats, false);
         assert!(msg.contains("skippedBudgetMaxFiles=1"));
         assert!(msg.contains("(budget_max_files)"));
         assert!(msg.contains("请使用 --stats"));

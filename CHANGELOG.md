@@ -53,9 +53,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Metadata: use MIT-only license identifier.
 - Scan budgets: `maxFiles` now stops scanning once the file-count budget is hit (`skippedBudgetMaxFiles` becomes non-zero).
 - Node installer: `postinstall` builds Rust binary with `cargo build --locked`.
-- Scan pipeline: stream `git ls-files` enumeration when `maxFiles` is set (stop early without collecting full lists).
+- Scan pipeline: stream `git ls-files` enumeration in the Git fast path (avoid collecting full lists; stop early under `maxFiles`).
 - CLI: clarify `--strict` semantics (fatal skips only: permission/traversal/budget/bucket) and add smoke coverage.
-- CLI: warn on fatal skips when `--stats` is not enabled.
+- CLI: always emit fatal-skip warnings to stderr (even with `--stats`; the `--stats` re-run hint is shown only when needed).
 - Rust: de-duplicate code-span (winnowing) and file-duplicate grouping logic via a shared internal helper.
 - Core: tighten `DUP_CODE_CHECK_GIT_BIN` override validation (absolute path required; must exist and be a file).
 - Core: require `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` to honor `DUP_CODE_CHECK_GIT_BIN` (opt-in).
@@ -112,5 +112,6 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: improve fatal-skip warnings with a reason summary and actionable hints when `--stats` is not enabled.
 - CLI: fatal-skip warnings now include JSON-compatible `scanStats` keys (camelCase), with snake_case aliases.
 - Core: reduce the risk of false file-duplicate grouping due to hash collisions by adding prefix/suffix samples to fingerprints.
+- Core: re-verify whitespace-normalized file contents before emitting file-duplicate groups (avoid false positives from hash collisions or file changes).
 - Scan budgets: binary files no longer bypass `maxFiles` / `maxTotalBytes`, and binary detection avoids reading entire binaries.
 - Report: avoid panics when truncating previews containing non-ASCII characters.

@@ -3,7 +3,8 @@ use std::path::PathBuf;
 
 use crate::dedupe::{FileDuplicateGrouper, detect_duplicate_code_spans_winnowing};
 use crate::scan::{
-    Repo, make_rel_path, read_repo_file_bytes, repo_label, validate_roots, visit_repo_files,
+    Repo, make_rel_path, read_repo_file_bytes, read_repo_file_bytes_for_verification, repo_label,
+    validate_roots, visit_repo_files,
 };
 use crate::types::{
     DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanOutcome, ScanStats,
@@ -82,7 +83,23 @@ pub fn find_duplicate_files_with_stats(
         }
     }
 
-    let mut out = groups.into_groups(options.cross_repo_only);
+    let mut out = groups.into_groups_verified(options.cross_repo_only, |file| {
+        let Some(repo) = repos.get(file.repo_id) else {
+            return Ok(None);
+        };
+        let canonical_root = canonical_roots
+            .as_ref()
+            .and_then(|roots| roots.get(file.repo_id))
+            .map(|p| p.as_path());
+
+        read_repo_file_bytes_for_verification(
+            &repo.root,
+            &file.path,
+            canonical_root,
+            options.follow_symlinks,
+            options.max_file_size,
+        )
+    })?;
 
     out.sort_by(|a, b| {
         (a.content_hash, a.normalized_len, a.files.len()).cmp(&(

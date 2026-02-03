@@ -93,26 +93,7 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
         } else {
             print!("{}", format_text_report(parsed.localization, &report));
         }
-
-        if parsed.stats && !parsed.json {
-            eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
-        }
-
-        if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
-            eprint!(
-                "{}",
-                format_fatal_skip_warning(parsed.localization, &scan_stats)
-            );
-        }
-
-        if parsed.strict && has_fatal_skips(&scan_stats) {
-            if !parsed.stats {
-                eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
-            }
-            return Ok(1);
-        }
-
-        return Ok(0);
+        return finalize_scan(parsed, &scan_stats);
     }
 
     if parsed.code_spans {
@@ -133,26 +114,7 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
         } else {
             print!("{}", format_text_code_spans(parsed.localization, &groups));
         }
-
-        if parsed.stats && !parsed.json {
-            eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
-        }
-
-        if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
-            eprint!(
-                "{}",
-                format_fatal_skip_warning(parsed.localization, &scan_stats)
-            );
-        }
-
-        if parsed.strict && has_fatal_skips(&scan_stats) {
-            if !parsed.stats {
-                eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
-            }
-            return Ok(1);
-        }
-
-        return Ok(0);
+        return finalize_scan(parsed, &scan_stats);
     }
 
     let outcome = dup_code_check_core::find_duplicate_files_with_stats(roots, &parsed.options)?;
@@ -172,20 +134,31 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
         print!("{}", format_text(parsed.localization, &groups));
     }
 
+    finalize_scan(parsed, &scan_stats)
+}
+
+fn finalize_scan(
+    parsed: &ParsedArgs,
+    scan_stats: &dup_code_check_core::ScanStats,
+) -> io::Result<i32> {
     if parsed.stats && !parsed.json {
-        eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
+        eprint!("{}", format_scan_stats(parsed.localization, scan_stats));
     }
 
-    if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
+    if has_fatal_skips(scan_stats) {
         eprint!(
             "{}",
-            format_fatal_skip_warning(parsed.localization, &scan_stats)
+            format_fatal_skip_warning(
+                parsed.localization,
+                scan_stats,
+                parsed.stats || parsed.strict
+            )
         );
     }
 
-    if parsed.strict && has_fatal_skips(&scan_stats) {
+    if parsed.strict && has_fatal_skips(scan_stats) {
         if !parsed.stats {
-            eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
+            eprint!("{}", format_scan_stats(parsed.localization, scan_stats));
         }
         return Ok(1);
     }

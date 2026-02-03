@@ -53,9 +53,9 @@
 - 元数据：license 仅使用 MIT（不再是双协议）。
 - 扫描预算：`maxFiles` 达到上限后会停止扫描（`skippedBudgetMaxFiles` 会变为非 0）。
 - Node 安装：`postinstall` 使用 `cargo build --locked` 构建 Rust 二进制。
-- 扫描流程：当设置 `maxFiles` 时，对 `git ls-files` 做流式遍历（提前停止，避免收集完整列表）。
+- 扫描流程：Git 快路径对 `git ls-files` 做流式遍历（避免收集完整列表；`maxFiles` 可提前停止）。
 - CLI：澄清 `--strict` 语义（仅在“致命跳过”：权限/遍历错误/预算中断/bucket 截断时返回非 0），并增加 smoke 覆盖。
-- CLI：当未启用 `--stats` 且出现“致命跳过”时，在 stderr 输出一次警告。
+- CLI：当出现“致命跳过”时，在 stderr 输出一次警告（即使启用了 `--stats`；仅在需要时提示重新运行 `--stats`）。
 - Rust：通过共享内部 helper 去重 code-span（winnowing）与 file-duplicates 分组逻辑，避免漂移。
 - Core：收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（仅允许绝对路径；且要求文件存在）。
 - Core：只有在 `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` 时才会启用 `DUP_CODE_CHECK_GIT_BIN`（显式 opt-in）。
@@ -109,8 +109,9 @@
 - Node smoke：在决定是否需要重建时额外验证 wrapper 可执行 `--version`。
 - npm 包：包含 `rust-toolchain.toml`，使安装时使用固定的 Rust toolchain。
 - CLI：本地化 `Number.MAX_SAFE_INTEGER` 相关整数参数错误信息。
-- CLI：当未启用 `--stats` 且出现致命跳过时，warning 会输出原因摘要与可操作建议。
+- CLI：致命跳过 warning 会输出原因摘要与可操作建议（未启用 `--stats` 时会提示使用 `--stats` 查看完整统计）。
 - CLI：致命跳过 warning 现在会包含与 JSON `scanStats` 对齐的 key（camelCase），并附带 snake_case 别名。
 - Core：为降低哈希碰撞导致的重复文件误分组风险，fingerprint 额外加入 prefix/suffix 样本。
+- Core：在输出重复文件组前会重新校验去空白后的文件内容，避免哈希碰撞或文件变化导致误报。
 - 扫描预算：二进制文件不会再绕过 `maxFiles` / `maxTotalBytes`，且二进制检测会避免读完整文件。
 - Report：截断包含非 ASCII 字符的 preview 时不再 panic。

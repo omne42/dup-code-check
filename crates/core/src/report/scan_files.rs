@@ -3,7 +3,8 @@ use std::path::PathBuf;
 
 use crate::dedupe::FileDuplicateGrouper;
 use crate::scan::{
-    Repo, make_rel_path, read_repo_file_bytes_with_path, repo_label, visit_repo_files,
+    Repo, make_rel_path, read_repo_file_bytes_for_verification, read_repo_file_bytes_with_path,
+    repo_label, visit_repo_files,
 };
 use crate::tokenize::{parse_brace_blocks, tokenize_for_dup_detection};
 use crate::types::{DuplicateFile, DuplicateGroup, ScanOptions, ScanStats};
@@ -106,7 +107,26 @@ pub(super) fn scan_text_files_for_report(
         }
     }
 
-    let mut file_duplicates = file_groups.into_groups(options.cross_repo_only);
+    let follow_symlinks = scan_options.follow_symlinks;
+    let max_file_size = scan_options.max_file_size;
+    let canonical_roots = canonical_roots.as_deref();
+    let mut file_duplicates =
+        file_groups.into_groups_verified(options.cross_repo_only, |file| {
+            let Some(repo) = repos.get(file.repo_id) else {
+                return Ok(None);
+            };
+            let canonical_root = canonical_roots
+                .and_then(|roots| roots.get(file.repo_id))
+                .map(|p| p.as_path());
+
+            read_repo_file_bytes_for_verification(
+                &repo.root,
+                &file.path,
+                canonical_root,
+                follow_symlinks,
+                max_file_size,
+            )
+        })?;
 
     sort_duplicate_groups_for_report(&mut file_duplicates);
     file_duplicates.truncate(options.max_report_items);

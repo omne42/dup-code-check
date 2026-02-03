@@ -1,6 +1,6 @@
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::types::{ScanOptions, ScanStats};
 use crate::util::fnv1a64;
@@ -186,4 +186,132 @@ pub(crate) fn read_repo_file_bytes_with_path(
     stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read as u64);
 
     Ok(Some((bytes, read_path)))
+}
+
+fn is_safe_relative_path(raw: &str) -> bool {
+    if raw.is_empty() {
+        return false;
+    }
+    let path = Path::new(raw);
+    if path.is_absolute() {
+        return false;
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => {}
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => return false,
+        }
+    }
+    true
+}
+
+pub(crate) fn read_repo_file_bytes_for_verification(
+    repo_root: &Path,
+    rel_path: &str,
+    canonical_root: Option<&Path>,
+    follow_symlinks: bool,
+    max_file_size: Option<u64>,
+) -> io::Result<Option<Vec<u8>>> {
+    if !is_safe_relative_path(rel_path) {
+        return Ok(None);
+    }
+
+    let candidate = repo_root.join(rel_path);
+    let read_path = if follow_symlinks {
+        let Some(canonical_root) = canonical_root else {
+            return Err(io::Error::other(
+                "read_repo_file_bytes_for_verification requires canonical_root when follow_symlinks=true",
+            ));
+        };
+
+        let resolved = match candidate.canonicalize() {
+            Ok(p) => p,
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
+                ) =>
+            {
+                return Ok(None);
+            }
+            Err(_) => return Ok(None),
+        };
+
+        if !resolved.starts_with(canonical_root) {
+            return Ok(None);
+        }
+
+        resolved
+    } else {
+        candidate
+    };
+
+    let metadata = match fs::symlink_metadata(&read_path) {
+        Ok(m) => {
+            if m.file_type().is_symlink() {
+                return Ok(None);
+            }
+            m
+        }
+        Err(err)
+            if matches!(
+                err.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
+            ) =>
+        {
+            return Ok(None);
+        }
+        Err(_) => return Ok(None),
+    };
+    if !metadata.is_file() {
+        return Ok(None);
+    }
+    if let Some(max_file_size) = max_file_size
+        && metadata.len() > max_file_size
+    {
+        return Ok(None);
+    }
+
+    let mut file = match fs::File::open(&read_path) {
+        Ok(f) => f,
+        Err(err)
+            if matches!(
+                err.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
+            ) =>
+        {
+            return Ok(None);
+        }
+        Err(err) => return Err(err),
+    };
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        let opened = match file.metadata() {
+            Ok(m) => m,
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
+                ) =>
+            {
+                return Ok(None);
+            }
+            Err(err) => return Err(err),
+        };
+        if (metadata.dev(), metadata.ino()) != (opened.dev(), opened.ino()) {
+            return Ok(None);
+        }
+    }
+
+    use std::io::Read;
+
+    let mut bytes: Vec<u8> = Vec::with_capacity(metadata.len().min(1024 * 1024) as usize);
+    file.read_to_end(&mut bytes)?;
+    Ok(Some(bytes))
 }

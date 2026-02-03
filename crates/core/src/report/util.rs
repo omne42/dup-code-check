@@ -24,9 +24,9 @@ fn preview_from_file_lines(
     path: &Path,
     start_line: u32,
     end_line: u32,
-    max_chars: usize,
+    max_bytes: usize,
 ) -> String {
-    if start_line == 0 || end_line == 0 || start_line > end_line || max_chars == 0 {
+    if start_line == 0 || end_line == 0 || start_line > end_line || max_bytes == 0 {
         return String::new();
     }
 
@@ -63,8 +63,8 @@ fn preview_from_file_lines(
                 out.push('\n');
             }
             out.push_str(std::string::String::from_utf8_lossy(slice).as_ref());
-            if out.len() >= max_chars {
-                truncate_to_char_boundary(&mut out, max_chars);
+            if out.len() >= max_bytes {
+                truncate_to_char_boundary(&mut out, max_bytes);
                 break;
             }
         }
@@ -81,9 +81,9 @@ fn preview_from_file_lines(
 pub(super) fn fill_missing_previews_from_files(
     files: &[ScannedTextFile],
     groups: &mut [DuplicateSpanGroup],
-    max_chars: usize,
+    max_bytes: usize,
 ) {
-    if groups.is_empty() || max_chars == 0 {
+    if groups.is_empty() || max_bytes == 0 {
         return;
     }
 
@@ -103,7 +103,7 @@ pub(super) fn fill_missing_previews_from_files(
             continue;
         };
 
-        group.preview = preview_from_file_lines(path, occ.start_line, occ.end_line, max_chars);
+        group.preview = preview_from_file_lines(path, occ.start_line, occ.end_line, max_bytes);
     }
 }
 

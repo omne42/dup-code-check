@@ -97,108 +97,8 @@ where
         return Ok(None);
     }
 
-    if options.max_files.is_some() {
-        return visit_repo_files_via_git_streaming(repo, options, stats, on_file);
-    }
-
-    let output = match Command::new(git_exe())
-        .arg("-C")
-        .arg(&repo.root)
-        .args([
-            "ls-files",
-            "-z",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-        ])
-        .stderr(Stdio::null())
-        .output()
-    {
-        Ok(out) => out,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(_) => return Ok(None),
-    };
-
-    if !output.status.success() {
-        return Ok(None);
-    }
-
-    let mut rel_paths = Vec::new();
-    for part in output.stdout.split(|b| *b == 0) {
-        if part.is_empty() {
-            continue;
-        }
-        let Ok(path) = std::str::from_utf8(part) else {
-            // Fall back to the walker on repositories containing non-UTF-8 paths.
-            return Ok(None);
-        };
-        rel_paths.push(path.to_string());
-    }
-
-    if rel_paths.is_empty() {
-        return Ok(Some(ControlFlow::Continue(())));
-    }
-
-    let ignored = match git_check_ignore(&repo.root, &rel_paths) {
-        Ok(set) => set,
-        Err(_) => return Ok(None),
-    };
-
-    for rel in rel_paths {
-        if ignored.contains(&rel) {
-            continue;
-        }
-        if !is_safe_relative_path(&rel) {
-            stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
-            continue;
-        }
-
-        let mut segs = rel.split('/');
-        segs.next_back();
-        if segs.any(|seg| ignore_dirs_contains(&options.ignore_dirs, seg)) {
-            continue;
-        }
-
-        let abs_path = repo.root.join(&rel);
-        let meta = match fs::symlink_metadata(&abs_path) {
-            Ok(m) => m,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
-                continue;
-            }
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
-                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
-                continue;
-            }
-            Err(err) => return Err(err),
-        };
-
-        if meta.file_type().is_symlink() && !options.follow_symlinks {
-            continue;
-        }
-        if !meta.is_file() {
-            continue;
-        }
-
-        stats.candidate_files = stats.candidate_files.saturating_add(1);
-        let file = RepoFile {
-            repo_id: repo.id,
-            repo_label: repo.label.clone(),
-            root: repo.root.clone(),
-            abs_path,
-        };
-
-        match on_file(stats, file)? {
-            ControlFlow::Continue(()) => {}
-            ControlFlow::Break(()) => return Ok(Some(ControlFlow::Break(()))),
-        }
-
-        if should_stop_due_to_max_files(options, stats) {
-            return Ok(Some(ControlFlow::Break(())));
-        }
-    }
-
-    Ok(Some(ControlFlow::Continue(())))
+    // Stream `git ls-files` in small batches to avoid collecting the full file list in memory.
+    visit_repo_files_via_git_streaming(repo, options, stats, on_file)
 }
 
 fn is_safe_relative_path(raw: &str) -> bool {
@@ -228,6 +128,7 @@ fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<Str
         .args(["check-ignore", "-z", "--stdin"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()?;
 
     {
@@ -295,17 +196,18 @@ where
         return Ok(None);
     };
 
-    // With `maxFiles`, avoid collecting the entire file list. We read paths in small batches,
-    // run a batched `git check-ignore`, and stop as soon as the scan budget is hit.
+    // Read paths in small batches, run a batched `git check-ignore`, and stop early when scan
+    // budgets are hit (e.g. `maxFiles`).
     const BATCH_SIZE: usize = 256;
     let mut batch: Vec<String> = Vec::with_capacity(BATCH_SIZE);
     let mut reader = BufReader::new(stdout);
+    let mut bytes: Vec<u8> = Vec::new();
 
     let mut started = false;
     let mut check_ignore_ok = true;
 
     loop {
-        let mut bytes: Vec<u8> = Vec::new();
+        bytes.clear();
         let n = reader.read_until(0, &mut bytes)?;
         if n == 0 {
             break;

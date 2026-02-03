@@ -16,6 +16,7 @@
   - Normalizes by removing symbols + whitespace (keeps `[A-Za-z0-9_]`)
   - Reports line ranges for occurrences
 - Report mode (`--report`): multiple detectors/levels in one run
+  - Defaults to `--max-total-bytes=268435456` (256 MiB); override with `--max-total-bytes`
 - Respects `.gitignore` by default
   - Note: in a Git repo, ignore rules include `.gitignore`, `.git/info/exclude`, and global Git ignores. Use `--no-gitignore` to include ignored files.
 

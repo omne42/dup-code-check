@@ -29,6 +29,7 @@ npm run docs:serve
   - 连续 `>= 50` 个字符相同视为疑似重复，报告真实行号范围
 - 重复检测报告（`--report`）
   - 行级 / token 级 / block 级 / “AST 子树”级（基于 `{}` 结构）重复
+  - 默认启用 `--max-total-bytes=268435456`（256 MiB），可用 `--max-total-bytes` 覆盖
 - 近似重复（MinHash / SimHash）
 - 扫描默认会跳过 `.gitignore` 命中的文件
   - 提示：在 Git 仓库内会遵循 `.gitignore`、`.git/info/exclude` 与全局忽略规则；如需包含被忽略文件，请用 `--no-gitignore`。

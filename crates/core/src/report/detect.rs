@@ -4,10 +4,8 @@ use crate::dedupe::detect_duplicate_code_spans_winnowing;
 use crate::types::{
     DuplicateSpanGroup, DuplicateSpanOccurrence, ScanOptions, ScanStats, SimilarityPair,
 };
-use crate::util::{
-    NormalizedFileView, SpanGroupBuilder, add_occurrence_view, canonicalize_match, fnv1a64_u32,
-    fold_u64_to_u32, maximal_match, winnowed_fingerprints,
-};
+use crate::util::{NormalizedFileView, SpanGroupBuilder, fnv1a64_u32, fold_u64_to_u32};
+use crate::winnowing::{detect_duplicate_span_groups_winnowing, finalize_span_groups};
 
 use super::ScannedTextFile;
 use super::util::{preview_from_lines, sort_span_groups_for_report};
@@ -197,7 +195,7 @@ pub(super) fn detect_duplicate_blocks(
         }
     }
 
-    let mut out = finalize_span_groups(groups, options);
+    let mut out = finalize_span_groups(groups, options.cross_repo_only);
     sort_span_groups_for_report(&mut out);
     out.truncate(options.max_report_items);
     out
@@ -313,7 +311,7 @@ pub(super) fn detect_duplicate_ast_subtrees(
         }
     }
 
-    let mut out = finalize_span_groups(groups, options);
+    let mut out = finalize_span_groups(groups, options.cross_repo_only);
     sort_span_groups_for_report(&mut out);
     out.truncate(options.max_report_items);
     out
@@ -331,241 +329,24 @@ fn detect_duplicate_span_groups_with_len_filter<'a>(
     max_items: usize,
     stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
-    if max_items == 0 {
-        return Vec::new();
-    }
-    if files.is_empty() {
+    if max_items == 0 || files.is_empty() {
         return Vec::new();
     }
 
-    #[derive(Debug, Clone, Copy)]
-    struct FingerprintOcc {
-        file_id: usize,
-        pos: usize,
-    }
-
-    let mut fingerprints: HashMap<u64, Vec<FingerprintOcc>> = HashMap::new();
-    for (file_id, file) in files.iter().enumerate() {
-        if file.normalized.len() < fingerprint_len {
-            continue;
-        }
-        for (hash, pos) in winnowed_fingerprints(file.normalized, fingerprint_len, window_size) {
-            fingerprints
-                .entry(hash)
-                .or_default()
-                .push(FingerprintOcc { file_id, pos });
-        }
-    }
-
-    #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-    struct MatchKey {
-        file_a: usize,
-        start_a: usize,
-        file_b: usize,
-        start_b: usize,
-        len: usize,
-    }
-
-    const MAX_BUCKET: usize = 512;
-
-    fn truncate_bucket_by_repo<'a>(
-        mut occs: Vec<FingerprintOcc>,
-        files: &[NormalizedFileView<'a>],
-        max_bucket: usize,
-    ) -> Vec<FingerprintOcc> {
-        if occs.len() <= max_bucket {
-            return occs;
-        }
-
-        occs.sort_by_key(|o| (files[o.file_id].repo_id, o.file_id, o.pos));
-
-        let mut by_repo: Vec<(usize, Vec<FingerprintOcc>)> = Vec::new();
-        for occ in occs {
-            let repo_id = files[occ.file_id].repo_id;
-            if let Some((last_repo, bucket)) = by_repo.last_mut()
-                && *last_repo == repo_id
-            {
-                bucket.push(occ);
-            } else {
-                by_repo.push((repo_id, vec![occ]));
-            }
-        }
-
-        let mut idxs = vec![0usize; by_repo.len()];
-        let mut out = Vec::with_capacity(max_bucket);
-        while out.len() < max_bucket {
-            let mut progressed = false;
-            for (i, (_, bucket)) in by_repo.iter().enumerate() {
-                if idxs[i] < bucket.len() {
-                    out.push(bucket[idxs[i]]);
-                    idxs[i] += 1;
-                    progressed = true;
-                    if out.len() == max_bucket {
-                        break;
-                    }
-                }
-            }
-            if !progressed {
-                break;
-            }
-        }
-
-        out
-    }
-
-    let mut seen_matches: HashSet<MatchKey> = HashSet::new();
-    let mut groups: HashMap<(u64, usize), Vec<SpanGroupBuilder>> = HashMap::new();
-
-    for mut occs in fingerprints.into_values() {
-        if occs.len() <= 1 {
-            continue;
-        }
-        let original_len = occs.len();
-        if original_len > MAX_BUCKET {
-            occs = truncate_bucket_by_repo(occs, files, MAX_BUCKET);
-            stats.skipped_bucket_truncated = stats
-                .skipped_bucket_truncated
-                .saturating_add((original_len - occs.len()) as u64);
-        }
-
-        for i in 0..occs.len() {
-            for j in (i + 1)..occs.len() {
-                let a = occs[i];
-                let b = occs[j];
-                if a.file_id == b.file_id && a.pos == b.pos {
-                    continue;
-                }
-                if cross_repo_only && files[a.file_id].repo_id == files[b.file_id].repo_id {
-                    continue;
-                }
-
-                let (start_a, start_b, len) = match maximal_match(
-                    files[a.file_id].normalized,
-                    a.pos,
-                    files[b.file_id].normalized,
-                    b.pos,
-                    fingerprint_len,
-                ) {
-                    Some(v) => v,
-                    None => continue,
-                };
-
-                if len < min_len {
-                    continue;
-                }
-                if !accept_match(a.file_id, start_a, len) || !accept_match(b.file_id, start_b, len)
-                {
-                    continue;
-                }
-
-                if a.file_id == b.file_id {
-                    let a_end = start_a + len;
-                    let b_end = start_b + len;
-                    if start_a < b_end && start_b < a_end {
-                        continue;
-                    }
-                }
-
-                let (file_a, file_b, start_a, start_b) =
-                    canonicalize_match(a.file_id, b.file_id, start_a, start_b);
-                let key = MatchKey {
-                    file_a,
-                    start_a,
-                    file_b,
-                    start_b,
-                    len,
-                };
-                if !seen_matches.insert(key) {
-                    continue;
-                }
-
-                let sample = files[file_a].normalized[start_a..start_a + len].to_vec();
-                let content_hash = fnv1a64_u32(&sample);
-                let bucket = groups.entry((content_hash, len)).or_default();
-                let builder = match bucket.iter_mut().find(|g| g.sample == sample) {
-                    Some(existing) => existing,
-                    None => {
-                        bucket.push(SpanGroupBuilder {
-                            content_hash,
-                            normalized_len: len,
-                            sample,
-                            preview: String::new(),
-                            occurrences: Vec::new(),
-                            occurrence_keys: HashSet::new(),
-                            repo_ids: HashSet::new(),
-                        });
-                        bucket.last_mut().expect("just pushed")
-                    }
-                };
-
-                if builder.occurrences.is_empty() {
-                    let start_line = files[file_a].line_map.get(start_a).copied().unwrap_or(1);
-                    let end_line = files[file_a]
-                        .line_map
-                        .get(start_a + len - 1)
-                        .copied()
-                        .unwrap_or(start_line);
-                    builder.preview = preview_from_occurrence(file_a, start_line, end_line);
-                }
-
-                add_occurrence_view(builder, &files[file_a], file_a, start_a, len);
-                add_occurrence_view(builder, &files[file_b], file_b, start_b, len);
-            }
-        }
-    }
-
-    let mut out = finalize_span_groups(
-        groups,
-        &ScanOptions {
-            cross_repo_only,
-            ..ScanOptions::default()
+    let mut out = detect_duplicate_span_groups_winnowing(
+        files,
+        min_len,
+        fingerprint_len,
+        window_size,
+        cross_repo_only,
+        accept_match,
+        |file_id, start_line, end_line, _sample| {
+            preview_from_occurrence(file_id, start_line, end_line)
         },
+        stats,
     );
     sort_span_groups_for_report(&mut out);
     out.truncate(max_items);
-    out
-}
-
-fn finalize_span_groups(
-    groups: HashMap<(u64, usize), Vec<SpanGroupBuilder>>,
-    options: &ScanOptions,
-) -> Vec<DuplicateSpanGroup> {
-    let mut out = Vec::new();
-    for builders in groups.into_values() {
-        for mut builder in builders {
-            if builder.occurrences.len() <= 1 {
-                continue;
-            }
-            if options.cross_repo_only && builder.repo_ids.len() < 2 {
-                continue;
-            }
-
-            builder.occurrences.sort_by(|a, b| {
-                (a.repo_id, &a.repo_label, &a.path, a.start_line, a.end_line).cmp(&(
-                    b.repo_id,
-                    &b.repo_label,
-                    &b.path,
-                    b.start_line,
-                    b.end_line,
-                ))
-            });
-
-            out.push(DuplicateSpanGroup {
-                content_hash: builder.content_hash,
-                normalized_len: builder.normalized_len,
-                preview: builder.preview,
-                occurrences: builder.occurrences,
-            });
-        }
-    }
-
-    out.sort_by(|a, b| {
-        (a.content_hash, a.normalized_len, a.occurrences.len()).cmp(&(
-            b.content_hash,
-            b.normalized_len,
-            b.occurrences.len(),
-        ))
-    });
     out
 }
 

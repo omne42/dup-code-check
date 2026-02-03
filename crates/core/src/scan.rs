@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io;
 use std::io::BufRead;
@@ -16,19 +16,44 @@ use ignore::WalkBuilder;
 use crate::types::{ScanOptions, ScanStats};
 use crate::util::fnv1a64;
 
+#[cfg(not(test))]
+const ENV_GIT_BIN: &str = "DUP_CODE_CHECK_GIT_BIN";
+#[cfg(not(test))]
+const ENV_ALLOW_CUSTOM_GIT: &str = "DUP_CODE_CHECK_ALLOW_CUSTOM_GIT";
+
+fn allow_custom_git_override(raw: Option<&OsStr>) -> bool {
+    raw == Some(OsStr::new("1"))
+}
+
+fn git_bin_override_from_env(
+    allow_custom_git: bool,
+    raw_git_bin: Option<OsString>,
+) -> Option<OsString> {
+    if !allow_custom_git {
+        return None;
+    }
+    raw_git_bin.and_then(validate_git_bin_override)
+}
+
 fn git_exe() -> OsString {
     #[cfg(test)]
     if let Some(exe) = TEST_GIT_EXE_OVERRIDE.with(|exe| exe.borrow().clone()) {
         return exe;
     }
 
-    // `DUP_CODE_CHECK_GIT_BIN` is a sharp edge: only use it in trusted environments.
-    // We validate the override strictly and keep tests hermetic via `TEST_GIT_EXE_OVERRIDE`.
+    // `DUP_CODE_CHECK_GIT_BIN` is a sharp edge.
+    // Ignore it unless `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` is set, and validate strictly.
+    // Keep tests hermetic via `TEST_GIT_EXE_OVERRIDE`.
     #[cfg(not(test))]
-    if let Some(exe) =
-        std::env::var_os("DUP_CODE_CHECK_GIT_BIN").and_then(validate_git_bin_override)
     {
-        return exe;
+        let allow_custom_git =
+            allow_custom_git_override(std::env::var_os(ENV_ALLOW_CUSTOM_GIT).as_deref());
+        let raw_git_bin = allow_custom_git
+            .then(|| std::env::var_os(ENV_GIT_BIN))
+            .flatten();
+        if let Some(exe) = git_bin_override_from_env(allow_custom_git, raw_git_bin) {
+            return exe;
+        }
     }
 
     OsString::from("git")
@@ -973,6 +998,42 @@ mod tests {
         assert_eq!(
             validate_git_bin_override(existing.as_os_str().to_os_string()),
             Some(existing.as_os_str().to_os_string())
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn git_bin_override_requires_opt_in() -> io::Result<()> {
+        let root = temp_dir("git_bin_override_opt_in");
+        fs::create_dir_all(&root)?;
+
+        let existing = root.join("git");
+        fs::write(&existing, "")?;
+        let existing = existing.as_os_str().to_os_string();
+
+        // Without explicit opt-in, ignore the override even if it points to an existing file.
+        assert_eq!(
+            git_bin_override_from_env(false, Some(existing.clone())),
+            None
+        );
+
+        // Opt-in is strict: only `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1`.
+        assert!(allow_custom_git_override(Some(OsStr::new("1"))));
+        assert!(!allow_custom_git_override(Some(OsStr::new("true"))));
+        assert!(!allow_custom_git_override(Some(OsStr::new("0"))));
+        assert!(!allow_custom_git_override(None));
+
+        // With opt-in, accept a valid absolute file path.
+        assert_eq!(
+            git_bin_override_from_env(true, Some(existing.clone())),
+            Some(existing)
+        );
+
+        // With opt-in, still reject invalid overrides.
+        assert_eq!(
+            git_bin_override_from_env(true, Some(OsString::from("git"))),
+            None
         );
 
         Ok(())

@@ -5,6 +5,7 @@ mod scan;
 mod tokenize;
 mod types;
 mod util;
+mod winnowing;
 
 pub use duplicates::{
     find_duplicate_code_spans, find_duplicate_code_spans_with_stats, find_duplicate_files,

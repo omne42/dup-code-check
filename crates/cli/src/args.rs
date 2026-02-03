@@ -15,7 +15,7 @@ const HELP_TEXT_EN: &str = concat!(
     "  --code-spans            Find suspected duplicate code spans\n",
     "  --json                  Output JSON\n",
     "  --stats                 Include scan stats (JSON) or print to stderr\n",
-    "  --strict                Exit non-zero on fatal skips (perm/traversal/budget)\n",
+    "  --strict                Exit non-zero on fatal skips (perm/traversal/budget/bucket)\n",
     "  --cross-repo-only       Only report groups spanning >= 2 roots\n",
     "  --no-gitignore          Do not respect .gitignore rules\n",
     "  --gitignore             Respect .gitignore rules (default: on)\n",
@@ -35,6 +35,7 @@ const HELP_TEXT_EN: &str = concat!(
     "Notes:\n",
     "  - --cross-repo-only requires 2+ roots (roots are the CLI paths)\n",
     "  - In text mode, --stats prints to stderr\n",
+    "  - In --report mode, --max-total-bytes defaults to 256 MiB (268435456 bytes); override with --max-total-bytes\n",
     "\n",
     "Examples:\n",
     "  dup-code-check .\n",
@@ -57,7 +58,7 @@ const HELP_TEXT_ZH: &str = concat!(
     "  --code-spans            查找疑似重复代码片段\n",
     "  --json                  输出 JSON\n",
     "  --stats                 输出扫描统计（JSON 模式合并到输出；文本模式写 stderr）\n",
-    "  --strict                若出现“致命跳过”（权限/遍历错误/预算中断）则退出码非 0\n",
+    "  --strict                若出现“致命跳过”（权限/遍历错误/预算中断/bucket 截断）则退出码非 0\n",
     "  --cross-repo-only       仅输出跨 >= 2 个 root 的重复组\n",
     "  --no-gitignore          不尊重 .gitignore 规则\n",
     "  --gitignore             启用 .gitignore 过滤（默认：开启）\n",
@@ -77,6 +78,7 @@ const HELP_TEXT_ZH: &str = concat!(
     "说明:\n",
     "  - --cross-repo-only 需要 2+ 个 root（root 即命令行路径）\n",
     "  - 文本模式下 --stats 输出到 stderr\n",
+    "  - 在 --report 模式下，--max-total-bytes 默认 256 MiB（268435456 bytes），可用 --max-total-bytes 覆盖\n",
     "\n",
     "示例:\n",
     "  dup-code-check .\n",
@@ -150,8 +152,14 @@ fn parse_u64_non_negative_safe(
     const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
     let value = parse_u64(localization, name, raw)?;
     if value > MAX_SAFE_INTEGER {
+        let note = tr(
+            localization,
+            " (Number.MAX_SAFE_INTEGER)",
+            "（Number.MAX_SAFE_INTEGER）",
+        );
         return Err(format!(
-            "{name} must be <= {MAX_SAFE_INTEGER} (Number.MAX_SAFE_INTEGER)"
+            "{name} {} {MAX_SAFE_INTEGER}{note}",
+            tr(localization, "must be <=", "必须 <= "),
         ));
     }
     Ok(value)
@@ -470,6 +478,15 @@ pub(crate) fn parse_args(
         i += 1;
     }
 
+    if report && code_spans {
+        return Err(tr(
+            localization,
+            "--report conflicts with --code-spans",
+            "--report 与 --code-spans 不能同时使用",
+        )
+        .to_string());
+    }
+
     let mut options = ScanOptions {
         respect_gitignore,
         cross_repo_only,
@@ -532,4 +549,45 @@ pub(crate) fn parse_args(
         roots,
         options,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn argv(args: &[&str]) -> Vec<String> {
+        args.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn report_and_code_spans_are_mutually_exclusive_en() {
+        let err =
+            parse_args(&argv(&["--report", "--code-spans", "."]), Localization::En).unwrap_err();
+        assert!(err.contains("conflicts"));
+    }
+
+    #[test]
+    fn report_and_code_spans_are_mutually_exclusive_zh() {
+        let err =
+            parse_args(&argv(&["--report", "--code-spans", "."]), Localization::Zh).unwrap_err();
+        assert!(err.contains("不能同时使用"));
+    }
+
+    #[test]
+    fn max_safe_integer_error_is_localized_en() {
+        let err =
+            parse_u64_non_negative_safe(Localization::En, "--max-total-bytes", "9007199254740992")
+                .unwrap_err();
+        assert!(err.contains("must be <="));
+        assert!(err.contains("Number.MAX_SAFE_INTEGER"));
+    }
+
+    #[test]
+    fn max_safe_integer_error_is_localized_zh() {
+        let err =
+            parse_u64_non_negative_safe(Localization::Zh, "--max-total-bytes", "9007199254740992")
+                .unwrap_err();
+        assert!(err.contains("必须"));
+        assert!(err.contains("Number.MAX_SAFE_INTEGER"));
+    }
 }

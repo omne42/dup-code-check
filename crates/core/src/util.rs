@@ -153,7 +153,10 @@ pub(crate) fn winnowed_fingerprints(
         deque.push_back((i, hash));
 
         if i + 1 >= window_size {
-            let (min_idx, min_hash) = *deque.front().expect("window has items");
+            let Some(&(min_idx, min_hash)) = deque.front() else {
+                debug_assert!(false, "window has items");
+                continue;
+            };
             if out.last().map(|&(_, idx)| idx) != Some(min_idx) {
                 out.push((min_hash, min_idx));
             }

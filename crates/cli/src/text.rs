@@ -9,6 +9,7 @@ pub(crate) fn has_fatal_skips(stats: &ScanStats) -> bool {
     stats.skipped_permission_denied > 0
         || stats.skipped_outside_root > 0
         || stats.skipped_walk_errors > 0
+        || stats.skipped_bucket_truncated > 0
         || stats.skipped_budget_max_files > 0
         || stats.skipped_budget_max_total_bytes > 0
 }
@@ -211,4 +212,18 @@ pub(crate) fn format_text_report(
     out.push_str("\n\n");
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bucket_truncated_is_fatal_skip() {
+        let stats = ScanStats {
+            skipped_bucket_truncated: 1,
+            ..ScanStats::default()
+        };
+        assert!(has_fatal_skips(&stats));
+    }
 }

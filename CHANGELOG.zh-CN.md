@@ -54,28 +54,35 @@
 - 扫描预算：`maxFiles` 达到上限后会停止扫描（`skippedBudgetMaxFiles` 会变为非 0）。
 - Node 安装：`postinstall` 使用 `cargo build --locked` 构建 Rust 二进制。
 - 扫描流程：当设置 `maxFiles` 时，对 `git ls-files` 做流式遍历（提前停止，避免收集完整列表）。
-- CLI：澄清 `--strict` 语义（仅在“致命跳过”：权限/遍历错误/预算中断时返回非 0），并增加 smoke 覆盖。
+- CLI：澄清 `--strict` 语义（仅在“致命跳过”：权限/遍历错误/预算中断/bucket 截断时返回非 0），并增加 smoke 覆盖。
 - CLI：当未启用 `--stats` 且出现“致命跳过”时，在 stderr 输出一次警告。
 - Rust：通过共享内部 helper 去重 code-span（winnowing）与 file-duplicates 分组逻辑，避免漂移。
 - Core：收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（仅允许绝对路径；且要求文件存在）。
+- Core：只有在 `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` 时才会启用 `DUP_CODE_CHECK_GIT_BIN`（显式 opt-in）。
+- Report：默认设置 `maxTotalBytes` 预算（256 MiB）以限制内存占用；可用 `--max-total-bytes` 覆盖。
+- 文档：在 `--help` 与 README 中说明 `--report` 模式默认 `--max-total-bytes` 预算。
 - CLI：root 路径使用 `canonicalize()`（失败则报错），降低符号链接歧义。
 - 文档：补充安全提示——npm `postinstall` 会触发原生构建（Cargo），并可能运行依赖的 build script。
 - 文档：在《快速开始》中补齐同样的 `postinstall` 安全提示。
 - 扫描统计：新增 `skippedBucketTruncated`，用于标记检测器 fingerprint bucket 被截断（防爆保护）。
+- CLI：将 `skippedBucketTruncated` 视为“扫描不完整”（致命跳过），从而影响 warning/`--strict` 退出码。
 - CLI：`--strict` 现在会把 `outside_root` 视为“扫描不完整”（遍历跳过），从而退出非 0。
 - 扫描：Windows 下 `ignoreDirs` 按 ASCII 做大小写不敏感匹配。
 - Tokenizer：仅在行首（允许前置空白）把 `#` 视为注释。
 - CI：docs build 默认启用 `LLMS_STRICT=1`。
+- CI：固定 Rust toolchain 为 `1.92.0`（与 `rust-toolchain.toml` 对齐）。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
 - 避免 `git check-ignore` 集成中的 panic；失败时会 fallback。
 - 当前缀剥离失败时避免在结果里泄漏绝对路径。
+- 避免 winnowing 在异常空窗口情况下可能触发的 panic。
 - `--follow-symlinks` 现在通过使用 walker path 更可靠。
 - 启用 `--follow-symlinks` 时，跳过解析后位于 root 之外的符号链接目录。
 - 启用 `--follow-symlinks` 时，读取文件增加针对 symlink/TOCTOU 竞态的防护。
 - token 检测器现在会记录多行字符串 token 的起始行号。
 - CLI 支持 `--` 终止参数解析（允许 root 以 `-` 开头）。
+- CLI：当同时指定 `--report` 与 `--code-spans` 时将报错。
 - CLI：`--cross-repo-only` 现在要求至少 2 个 root，否则会报错。
 - 扫描会跳过 `PermissionDenied` 和 walker traversal errors，而不是直接中止。
 - CLI 现在会捕获运行期扫描失败并以退出码 1 退出。
@@ -96,3 +103,4 @@
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。
 - Node smoke：在决定是否需要重建时额外验证 wrapper 可执行 `--version`。
 - npm 包：包含 `rust-toolchain.toml`，使安装时使用固定的 Rust toolchain。
+- CLI：本地化 `Number.MAX_SAFE_INTEGER` 相关整数参数错误信息。

@@ -54,28 +54,35 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan budgets: `maxFiles` now stops scanning once the file-count budget is hit (`skippedBudgetMaxFiles` becomes non-zero).
 - Node installer: `postinstall` builds Rust binary with `cargo build --locked`.
 - Scan pipeline: stream `git ls-files` enumeration when `maxFiles` is set (stop early without collecting full lists).
-- CLI: clarify `--strict` semantics (fatal skips only: permission/traversal/budget abort) and add smoke coverage.
+- CLI: clarify `--strict` semantics (fatal skips only: permission/traversal/budget/bucket) and add smoke coverage.
 - CLI: warn on fatal skips when `--stats` is not enabled.
 - Rust: de-duplicate code-span (winnowing) and file-duplicate grouping logic via a shared internal helper.
 - Core: tighten `DUP_CODE_CHECK_GIT_BIN` override validation (absolute path required; must exist and be a file).
+- Core: require `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` to honor `DUP_CODE_CHECK_GIT_BIN` (opt-in).
+- Report: set a default `maxTotalBytes` budget (256 MiB) to bound memory use; override via `--max-total-bytes`.
+- Docs: mention the `--report` default `--max-total-bytes` budget in `--help` and `README`.
 - CLI: resolve roots via `canonicalize()` (fail if it fails) to reduce symlink ambiguity.
 - Docs: add a security note that npm `postinstall` runs a native build (Cargo) and may execute dependency build scripts.
 - Docs: add the same `postinstall` security note to Getting Started.
 - Scan stats: record detector bucket truncation as `skippedBucketTruncated`.
+- CLI: treat `skippedBucketTruncated` as a fatal skip (scan incomplete) for warnings/`--strict`.
 - CLI: `--strict` now treats `outside_root` traversal skips as fatal (scan incomplete).
 - Scan: `ignoreDirs` matching is case-insensitive on Windows (ASCII).
 - Tokenizer: treat `#` as a comment only at line start (after optional whitespace).
 - CI: docs build now runs with `LLMS_STRICT=1`.
+- CI: pin Rust toolchain to `1.92.0` (match `rust-toolchain.toml`).
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
 - Avoid panics in `git check-ignore` integration; fall back when it fails.
 - Avoid leaking absolute paths in results when path prefix stripping fails.
+- Avoid potential panics in winnowing match selection on unexpected empty windows.
 - `--follow-symlinks` now works reliably by using the walker path when enabled.
 - When `--follow-symlinks` is enabled, skip symlinked directories that resolve outside the root.
 - Harden file reads under `--follow-symlinks` against symlink/TOCTOU races.
 - Token-based detectors now record the start line for multi-line string tokens.
 - CLI now supports `--` to terminate option parsing (allows roots that start with `-`).
+- CLI now errors when `--report` and `--code-spans` are both specified.
 - CLI: `--cross-repo-only` now errors when fewer than 2 roots are provided.
 - Scanning now skips `PermissionDenied` and walker traversal errors instead of aborting.
 - CLI now catches runtime scan failures and exits with code 1.
@@ -96,3 +103,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - npm build: improve Cargo build failure diagnostics.
 - Node smoke: verify the wrapper can execute `--version` when deciding whether to rebuild.
 - npm package: include `rust-toolchain.toml` so installs use the pinned Rust toolchain.
+- CLI: localize `Number.MAX_SAFE_INTEGER` errors for integer options.

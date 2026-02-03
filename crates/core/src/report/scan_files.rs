@@ -10,11 +10,20 @@ use crate::util::{fnv1a64_u32, fold_u64_to_u32, normalize_for_code_spans, normal
 use super::ScannedTextFile;
 use super::util::sort_duplicate_groups_for_report;
 
+const DEFAULT_REPORT_MAX_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
+
 pub(super) fn scan_text_files_for_report(
     roots: &[PathBuf],
     options: &ScanOptions,
     stats: &mut ScanStats,
 ) -> io::Result<(Vec<ScannedTextFile>, Vec<DuplicateGroup>)> {
+    let mut scan_options = options.clone();
+    scan_options.max_total_bytes = Some(
+        scan_options
+            .max_total_bytes
+            .unwrap_or(DEFAULT_REPORT_MAX_TOTAL_BYTES),
+    );
+
     let repos: Vec<Repo> = roots
         .iter()
         .enumerate()
@@ -45,8 +54,9 @@ pub(super) fn scan_text_files_for_report(
             .map(|roots| roots[repo.id].as_path());
 
         if let std::ops::ControlFlow::Break(()) =
-            visit_repo_files(repo, options, stats, |stats, repo_file| {
-                let Some(bytes) = read_repo_file_bytes(&repo_file, canonical_root, options, stats)?
+            visit_repo_files(repo, &scan_options, stats, |stats, repo_file| {
+                let Some(bytes) =
+                    read_repo_file_bytes(&repo_file, canonical_root, &scan_options, stats)?
                 else {
                     return Ok(std::ops::ControlFlow::Continue(()));
                 };

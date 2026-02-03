@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::io;
 use std::ops::ControlFlow;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -13,7 +15,7 @@ pub(crate) fn visit_repo_files<F>(
     repo: &Repo,
     options: &ScanOptions,
     stats: &mut ScanStats,
-    mut on_file: F,
+    mut on_file_cb: F,
 ) -> io::Result<ControlFlow<()>>
 where
     F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
@@ -23,10 +25,17 @@ where
         return Ok(ControlFlow::Break(()));
     }
 
+    let mut visited: HashSet<PathBuf> = HashSet::new();
+
     if options.respect_gitignore
         && !options.follow_symlinks
-        && let Some(flow) =
-            super::git::try_visit_repo_files_via_git(repo, options, stats, &mut on_file)?
+        && let Some(flow) = {
+            let mut on_git_file = |stats: &mut ScanStats, file: RepoFile| {
+                visited.insert(file.abs_path.clone());
+                on_file_cb(stats, file)
+            };
+            super::git::try_visit_repo_files_via_git(repo, options, stats, &mut on_git_file)?
+        }
     {
         return Ok(flow);
     }
@@ -161,15 +170,21 @@ where
             continue;
         }
 
+        let abs_path = entry.into_path();
+        if visited.contains(&abs_path) {
+            continue;
+        }
+        visited.insert(abs_path.clone());
+
         stats.candidate_files = stats.candidate_files.saturating_add(1);
         let file = RepoFile {
             repo_id: repo.id,
             repo_label: repo.label.clone(),
             root: repo.root.clone(),
-            abs_path: entry.into_path(),
+            abs_path,
         };
 
-        match on_file(stats, file)? {
+        match on_file_cb(stats, file)? {
             ControlFlow::Continue(()) => {}
             ControlFlow::Break(()) => {
                 flush_filter_skips(stats);

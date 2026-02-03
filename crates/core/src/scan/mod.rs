@@ -12,7 +12,7 @@ mod walker;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use read::{make_rel_path, read_repo_file_bytes};
+pub(crate) use read::{make_rel_path, read_repo_file_bytes, read_repo_file_bytes_with_path};
 pub(crate) use walker::visit_repo_files;
 
 fn should_stop_due_to_max_files(options: &ScanOptions, stats: &mut ScanStats) -> bool {

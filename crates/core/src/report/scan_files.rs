@@ -2,7 +2,9 @@ use std::io;
 use std::path::PathBuf;
 
 use crate::dedupe::FileDuplicateGrouper;
-use crate::scan::{Repo, make_rel_path, read_repo_file_bytes, repo_label, visit_repo_files};
+use crate::scan::{
+    Repo, make_rel_path, read_repo_file_bytes_with_path, repo_label, visit_repo_files,
+};
 use crate::tokenize::{parse_brace_blocks, tokenize_for_dup_detection};
 use crate::types::{DuplicateFile, DuplicateGroup, ScanOptions, ScanStats};
 use crate::util::{fnv1a64_u32, fold_u64_to_u32, normalize_for_code_spans};
@@ -55,8 +57,12 @@ pub(super) fn scan_text_files_for_report(
 
         if let std::ops::ControlFlow::Break(()) =
             visit_repo_files(repo, &scan_options, stats, |stats, repo_file| {
-                let Some(bytes) =
-                    read_repo_file_bytes(&repo_file, canonical_root, &scan_options, stats)?
+                let Some((bytes, read_path)) = read_repo_file_bytes_with_path(
+                    &repo_file,
+                    canonical_root,
+                    &scan_options,
+                    stats,
+                )?
                 else {
                     return Ok(std::ops::ControlFlow::Continue(()));
                 };
@@ -82,7 +88,7 @@ pub(super) fn scan_text_files_for_report(
                     repo_id: repo_file.repo_id,
                     repo_label: repo_file.repo_label,
                     path: rel_path,
-                    text,
+                    abs_path: read_path,
                     code_chars: code_norm.chars,
                     code_char_lines: code_norm.line_map,
                     line_tokens: line_norm.line_tokens,

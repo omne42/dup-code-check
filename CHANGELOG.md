@@ -73,6 +73,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Tokenizer: treat `#` as a comment only at line start (after optional whitespace).
 - CI: docs build now runs with `LLMS_STRICT=1`.
 - CI: pin Rust toolchain to `1.92.0` (match `rust-toolchain.toml`).
+- Scan: when `git check-ignore` fails during streaming, fall back to the walker (avoid early aborts / double-scans).
+- CLI: resolve roots by directly `canonicalize()`-ing user paths (preserve symlink semantics).
+- Report: reduce memory usage by avoiding storing full file text for previews (generate previews from files on demand).
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
@@ -109,3 +112,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: improve fatal-skip warnings with a reason summary and actionable hints when `--stats` is not enabled.
 - CLI: fatal-skip warnings now include JSON-compatible `scanStats` keys (camelCase), with snake_case aliases.
 - Core: reduce the risk of false file-duplicate grouping due to hash collisions by adding prefix/suffix samples to fingerprints.
+- Scan budgets: binary files no longer bypass `maxFiles` / `maxTotalBytes`, and binary detection avoids reading entire binaries.

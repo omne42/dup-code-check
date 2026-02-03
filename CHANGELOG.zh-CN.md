@@ -73,6 +73,9 @@
 - Tokenizer：仅在行首（允许前置空白）把 `#` 视为注释。
 - CI：docs build 默认启用 `LLMS_STRICT=1`。
 - CI：固定 Rust toolchain 为 `1.92.0`（与 `rust-toolchain.toml` 对齐）。
+- 扫描：流式模式下 `git check-ignore` 失败时回退到 walker（避免提前中止/重复扫描）。
+- CLI：root 路径直接使用 `canonicalize()` 解析（保留 symlink 语义）。
+- Report：不再为 preview 保存全量文本，按需从文件生成 preview，降低内存占用。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
@@ -109,3 +112,4 @@
 - CLI：当未启用 `--stats` 且出现致命跳过时，warning 会输出原因摘要与可操作建议。
 - CLI：致命跳过 warning 现在会包含与 JSON `scanStats` 对齐的 key（camelCase），并附带 snake_case 别名。
 - Core：为降低哈希碰撞导致的重复文件误分组风险，fingerprint 额外加入 prefix/suffix 样本。
+- 扫描预算：二进制文件不会再绕过 `maxFiles` / `maxTotalBytes`，且二进制检测会避免读完整文件。

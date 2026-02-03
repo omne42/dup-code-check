@@ -360,6 +360,9 @@ where
             ControlFlow::Break(()) => {
                 let _ = child.kill();
                 let _ = child.wait();
+                if !check_ignore_ok {
+                    return Ok(None);
+                }
                 return Ok(Some(ControlFlow::Break(())));
             }
         }
@@ -390,6 +393,9 @@ where
             ControlFlow::Break(()) => {
                 let _ = child.kill();
                 let _ = child.wait();
+                if !check_ignore_ok {
+                    return Ok(None);
+                }
                 return Ok(Some(ControlFlow::Break(())));
             }
         }
@@ -427,6 +433,7 @@ where
                     return Err(io::Error::other("git check-ignore failed"));
                 }
                 stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+                *check_ignore_ok = false;
                 return Ok(ControlFlow::Break(()));
             }
         }

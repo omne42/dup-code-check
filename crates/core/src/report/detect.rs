@@ -8,7 +8,7 @@ use crate::util::{NormalizedFileView, SpanGroupBuilder, fnv1a64_u32, fold_u64_to
 use crate::winnowing::{detect_duplicate_span_groups_winnowing, finalize_span_groups};
 
 use super::ScannedTextFile;
-use super::util::{preview_from_lines, sort_span_groups_for_report};
+use super::util::{fill_missing_previews_from_files, sort_span_groups_for_report};
 
 pub(super) fn detect_duplicate_code_spans(
     files: &[ScannedTextFile],
@@ -50,7 +50,6 @@ pub(super) fn detect_duplicate_line_spans(
 
     let mut normalized = Vec::new();
     let mut file_line_lens = Vec::new();
-    let mut file_texts = Vec::new();
 
     for file in files {
         if file.line_tokens.is_empty() {
@@ -64,10 +63,9 @@ pub(super) fn detect_duplicate_line_spans(
             line_map: &file.line_token_lines,
         });
         file_line_lens.push(file.line_token_char_lens.as_slice());
-        file_texts.push(file.text.as_str());
     }
 
-    detect_duplicate_span_groups_with_len_filter(
+    let mut out = detect_duplicate_span_groups_with_len_filter(
         &normalized,
         2,
         2,
@@ -84,12 +82,12 @@ pub(super) fn detect_duplicate_line_spans(
             }
             false
         },
-        |file_id, start_line, end_line| {
-            preview_from_lines(file_texts[file_id], start_line, end_line, 120)
-        },
+        |_file_id, _start_line, _end_line| String::new(),
         options.max_report_items,
         stats,
-    )
+    );
+    fill_missing_previews_from_files(files, &mut out, 120);
+    out
 }
 
 pub(super) fn detect_duplicate_token_spans(
@@ -104,7 +102,6 @@ pub(super) fn detect_duplicate_token_spans(
         .saturating_add(1);
 
     let mut normalized = Vec::new();
-    let mut file_texts = Vec::new();
 
     for file in files {
         if file.tokens.len() < min_token_len {
@@ -117,22 +114,21 @@ pub(super) fn detect_duplicate_token_spans(
             normalized: &file.tokens,
             line_map: &file.token_lines,
         });
-        file_texts.push(file.text.as_str());
     }
 
-    detect_duplicate_span_groups_with_len_filter(
+    let mut out = detect_duplicate_span_groups_with_len_filter(
         &normalized,
         min_token_len,
         fingerprint_len,
         window_size,
         options.cross_repo_only,
         |_file_id, _start, _len| true,
-        |file_id, start_line, end_line| {
-            preview_from_lines(file_texts[file_id], start_line, end_line, 120)
-        },
+        |_file_id, _start_line, _end_line| String::new(),
         options.max_report_items,
         stats,
-    )
+    );
+    fill_missing_previews_from_files(files, &mut out, 120);
+    out
 }
 
 pub(super) fn detect_duplicate_blocks(
@@ -160,13 +156,11 @@ pub(super) fn detect_duplicate_blocks(
             let builder = match bucket.iter_mut().find(|g| g.sample == slice) {
                 Some(existing) => existing,
                 None => {
-                    let preview =
-                        preview_from_lines(&file.text, node.start_line, node.end_line, 120);
                     bucket.push(SpanGroupBuilder {
                         content_hash,
                         normalized_len: slice.len(),
                         sample: slice.to_vec(),
-                        preview,
+                        preview: String::new(),
                         occurrences: vec![DuplicateSpanOccurrence {
                             repo_id: file.repo_id,
                             repo_label: file.repo_label.clone(),
@@ -198,6 +192,7 @@ pub(super) fn detect_duplicate_blocks(
     let mut out = finalize_span_groups(groups, options.cross_repo_only);
     sort_span_groups_for_report(&mut out);
     out.truncate(options.max_report_items);
+    fill_missing_previews_from_files(files, &mut out, 120);
     out
 }
 
@@ -273,8 +268,6 @@ pub(super) fn detect_duplicate_ast_subtrees(
             }) {
                 Some(existing) => existing,
                 None => {
-                    let preview =
-                        preview_from_lines(&file.text, node.start_line, node.end_line, 120);
                     bucket.push(SpanGroupBuilder {
                         content_hash,
                         normalized_len: repr_len,
@@ -282,7 +275,7 @@ pub(super) fn detect_duplicate_ast_subtrees(
                             .as_ref()
                             .map(|r| r.repr.clone())
                             .unwrap_or_default(),
-                        preview,
+                        preview: String::new(),
                         occurrences: vec![DuplicateSpanOccurrence {
                             repo_id: file.repo_id,
                             repo_label: file.repo_label.clone(),
@@ -314,6 +307,7 @@ pub(super) fn detect_duplicate_ast_subtrees(
     let mut out = finalize_span_groups(groups, options.cross_repo_only);
     sort_span_groups_for_report(&mut out);
     out.truncate(options.max_report_items);
+    fill_missing_previews_from_files(files, &mut out, 120);
     out
 }
 

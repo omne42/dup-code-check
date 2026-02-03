@@ -9,17 +9,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::fs;
 
 #[test]
-fn git_streaming_check_ignore_failure_degrades_without_double_scan() -> io::Result<()> {
+fn git_streaming_check_ignore_failure_falls_back_to_walker_without_double_scan() -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::collections::HashSet;
         use std::os::unix::fs::PermissionsExt;
 
-        const BATCH_SIZE: usize = 256;
         const FILES: usize = 600;
 
         let root = temp_dir("git_streaming_check_ignore_failure");
-        fs::create_dir_all(root.join(".git"))?;
+        let git_dir = root.join(".git");
+        fs::create_dir_all(&git_dir)?;
 
         let mut rels = Vec::with_capacity(FILES);
         for idx in 0..FILES {
@@ -28,11 +28,11 @@ fn git_streaming_check_ignore_failure_degrades_without_double_scan() -> io::Resu
             rels.push(name);
         }
 
-        let list_path = root.join("filelist.txt");
+        let list_path = git_dir.join("filelist.txt");
         fs::write(&list_path, rels.join("\n"))?;
-        let count_path = root.join("check_ignore_count.txt");
+        let count_path = git_dir.join("check_ignore_count.txt");
 
-        let fake_git_path = root.join("fake_git.sh");
+        let fake_git_path = git_dir.join("fake_git.sh");
         fs::write(
             &fake_git_path,
             fake_git_script(&root, &list_path, &count_path),
@@ -61,15 +61,15 @@ fn git_streaming_check_ignore_failure_degrades_without_double_scan() -> io::Resu
             })
         })?;
 
-        assert_eq!(flow, ControlFlow::Break(()));
-        assert_eq!(visited.len(), BATCH_SIZE);
+        assert_eq!(flow, ControlFlow::Continue(()));
+        assert_eq!(visited.len(), FILES);
         let unique: HashSet<&str> = visited.iter().map(String::as_str).collect();
-        assert_eq!(unique.len(), BATCH_SIZE);
-        assert_eq!(stats.candidate_files, BATCH_SIZE as u64);
+        assert_eq!(unique.len(), FILES);
+        assert_eq!(stats.candidate_files, FILES as u64);
         assert_eq!(stats.skipped_walk_errors, 1);
 
         // 1st batch: check-ignore -> exit 1 (no ignores), 2nd batch: exit 2 (failure).
-        // After the failure we should stop scanning (and avoid calling check-ignore again).
+        // After the failure we should fall back to the walker (and avoid calling check-ignore again).
         let count: usize = fs::read_to_string(&count_path)
             .unwrap_or_default()
             .trim()
@@ -194,6 +194,32 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Res
         assert!(marker_path.exists());
         assert_eq!(stats.skipped_walk_errors, 0);
     }
+
+    Ok(())
+}
+
+#[test]
+fn read_repo_file_bytes_counts_binary_reads_in_scan_stats() -> io::Result<()> {
+    let root = temp_dir("read_repo_file_bytes_binary_counts");
+    fs::create_dir_all(&root)?;
+    let path = root.join("bin.dat");
+    fs::write(&path, b"hello\0world")?;
+
+    let repo_file = RepoFile {
+        repo_id: 0,
+        repo_label: "test".to_string(),
+        root: root.clone(),
+        abs_path: path,
+    };
+
+    let options = ScanOptions::default();
+    let mut stats = ScanStats::default();
+    let out = read_repo_file_bytes(&repo_file, None, &options, &mut stats)?;
+
+    assert!(out.is_none());
+    assert_eq!(stats.skipped_binary, 1);
+    assert_eq!(stats.scanned_files, 1);
+    assert!(stats.scanned_bytes > 0);
 
     Ok(())
 }

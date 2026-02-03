@@ -67,6 +67,18 @@ pub(crate) fn read_repo_file_bytes(
     options: &ScanOptions,
     stats: &mut ScanStats,
 ) -> io::Result<Option<Vec<u8>>> {
+    Ok(
+        read_repo_file_bytes_with_path(repo_file, canonical_root, options, stats)?
+            .map(|(bytes, _path)| bytes),
+    )
+}
+
+pub(crate) fn read_repo_file_bytes_with_path(
+    repo_file: &RepoFile,
+    canonical_root: Option<&Path>,
+    options: &ScanOptions,
+    stats: &mut ScanStats,
+) -> io::Result<Option<(Vec<u8>, PathBuf)>> {
     if let Some(max_files) = options.max_files
         && stats.scanned_files >= max_files as u64
     {
@@ -150,17 +162,28 @@ pub(crate) fn read_repo_file_bytes(
         }
     }
 
-    let mut bytes: Vec<u8> = Vec::with_capacity(metadata.len().min(1024 * 1024) as usize);
     use std::io::Read;
-    file.read_to_end(&mut bytes)?;
 
-    if bytes.contains(&0) {
-        stats.skipped_binary = stats.skipped_binary.saturating_add(1);
-        return Ok(None);
+    let mut bytes: Vec<u8> = Vec::with_capacity(metadata.len().min(1024 * 1024) as usize);
+    let mut total_read = 0usize;
+    let mut buf = [0u8; 16 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        total_read = total_read.saturating_add(n);
+        if buf[..n].contains(&0) {
+            stats.scanned_files = stats.scanned_files.saturating_add(1);
+            stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read as u64);
+            stats.skipped_binary = stats.skipped_binary.saturating_add(1);
+            return Ok(None);
+        }
+        bytes.extend_from_slice(&buf[..n]);
     }
 
     stats.scanned_files = stats.scanned_files.saturating_add(1);
-    stats.scanned_bytes = stats.scanned_bytes.saturating_add(bytes.len() as u64);
+    stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read as u64);
 
-    Ok(Some(bytes))
+    Ok(Some((bytes, read_path)))
 }

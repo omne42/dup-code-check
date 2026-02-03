@@ -4,6 +4,8 @@ use crate::types::{DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOption
 use crate::util::{NormalizedFileView, make_preview, whitespace_insensitive_fingerprint};
 use crate::winnowing::detect_duplicate_span_groups_winnowing;
 
+type FileDuplicateKey = (u64, usize, u64, [u8; 16], [u8; 16]);
+
 #[derive(Debug)]
 struct FileGroupBuilder {
     content_hash: u64,
@@ -14,7 +16,7 @@ struct FileGroupBuilder {
 
 #[derive(Debug, Default)]
 pub(crate) struct FileDuplicateGrouper {
-    groups: HashMap<(u64, usize, u64, [u8; 16], [u8; 16]), FileGroupBuilder>,
+    groups: HashMap<FileDuplicateKey, FileGroupBuilder>,
 }
 
 impl FileDuplicateGrouper {

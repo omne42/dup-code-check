@@ -17,7 +17,7 @@ struct ScannedTextFile {
     repo_id: usize,
     repo_label: String,
     path: String,
-    text: String,
+    abs_path: PathBuf,
     code_chars: Vec<u32>,
     code_char_lines: Vec<u32>,
     line_tokens: Vec<u32>,

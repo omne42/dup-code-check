@@ -513,6 +513,15 @@ pub(crate) fn parse_args(
         roots
     };
 
+    if cross_repo_only && roots.len() < 2 {
+        return Err(tr(
+            localization,
+            "--cross-repo-only requires at least 2 roots",
+            "--cross-repo-only 需要至少 2 个 root",
+        )
+        .to_string());
+    }
+
     Ok(ParsedArgs {
         localization,
         json,

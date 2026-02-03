@@ -73,8 +73,10 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Avoid leaking absolute paths in results when path prefix stripping fails.
 - `--follow-symlinks` now works reliably by using the walker path when enabled.
 - When `--follow-symlinks` is enabled, skip symlinked directories that resolve outside the root.
+- Harden file reads under `--follow-symlinks` against symlink/TOCTOU races.
 - Token-based detectors now record the start line for multi-line string tokens.
 - CLI now supports `--` to terminate option parsing (allows roots that start with `-`).
+- CLI: `--cross-repo-only` now errors when fewer than 2 roots are provided.
 - Scanning now skips `PermissionDenied` and walker traversal errors instead of aborting.
 - CLI now catches runtime scan failures and exits with code 1.
 - Remove unstable rustfmt config options to avoid warnings on stable toolchains.

@@ -168,6 +168,7 @@ if (groupsWithBig.length !== 1) {
 }
 
 expectExitCode('bad --max-file-size', ['--max-file-size', '1.5', repoA], 2);
+expectExitCode('cross-repo-only needs 2 roots', ['--cross-repo-only', repoA], 2);
 
 const dashRepo = path.join(tmp, '-repo');
 fs.mkdirSync(dashRepo, { recursive: true });

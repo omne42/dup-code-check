@@ -73,8 +73,10 @@
 - 当前缀剥离失败时避免在结果里泄漏绝对路径。
 - `--follow-symlinks` 现在通过使用 walker path 更可靠。
 - 启用 `--follow-symlinks` 时，跳过解析后位于 root 之外的符号链接目录。
+- 启用 `--follow-symlinks` 时，读取文件增加针对 symlink/TOCTOU 竞态的防护。
 - token 检测器现在会记录多行字符串 token 的起始行号。
 - CLI 支持 `--` 终止参数解析（允许 root 以 `-` 开头）。
+- CLI：`--cross-repo-only` 现在要求至少 2 个 root，否则会报错。
 - 扫描会跳过 `PermissionDenied` 和 walker traversal errors，而不是直接中止。
 - CLI 现在会捕获运行期扫描失败并以退出码 1 退出。
 - 移除 unstable rustfmt 配置，避免 stable toolchain 警告。

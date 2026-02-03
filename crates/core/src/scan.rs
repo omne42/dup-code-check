@@ -22,9 +22,16 @@ fn git_exe() -> OsString {
         return exe;
     }
 
-    std::env::var_os("DUP_CODE_CHECK_GIT_BIN")
-        .and_then(validate_git_bin_override)
-        .unwrap_or_else(|| OsString::from("git"))
+    // `DUP_CODE_CHECK_GIT_BIN` is a sharp edge: only use it in trusted environments.
+    // We validate the override strictly and keep tests hermetic via `TEST_GIT_EXE_OVERRIDE`.
+    #[cfg(not(test))]
+    if let Some(exe) =
+        std::env::var_os("DUP_CODE_CHECK_GIT_BIN").and_then(validate_git_bin_override)
+    {
+        return exe;
+    }
+
+    OsString::from("git")
 }
 
 fn validate_git_bin_override(raw: OsString) -> Option<OsString> {
@@ -775,8 +782,16 @@ pub(crate) fn read_repo_file_bytes(
         return Ok(None);
     };
 
-    let metadata = match fs::metadata(&read_path) {
-        Ok(m) => m,
+    // Harden against TOCTOU when following symlinks: avoid reading from a different file than the
+    // one we just resolved/validated (especially if a path is replaced with a symlink concurrently).
+    let metadata = match fs::symlink_metadata(&read_path) {
+        Ok(m) => {
+            if m.file_type().is_symlink() {
+                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+                return Ok(None);
+            }
+            m
+        }
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
             stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
             return Ok(None);
@@ -803,8 +818,8 @@ pub(crate) fn read_repo_file_bytes(
         return Ok(None);
     }
 
-    let bytes = match fs::read(&read_path) {
-        Ok(b) => b,
+    let mut file = match fs::File::open(&read_path) {
+        Ok(f) => f,
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
             stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
             return Ok(None);
@@ -815,6 +830,32 @@ pub(crate) fn read_repo_file_bytes(
         }
         Err(err) => return Err(err),
     };
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        let opened = match file.metadata() {
+            Ok(m) => m,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                stats.skipped_not_found = stats.skipped_not_found.saturating_add(1);
+                return Ok(None);
+            }
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
+                return Ok(None);
+            }
+            Err(err) => return Err(err),
+        };
+        if (metadata.dev(), metadata.ino()) != (opened.dev(), opened.ino()) {
+            stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+            return Ok(None);
+        }
+    }
+
+    let mut bytes: Vec<u8> = Vec::with_capacity(metadata.len().min(1024 * 1024) as usize);
+    use std::io::Read;
+    file.read_to_end(&mut bytes)?;
 
     if bytes.contains(&0) {
         stats.skipped_binary = stats.skipped_binary.saturating_add(1);

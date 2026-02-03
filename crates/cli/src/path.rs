@@ -10,10 +10,7 @@ pub(crate) fn resolve_path(p: &Path) -> io::Result<PathBuf> {
         env::current_dir()?
     };
     let normalized = normalize_path(&base.join(p));
-    match fs::canonicalize(&normalized) {
-        Ok(canonical) => Ok(canonical),
-        Err(_) => Ok(normalized),
-    }
+    fs::canonicalize(&normalized)
 }
 
 fn normalize_path(path: &Path) -> PathBuf {

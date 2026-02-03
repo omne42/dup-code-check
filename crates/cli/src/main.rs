@@ -64,8 +64,7 @@ fn main() {
         }
     };
 
-    let need_stats = parsed.stats || parsed.strict;
-    match run(&parsed, &roots, need_stats) {
+    match run(&parsed, &roots) {
         Ok(exit_code) => std::process::exit(exit_code),
         Err(err) => {
             eprintln!("{}: {err}", tr(localization, "Error", "错误"));
@@ -74,24 +73,18 @@ fn main() {
     }
 }
 
-fn run(parsed: &ParsedArgs, roots: &[PathBuf], need_stats: bool) -> io::Result<i32> {
+fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
     if parsed.report {
-        let (report, scan_stats) = if need_stats {
-            let outcome = dup_code_check_core::generate_duplication_report_with_stats(
-                roots,
-                &parsed.options,
-            )?;
-            (map_report(outcome.result), Some(outcome.stats))
-        } else {
-            let report = dup_code_check_core::generate_duplication_report(roots, &parsed.options)?;
-            (map_report(report), None)
-        };
+        let outcome =
+            dup_code_check_core::generate_duplication_report_with_stats(roots, &parsed.options)?;
+        let report = map_report(outcome.result);
+        let scan_stats = outcome.stats;
 
         if parsed.json {
             if parsed.stats {
                 write_json(&serde_json::json!({
                     "report": report,
-                    "scanStats": scan_stats.clone().map(JsonScanStats::from),
+                    "scanStats": Some(JsonScanStats::from(scan_stats.clone())),
                 }))?;
             } else {
                 write_json(&report)?;
@@ -100,36 +93,42 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf], need_stats: bool) -> io::Result<i
             print!("{}", format_text_report(parsed.localization, &report));
         }
 
-        if let Some(stats) = scan_stats {
-            if parsed.stats && !parsed.json {
-                eprint!("{}", format_scan_stats(parsed.localization, &stats));
+        if parsed.stats && !parsed.json {
+            eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
+        }
+
+        if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
+            eprintln!(
+                "{}",
+                tr(
+                    parsed.localization,
+                    "Warning: scan was incomplete; re-run with --stats for details.",
+                    "警告：扫描不完整；请使用 --stats 重新运行以查看详情。",
+                )
+            );
+        }
+
+        if parsed.strict && has_fatal_skips(&scan_stats) {
+            if !parsed.stats {
+                eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
             }
-            if parsed.strict && has_fatal_skips(&stats) {
-                if !parsed.stats {
-                    eprint!("{}", format_scan_stats(parsed.localization, &stats));
-                }
-                return Ok(1);
-            }
+            return Ok(1);
         }
 
         return Ok(0);
     }
 
     if parsed.code_spans {
-        let (groups, scan_stats) = if need_stats {
-            let outcome =
-                dup_code_check_core::find_duplicate_code_spans_with_stats(roots, &parsed.options)?;
-            (map_span_groups(outcome.result), Some(outcome.stats))
-        } else {
-            let groups = dup_code_check_core::find_duplicate_code_spans(roots, &parsed.options)?;
-            (map_span_groups(groups), None)
-        };
+        let outcome =
+            dup_code_check_core::find_duplicate_code_spans_with_stats(roots, &parsed.options)?;
+        let groups = map_span_groups(outcome.result);
+        let scan_stats = outcome.stats;
 
         if parsed.json {
             if parsed.stats {
                 write_json(&serde_json::json!({
                     "groups": groups,
-                    "scanStats": scan_stats.clone().map(JsonScanStats::from),
+                    "scanStats": Some(JsonScanStats::from(scan_stats.clone())),
                 }))?;
             } else {
                 write_json(&groups)?;
@@ -138,34 +137,40 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf], need_stats: bool) -> io::Result<i
             print!("{}", format_text_code_spans(parsed.localization, &groups));
         }
 
-        if let Some(stats) = scan_stats {
-            if parsed.stats && !parsed.json {
-                eprint!("{}", format_scan_stats(parsed.localization, &stats));
+        if parsed.stats && !parsed.json {
+            eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
+        }
+
+        if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
+            eprintln!(
+                "{}",
+                tr(
+                    parsed.localization,
+                    "Warning: scan was incomplete; re-run with --stats for details.",
+                    "警告：扫描不完整；请使用 --stats 重新运行以查看详情。",
+                )
+            );
+        }
+
+        if parsed.strict && has_fatal_skips(&scan_stats) {
+            if !parsed.stats {
+                eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
             }
-            if parsed.strict && has_fatal_skips(&stats) {
-                if !parsed.stats {
-                    eprint!("{}", format_scan_stats(parsed.localization, &stats));
-                }
-                return Ok(1);
-            }
+            return Ok(1);
         }
 
         return Ok(0);
     }
 
-    let (groups, scan_stats) = if need_stats {
-        let outcome = dup_code_check_core::find_duplicate_files_with_stats(roots, &parsed.options)?;
-        (map_duplicate_groups(outcome.result), Some(outcome.stats))
-    } else {
-        let groups = dup_code_check_core::find_duplicate_files(roots, &parsed.options)?;
-        (map_duplicate_groups(groups), None)
-    };
+    let outcome = dup_code_check_core::find_duplicate_files_with_stats(roots, &parsed.options)?;
+    let groups = map_duplicate_groups(outcome.result);
+    let scan_stats = outcome.stats;
 
     if parsed.json {
         if parsed.stats {
             write_json(&serde_json::json!({
                 "groups": groups,
-                "scanStats": scan_stats.clone().map(JsonScanStats::from),
+                "scanStats": Some(JsonScanStats::from(scan_stats.clone())),
             }))?;
         } else {
             write_json(&groups)?;
@@ -174,16 +179,26 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf], need_stats: bool) -> io::Result<i
         print!("{}", format_text(parsed.localization, &groups));
     }
 
-    if let Some(stats) = scan_stats {
-        if parsed.stats && !parsed.json {
-            eprint!("{}", format_scan_stats(parsed.localization, &stats));
+    if parsed.stats && !parsed.json {
+        eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
+    }
+
+    if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
+        eprintln!(
+            "{}",
+            tr(
+                parsed.localization,
+                "Warning: scan was incomplete; re-run with --stats for details.",
+                "警告：扫描不完整；请使用 --stats 重新运行以查看详情。",
+            )
+        );
+    }
+
+    if parsed.strict && has_fatal_skips(&scan_stats) {
+        if !parsed.stats {
+            eprint!("{}", format_scan_stats(parsed.localization, &scan_stats));
         }
-        if parsed.strict && has_fatal_skips(&stats) {
-            if !parsed.stats {
-                eprint!("{}", format_scan_stats(parsed.localization, &stats));
-            }
-            return Ok(1);
-        }
+        return Ok(1);
     }
 
     Ok(0)

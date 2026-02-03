@@ -33,23 +33,10 @@ fn validate_git_bin_override(raw: OsString) -> Option<OsString> {
     }
 
     let path = Path::new(&raw);
-    if path.is_absolute() {
-        return fs::metadata(path).ok().filter(|m| m.is_file()).map(|_| raw);
-    }
-
-    // Command name: disallow whitespace and path separators to reduce misuse.
-    let s = raw.to_string_lossy();
-    if s.chars()
-        .any(|c| c.is_whitespace() || c == '/' || c == '\\')
-    {
+    if !path.is_absolute() {
         return None;
     }
-
-    let mut components = path.components();
-    match (components.next(), components.next()) {
-        (Some(Component::Normal(_)), None) => Some(raw),
-        _ => None,
-    }
+    fs::metadata(path).ok().filter(|m| m.is_file()).map(|_| raw)
 }
 
 #[cfg(test)]
@@ -528,6 +515,11 @@ where
         let rel = match std::str::from_utf8(&bytes) {
             Ok(s) => s.to_string(),
             Err(_) => {
+                if !started {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Ok(None);
+                }
                 stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
                 continue;
             }
@@ -626,9 +618,11 @@ where
         match git_check_ignore(&repo.root, rel_paths) {
             Ok(ignored) => ignored,
             Err(_) => {
-                *check_ignore_ok = false;
+                if !*started {
+                    return Err(io::Error::other("git check-ignore failed"));
+                }
                 stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
-                HashSet::new()
+                return Ok(ControlFlow::Break(()));
             }
         }
     } else {
@@ -832,6 +826,7 @@ mod tests {
             use std::collections::HashSet;
             use std::os::unix::fs::PermissionsExt;
 
+            const BATCH_SIZE: usize = 256;
             const FILES: usize = 600;
 
             let root = temp_dir("git_streaming_check_ignore_failure");
@@ -877,15 +872,15 @@ mod tests {
                 })
             })?;
 
-            assert_eq!(flow, ControlFlow::Continue(()));
-            assert_eq!(visited.len(), FILES);
+            assert_eq!(flow, ControlFlow::Break(()));
+            assert_eq!(visited.len(), BATCH_SIZE);
             let unique: HashSet<&str> = visited.iter().map(String::as_str).collect();
-            assert_eq!(unique.len(), FILES);
-            assert_eq!(stats.candidate_files, FILES as u64);
+            assert_eq!(unique.len(), BATCH_SIZE);
+            assert_eq!(stats.candidate_files, BATCH_SIZE as u64);
             assert_eq!(stats.skipped_walk_errors, 1);
 
-            // 1st batch: check-ignore -> exit 1 (no ignores), 2nd batch: exit 2 (failure),
-            // later batches should stop calling check-ignore.
+            // 1st batch: check-ignore -> exit 1 (no ignores), 2nd batch: exit 2 (failure).
+            // After the failure we should stop scanning (and avoid calling check-ignore again).
             let count: usize = fs::read_to_string(&count_path)
                 .unwrap_or_default()
                 .trim()
@@ -899,10 +894,7 @@ mod tests {
 
     #[test]
     fn git_bin_override_validation_is_restrictive() -> io::Result<()> {
-        assert_eq!(
-            validate_git_bin_override(OsString::from("git")),
-            Some(OsString::from("git"))
-        );
+        assert_eq!(validate_git_bin_override(OsString::from("git")), None);
         assert_eq!(validate_git_bin_override(OsString::from("git/")), None);
         assert_eq!(validate_git_bin_override(OsString::from("bin/git")), None);
         assert_eq!(
@@ -925,6 +917,55 @@ mod tests {
             validate_git_bin_override(existing.as_os_str().to_os_string()),
             Some(existing.as_os_str().to_os_string())
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let root = temp_dir("git_streaming_non_utf8_fallback");
+            fs::create_dir_all(root.join(".git"))?;
+
+            fs::write(root.join("a.txt"), "x")?;
+
+            let marker_path = root.join(".git").join("git_called");
+            let fake_git_path = root.join(".git").join("fake_git.sh");
+            fs::write(
+                &fake_git_path,
+                fake_git_script_non_utf8(&root, &marker_path),
+            )?;
+            let mut perms = fs::metadata(&fake_git_path)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&fake_git_path, perms)?;
+
+            let repo = Repo {
+                id: 0,
+                root: root.clone(),
+                label: "test".to_string(),
+            };
+            let options = ScanOptions {
+                max_files: Some(10),
+                ..ScanOptions::default()
+            };
+
+            let mut stats = ScanStats::default();
+            let mut visited: Vec<String> = Vec::new();
+            let flow = with_test_git_exe(&fake_git_path, || {
+                visit_repo_files(&repo, &options, &mut stats, |_stats, file| {
+                    visited.push(make_rel_path(&root, &file.abs_path));
+                    Ok(ControlFlow::Continue(()))
+                })
+            })?;
+
+            assert_eq!(flow, ControlFlow::Continue(()));
+            assert!(visited.iter().any(|p| p == "a.txt"));
+            assert!(marker_path.exists());
+            assert_eq!(stats.skipped_walk_errors, 0);
+        }
 
         Ok(())
     }
@@ -984,6 +1025,44 @@ if [ -n "$repo" ]; then
   exec git -C "$repo" "$cmd" "$@"
 fi
 exec git "$cmd" "$@"
+"#
+        )
+    }
+
+    fn fake_git_script_non_utf8(repo: &Path, marker: &Path) -> String {
+        let repo = sh_single_quote(repo.to_string_lossy().as_ref());
+        let marker = sh_single_quote(marker.to_string_lossy().as_ref());
+        format!(
+            r#"#!/bin/sh
+set -eu
+
+repo=""
+if [ "${{1:-}}" = "-C" ]; then
+  repo="${{2:-}}"
+  shift 2
+fi
+
+cmd="${{1:-}}"
+if [ -z "$cmd" ]; then
+  exit 2
+fi
+shift
+
+target_repo={repo}
+marker={marker}
+
+if [ "$repo" = "$target_repo" ]; then
+  case "$cmd" in
+    ls-files)
+      : > "$marker"
+      # Output a non-UTF-8 path to force the streaming scanner to fall back to the walker.
+      printf '\377\0'
+      exit 0
+      ;;
+  esac
+fi
+
+exit 2
 "#
         )
     }

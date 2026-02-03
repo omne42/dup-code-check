@@ -55,10 +55,12 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Node installer: `postinstall` builds Rust binary with `cargo build --locked`.
 - Scan pipeline: stream `git ls-files` enumeration when `maxFiles` is set (stop early without collecting full lists).
 - CLI: clarify `--strict` semantics (fatal skips only: permission/traversal/budget abort) and add smoke coverage.
+- CLI: warn on fatal skips when `--stats` is not enabled.
 - Rust: de-duplicate code-span (winnowing) and file-duplicate grouping logic via a shared internal helper.
-- Core: tighten `DUP_CODE_CHECK_GIT_BIN` override validation (reject paths/whitespace; require an existing absolute path when provided).
-- CLI: resolve roots via best-effort `canonicalize()` to reduce symlink ambiguity.
+- Core: tighten `DUP_CODE_CHECK_GIT_BIN` override validation (absolute path required; must exist and be a file).
+- CLI: resolve roots via `canonicalize()` (fail if it fails) to reduce symlink ambiguity.
 - Docs: add a security note that npm `postinstall` runs a native build (Cargo) and may execute dependency build scripts.
+- Docs: add the same `postinstall` security note to Getting Started.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
@@ -80,5 +82,6 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - npm install: make the `dup-code-check` bin work on Windows by launching the platform binary from the Node wrapper.
 - Docs: document `maxFiles` stop behavior and `skippedBudgetMaxFiles` semantics.
 - CLI: `--version` now respects `--` (treats `--version` after `--` as a root).
-- Scan pipeline: when `git check-ignore` fails during streaming, degrade gracefully and continue scanning (recording a traversal error).
+- Scan pipeline: when `git check-ignore` fails during streaming, stop scanning (fail closed) instead of continuing without ignore filtering.
+- Scan pipeline: when `git ls-files` outputs non-UTF-8 paths in streaming mode, fall back to the walker before scanning.
 - npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.

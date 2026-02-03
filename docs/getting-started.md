@@ -33,6 +33,8 @@ Or run via `npx` (will compile during `postinstall`):
 npx dup-code-check --help
 ```
 
+> Security note: npm installs run `postinstall` (Cargo build), which may execute dependency build scripts. Use `--ignore-scripts` / `npm_config_ignore_scripts=true` if you need to avoid running install scripts (see [Installation & Build](installation.md)).
+
 ## 2) Scan a directory: duplicate files (default)
 
 ```bash

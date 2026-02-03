@@ -33,6 +33,8 @@ npm run build
 npx dup-code-check --help
 ```
 
+> 安全提示：npm 安装会执行 `postinstall`（Cargo 原生构建），并可能运行依赖的 build script。如果你需要避免执行安装脚本，请使用 `--ignore-scripts` / `npm_config_ignore_scripts=true`（见《[安装与构建](installation.zh-CN.md)》）。
+
 ## 2) 扫描一个目录：重复文件（默认）
 
 ```bash

@@ -65,6 +65,8 @@
 - 文档：补充安全提示——npm `postinstall` 会触发原生构建（Cargo），并可能运行依赖的 build script。
 - 文档：在《快速开始》中补齐同样的 `postinstall` 安全提示。
 - 扫描统计：新增 `skippedBucketTruncated`，用于标记检测器 fingerprint bucket 被截断（防爆保护）。
+- Core：重复文件分组不再保存完整归一化样本，显著降低大仓库内存占用。
+- Core：将 scan 模块拆分为更小的文件（无行为变化）。
 - CLI：将 `skippedBucketTruncated` 视为“扫描不完整”（致命跳过），从而影响 warning/`--strict` 退出码。
 - CLI：`--strict` 现在会把 `outside_root` 视为“扫描不完整”（遍历跳过），从而退出非 0。
 - 扫描：Windows 下 `ignoreDirs` 按 ASCII 做大小写不敏感匹配。
@@ -104,3 +106,4 @@
 - Node smoke：在决定是否需要重建时额外验证 wrapper 可执行 `--version`。
 - npm 包：包含 `rust-toolchain.toml`，使安装时使用固定的 Rust toolchain。
 - CLI：本地化 `Number.MAX_SAFE_INTEGER` 相关整数参数错误信息。
+- CLI：当未启用 `--stats` 且出现致命跳过时，warning 会输出原因摘要与可操作建议。

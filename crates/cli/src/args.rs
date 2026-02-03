@@ -159,7 +159,7 @@ fn parse_u64_non_negative_safe(
         );
         return Err(format!(
             "{name} {} {MAX_SAFE_INTEGER}{note}",
-            tr(localization, "must be <=", "必须 <= "),
+            tr(localization, "must be <=", "必须 <="),
         ));
     }
     Ok(value)

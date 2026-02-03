@@ -65,6 +65,8 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Docs: add a security note that npm `postinstall` runs a native build (Cargo) and may execute dependency build scripts.
 - Docs: add the same `postinstall` security note to Getting Started.
 - Scan stats: record detector bucket truncation as `skippedBucketTruncated`.
+- Core: reduce memory usage for file-duplicate grouping by avoiding storing full normalized samples.
+- Core: split the scan module into smaller files (no behavior change).
 - CLI: treat `skippedBucketTruncated` as a fatal skip (scan incomplete) for warnings/`--strict`.
 - CLI: `--strict` now treats `outside_root` traversal skips as fatal (scan incomplete).
 - Scan: `ignoreDirs` matching is case-insensitive on Windows (ASCII).
@@ -104,3 +106,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Node smoke: verify the wrapper can execute `--version` when deciding whether to rebuild.
 - npm package: include `rust-toolchain.toml` so installs use the pinned Rust toolchain.
 - CLI: localize `Number.MAX_SAFE_INTEGER` errors for integer options.
+- CLI: improve fatal-skip warnings with a reason summary and actionable hints when `--stats` is not enabled.

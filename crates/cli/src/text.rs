@@ -14,6 +14,81 @@ pub(crate) fn has_fatal_skips(stats: &ScanStats) -> bool {
         || stats.skipped_budget_max_total_bytes > 0
 }
 
+pub(crate) fn format_fatal_skip_warning(localization: Localization, stats: &ScanStats) -> String {
+    if !has_fatal_skips(stats) {
+        return String::new();
+    }
+
+    let mut out = String::new();
+    out.push_str(tr(
+        localization,
+        "Warning: scan was incomplete (fatal skips):\n",
+        "警告：扫描不完整（致命跳过）：\n",
+    ));
+
+    let push_item =
+        |out: &mut String, key: &str, value: u64, hint_en: &'static str, hint_zh: &'static str| {
+            if value == 0 {
+                return;
+            }
+            out.push_str(&format!(
+                "- {key}={value}: {}\n",
+                tr(localization, hint_en, hint_zh)
+            ));
+        };
+
+    push_item(
+        &mut out,
+        "permission_denied",
+        stats.skipped_permission_denied,
+        "some files could not be read; check permissions.",
+        "部分文件无法读取；请检查权限。",
+    );
+    push_item(
+        &mut out,
+        "outside_root",
+        stats.skipped_outside_root,
+        "some symlink targets resolved outside roots; consider disabling --follow-symlinks or fixing symlinks.",
+        "部分符号链接解析后位于 root 之外；可考虑关闭 --follow-symlinks 或修复符号链接。",
+    );
+    push_item(
+        &mut out,
+        "walk_errors",
+        stats.skipped_walk_errors,
+        "filesystem traversal/read errors occurred; check the underlying errors.",
+        "文件系统遍历/读取出错；请检查底层错误。",
+    );
+    push_item(
+        &mut out,
+        "bucket_truncated",
+        stats.skipped_bucket_truncated,
+        "high-frequency fingerprints were truncated; consider increasing --min-match-len/--min-token-len or using --ignore-dir to skip generated/vendor dirs.",
+        "高频 fingerprint bucket 被截断；可考虑提高 --min-match-len/--min-token-len，或用 --ignore-dir 跳过生成物/依赖目录。",
+    );
+    push_item(
+        &mut out,
+        "budget_max_files",
+        stats.skipped_budget_max_files,
+        "hit --max-files; increase the budget or remove the limit.",
+        "触发 --max-files 预算；请提高预算或移除限制。",
+    );
+    push_item(
+        &mut out,
+        "budget_max_total_bytes",
+        stats.skipped_budget_max_total_bytes,
+        "hit --max-total-bytes; increase the budget or remove the limit.",
+        "触发 --max-total-bytes 预算；请提高预算或移除限制。",
+    );
+
+    out.push_str(tr(
+        localization,
+        "Re-run with --stats for full details.\n",
+        "请使用 --stats 重新运行以查看完整统计。\n",
+    ));
+
+    out
+}
+
 pub(crate) fn format_scan_stats(localization: Localization, stats: &ScanStats) -> String {
     let mut out = String::new();
     out.push_str(tr(localization, "== scan stats ==\n", "== 扫描统计 ==\n"));
@@ -225,5 +300,28 @@ mod tests {
             ..ScanStats::default()
         };
         assert!(has_fatal_skips(&stats));
+    }
+
+    #[test]
+    fn fatal_skip_warning_is_actionable_en() {
+        let stats = ScanStats {
+            skipped_bucket_truncated: 3,
+            ..ScanStats::default()
+        };
+        let msg = format_fatal_skip_warning(Localization::En, &stats);
+        assert!(msg.contains("bucket_truncated=3"));
+        assert!(msg.contains("--ignore-dir"));
+        assert!(msg.contains("--stats"));
+    }
+
+    #[test]
+    fn fatal_skip_warning_is_actionable_zh() {
+        let stats = ScanStats {
+            skipped_budget_max_files: 1,
+            ..ScanStats::default()
+        };
+        let msg = format_fatal_skip_warning(Localization::Zh, &stats);
+        assert!(msg.contains("budget_max_files=1"));
+        assert!(msg.contains("请使用 --stats"));
     }
 }

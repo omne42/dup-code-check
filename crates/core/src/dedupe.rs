@@ -1,65 +1,65 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::types::{DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanStats};
-use crate::util::{NormalizedFileView, fnv1a64, make_preview};
+use crate::util::{NormalizedFileView, make_preview, whitespace_insensitive_fingerprint};
 use crate::winnowing::detect_duplicate_span_groups_winnowing;
 
 #[derive(Debug)]
 struct FileGroupBuilder {
     content_hash: u64,
     normalized_len: usize,
-    sample: Vec<u8>,
     files: Vec<DuplicateFile>,
     repo_ids: HashSet<usize>,
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct FileDuplicateGrouper {
-    groups: HashMap<(u64, usize), Vec<FileGroupBuilder>>,
+    groups: HashMap<(u64, usize, u64), FileGroupBuilder>,
 }
 
 impl FileDuplicateGrouper {
-    pub(crate) fn push(&mut self, normalized: Vec<u8>, file: DuplicateFile) {
-        let content_hash = fnv1a64(&normalized);
-        let key = (content_hash, normalized.len());
-        let bucket = self.groups.entry(key).or_default();
+    pub(crate) fn push_bytes(&mut self, bytes: &[u8], file: DuplicateFile) {
+        let fp = whitespace_insensitive_fingerprint(bytes);
+        let key = (fp.content_hash, fp.normalized_len, fp.content_hash2);
 
-        if let Some(existing) = bucket.iter_mut().find(|g| g.sample == normalized) {
-            existing.repo_ids.insert(file.repo_id);
-            existing.files.push(file);
-            return;
+        match self.groups.get_mut(&key) {
+            Some(existing) => {
+                existing.repo_ids.insert(file.repo_id);
+                existing.files.push(file);
+            }
+            None => {
+                let mut repo_ids = HashSet::new();
+                repo_ids.insert(file.repo_id);
+                self.groups.insert(
+                    key,
+                    FileGroupBuilder {
+                        content_hash: fp.content_hash,
+                        normalized_len: fp.normalized_len,
+                        files: vec![file],
+                        repo_ids,
+                    },
+                );
+            }
         }
-
-        let mut repo_ids = HashSet::new();
-        repo_ids.insert(file.repo_id);
-        bucket.push(FileGroupBuilder {
-            content_hash,
-            normalized_len: normalized.len(),
-            sample: normalized,
-            files: vec![file],
-            repo_ids,
-        });
     }
 
     pub(crate) fn into_groups(self, cross_repo_only: bool) -> Vec<DuplicateGroup> {
         let mut out = Vec::new();
-        for builders in self.groups.into_values() {
-            for builder in builders {
-                if builder.files.len() <= 1 {
-                    continue;
-                }
-                if cross_repo_only && builder.repo_ids.len() < 2 {
-                    continue;
-                }
-
-                let mut files = builder.files;
-                files.sort_by(|a, b| (a.repo_id, &a.path).cmp(&(b.repo_id, &b.path)));
-                out.push(DuplicateGroup {
-                    content_hash: builder.content_hash,
-                    normalized_len: builder.normalized_len,
-                    files,
-                });
+        for builder in self.groups.into_values() {
+            if builder.files.len() <= 1 {
+                continue;
             }
+            if cross_repo_only && builder.repo_ids.len() < 2 {
+                continue;
+            }
+
+            let mut files = builder.files;
+            files.sort_by(|a, b| (a.repo_id, &a.path).cmp(&(b.repo_id, &b.path)));
+            out.push(DuplicateGroup {
+                content_hash: builder.content_hash,
+                normalized_len: builder.normalized_len,
+                files,
+            });
         }
         out
     }

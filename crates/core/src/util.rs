@@ -37,6 +37,14 @@ pub(crate) struct NormalizedText {
     pub(crate) line_map: Vec<u32>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct WhitespaceInsensitiveFingerprint {
+    pub(crate) content_hash: u64,
+    pub(crate) content_hash2: u64,
+    pub(crate) normalized_len: usize,
+}
+
+#[cfg(test)]
 pub(crate) fn normalize_whitespace(bytes: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(bytes.len());
     for &b in bytes {
@@ -45,6 +53,34 @@ pub(crate) fn normalize_whitespace(bytes: &[u8]) -> Vec<u8> {
         }
     }
     out
+}
+
+pub(crate) fn whitespace_insensitive_fingerprint(bytes: &[u8]) -> WhitespaceInsensitiveFingerprint {
+    const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+    const BASE: u64 = 911382323;
+
+    let mut normalized_len = 0usize;
+    let mut content_hash = FNV_OFFSET_BASIS;
+    let mut content_hash2 = 0u64;
+
+    for &b in bytes {
+        if b.is_ascii_whitespace() {
+            continue;
+        }
+        normalized_len = normalized_len.saturating_add(1);
+        content_hash ^= u64::from(b);
+        content_hash = content_hash.wrapping_mul(FNV_PRIME);
+        content_hash2 = content_hash2
+            .wrapping_mul(BASE)
+            .wrapping_add(u64::from(b).wrapping_add(1));
+    }
+
+    WhitespaceInsensitiveFingerprint {
+        content_hash,
+        content_hash2,
+        normalized_len,
+    }
 }
 
 pub(crate) fn normalize_for_code_spans(bytes: &[u8]) -> NormalizedText {
@@ -252,4 +288,20 @@ pub(crate) fn make_preview(codepoints: &[u32], max_len: usize) -> String {
         .take(max_len)
         .filter_map(|&cp| char::from_u32(cp))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fingerprint_matches_normalize_whitespace_and_fnv() {
+        let bytes = b"a b\nc\t";
+        let normalized = normalize_whitespace(bytes);
+        let expected_hash = fnv1a64(&normalized);
+
+        let fp = whitespace_insensitive_fingerprint(bytes);
+        assert_eq!(fp.content_hash, expected_hash);
+        assert_eq!(fp.normalized_len, normalized.len());
+    }
 }

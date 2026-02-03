@@ -8,9 +8,7 @@ use crate::scan::{
 use crate::types::{
     DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanOutcome, ScanStats,
 };
-use crate::util::{
-    NormalizedFile, NormalizedFileView, normalize_for_code_spans, normalize_whitespace,
-};
+use crate::util::{NormalizedFile, NormalizedFileView, normalize_for_code_spans};
 
 pub fn find_duplicate_files(
     roots: &[PathBuf],
@@ -68,8 +66,6 @@ pub fn find_duplicate_files_with_stats(
                     return Ok(std::ops::ControlFlow::Continue(()));
                 };
 
-                let normalized = normalize_whitespace(&bytes);
-
                 let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
                 let file = DuplicateFile {
                     repo_id: repo_file.repo_id,
@@ -77,7 +73,7 @@ pub fn find_duplicate_files_with_stats(
                     path: rel_path,
                 };
 
-                groups.push(normalized, file);
+                groups.push_bytes(&bytes, file);
 
                 Ok(std::ops::ControlFlow::Continue(()))
             })?

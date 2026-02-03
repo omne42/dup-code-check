@@ -1,0 +1,78 @@
+use std::collections::HashSet;
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+
+use crate::types::{ScanOptions, ScanStats};
+
+mod git;
+mod read;
+mod walker;
+
+#[cfg(test)]
+mod tests;
+
+pub(crate) use read::{make_rel_path, read_repo_file_bytes};
+pub(crate) use walker::visit_repo_files;
+
+fn should_stop_due_to_max_files(options: &ScanOptions, stats: &mut ScanStats) -> bool {
+    let Some(max_files) = options.max_files else {
+        return false;
+    };
+    if stats.scanned_files < max_files as u64 {
+        return false;
+    }
+    stats.skipped_budget_max_files = stats.skipped_budget_max_files.saturating_add(1);
+    true
+}
+
+pub(crate) fn validate_roots(roots: &[PathBuf]) -> io::Result<()> {
+    for root in roots {
+        let meta = fs::metadata(root)
+            .map_err(|err| io::Error::new(err.kind(), format!("root {}: {err}", root.display())))?;
+        if !meta.is_dir() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("root {} is not a directory", root.display()),
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Repo {
+    pub(crate) id: usize,
+    pub(crate) root: PathBuf,
+    pub(crate) label: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RepoFile {
+    pub(crate) repo_id: usize,
+    pub(crate) repo_label: String,
+    pub(crate) root: PathBuf,
+    pub(crate) abs_path: PathBuf,
+}
+
+pub(crate) fn repo_label(root: &Path, id: usize) -> String {
+    root.file_name()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("repo{id}"))
+}
+
+fn ignore_dirs_contains(ignore_dirs: &HashSet<String>, name: &str) -> bool {
+    if ignore_dirs.contains(name) {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        ignore_dirs.iter().any(|d| d.eq_ignore_ascii_case(name))
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}

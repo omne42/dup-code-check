@@ -11,7 +11,8 @@ use crate::args::{Localization, ParsedArgs, detect_localization, parse_args, pri
 use crate::json::{JsonScanStats, map_duplicate_groups, map_report, map_span_groups, write_json};
 use crate::path::resolve_path;
 use crate::text::{
-    format_scan_stats, format_text, format_text_code_spans, format_text_report, has_fatal_skips,
+    format_fatal_skip_warning, format_scan_stats, format_text, format_text_code_spans,
+    format_text_report, has_fatal_skips,
 };
 
 fn args_before_dashdash(args: &[String]) -> &[String] {
@@ -98,13 +99,9 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
         }
 
         if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
-            eprintln!(
+            eprint!(
                 "{}",
-                tr(
-                    parsed.localization,
-                    "Warning: scan was incomplete; re-run with --stats for details.",
-                    "警告：扫描不完整；请使用 --stats 重新运行以查看详情。",
-                )
+                format_fatal_skip_warning(parsed.localization, &scan_stats)
             );
         }
 
@@ -142,13 +139,9 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
         }
 
         if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
-            eprintln!(
+            eprint!(
                 "{}",
-                tr(
-                    parsed.localization,
-                    "Warning: scan was incomplete; re-run with --stats for details.",
-                    "警告：扫描不完整；请使用 --stats 重新运行以查看详情。",
-                )
+                format_fatal_skip_warning(parsed.localization, &scan_stats)
             );
         }
 
@@ -184,13 +177,9 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
     }
 
     if !parsed.strict && !parsed.stats && has_fatal_skips(&scan_stats) {
-        eprintln!(
+        eprint!(
             "{}",
-            tr(
-                parsed.localization,
-                "Warning: scan was incomplete; re-run with --stats for details.",
-                "警告：扫描不完整；请使用 --stats 重新运行以查看详情。",
-            )
+            format_fatal_skip_warning(parsed.localization, &scan_stats)
         );
     }
 

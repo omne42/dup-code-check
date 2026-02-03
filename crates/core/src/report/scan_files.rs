@@ -5,7 +5,7 @@ use crate::dedupe::FileDuplicateGrouper;
 use crate::scan::{Repo, make_rel_path, read_repo_file_bytes, repo_label, visit_repo_files};
 use crate::tokenize::{parse_brace_blocks, tokenize_for_dup_detection};
 use crate::types::{DuplicateFile, DuplicateGroup, ScanOptions, ScanStats};
-use crate::util::{fnv1a64_u32, fold_u64_to_u32, normalize_for_code_spans, normalize_whitespace};
+use crate::util::{fnv1a64_u32, fold_u64_to_u32, normalize_for_code_spans};
 
 use super::ScannedTextFile;
 use super::util::sort_duplicate_groups_for_report;
@@ -64,13 +64,12 @@ pub(super) fn scan_text_files_for_report(
                 let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
 
                 // 1) File duplicates (whitespace-insensitive)
-                let normalized_ws = normalize_whitespace(&bytes);
                 let file = DuplicateFile {
                     repo_id: repo_file.repo_id,
                     repo_label: repo_file.repo_label.clone(),
                     path: rel_path.clone(),
                 };
-                file_groups.push(normalized_ws, file);
+                file_groups.push_bytes(&bytes, file);
 
                 // 2) Text-based detectors
                 let text = String::from_utf8_lossy(&bytes).to_string();

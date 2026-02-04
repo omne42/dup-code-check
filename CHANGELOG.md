@@ -83,6 +83,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Report: avoid extra `String` allocations when scanning/tokenizing files for `--report`.
 - Scan: reduce per-file allocations by keeping `RepoFile` lightweight (avoid cloning repo root/label per candidate file).
 - Core/report: avoid storing duplicated repo labels per scanned file (resolve labels lazily when building results).
+- Core/report: remove `<unknown>` fallbacks for internal repo label lookups (fail fast on invariant violations).
 - Scan: remove the redundant `git check-ignore` step in the Git fast path (less overhead; same results).
 - Scan stats: add `gitFastPathFallbacks` to record when the Git fast path falls back to the walker.
 - Report: de-duplicate the `splitmix64` helper for similar-block detectors (no behavior change).

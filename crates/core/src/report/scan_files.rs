@@ -108,12 +108,8 @@ pub(super) fn scan_text_files_for_report(
     let mut file_duplicates = file_groups.into_groups_verified(
         options.cross_repo_only,
         |repo_id, path| {
-            let Some(repo) = repos.get(repo_id) else {
-                return Ok(None);
-            };
-            let canonical_root = canonical_roots
-                .and_then(|roots| roots.get(repo_id))
-                .map(|p| p.as_path());
+            let repo = &repos[repo_id];
+            let canonical_root = canonical_roots.map(|roots| roots[repo_id].as_path());
 
             read_repo_file_bytes_for_verification(
                 &repo.root,
@@ -123,12 +119,7 @@ pub(super) fn scan_text_files_for_report(
                 max_file_size,
             )
         },
-        |repo_id| {
-            repos
-                .get(repo_id)
-                .map(|repo| repo.label.clone())
-                .unwrap_or_else(|| "<unknown>".to_string())
-        },
+        |repo_id| repos[repo_id].label.clone(),
     )?;
 
     sort_duplicate_groups_for_report(&mut file_duplicates);

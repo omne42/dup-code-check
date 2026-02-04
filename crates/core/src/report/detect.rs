@@ -12,6 +12,14 @@ use crate::winnowing::{
 use super::ScannedTextFile;
 use super::util::{fill_missing_previews_from_files, sort_span_groups_for_report};
 
+fn repo_label_str(repo_labels: &[String], repo_id: usize) -> &str {
+    repo_labels[repo_id].as_str()
+}
+
+fn repo_label_owned(repo_labels: &[String], repo_id: usize) -> String {
+    repo_labels[repo_id].clone()
+}
+
 fn splitmix64(mut x: u64) -> u64 {
     x = x.wrapping_add(0x9e3779b97f4a7c15);
     let mut z = x;
@@ -35,10 +43,7 @@ pub(super) fn detect_duplicate_code_spans(
         }
         normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: repo_labels
-                .get(file.repo_id)
-                .map(|label| label.as_str())
-                .unwrap_or("<unknown>"),
+            repo_label: repo_label_str(repo_labels, file.repo_id),
             rel_path: &file.path,
             normalized: &file.code_chars,
             line_map: &file.code_char_lines,
@@ -72,10 +77,7 @@ pub(super) fn detect_duplicate_line_spans(
         }
         normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: repo_labels
-                .get(file.repo_id)
-                .map(|label| label.as_str())
-                .unwrap_or("<unknown>"),
+            repo_label: repo_label_str(repo_labels, file.repo_id),
             rel_path: &file.path,
             normalized: &file.line_tokens,
             line_map: &file.line_token_lines,
@@ -130,10 +132,7 @@ pub(super) fn detect_duplicate_token_spans(
         }
         normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: repo_labels
-                .get(file.repo_id)
-                .map(|label| label.as_str())
-                .unwrap_or("<unknown>"),
+            repo_label: repo_label_str(repo_labels, file.repo_id),
             rel_path: &file.path,
             normalized: &file.tokens,
             line_map: &file.token_lines,
@@ -190,10 +189,7 @@ pub(super) fn detect_duplicate_blocks(
                         preview: String::new(),
                         occurrences: vec![DuplicateSpanOccurrence {
                             repo_id: file.repo_id,
-                            repo_label: repo_labels
-                                .get(file.repo_id)
-                                .cloned()
-                                .unwrap_or_else(|| "<unknown>".to_string()),
+                            repo_label: repo_label_owned(repo_labels, file.repo_id),
                             path: file.path.clone(),
                             start_line: node.start_line,
                             end_line: node.end_line,
@@ -211,10 +207,7 @@ pub(super) fn detect_duplicate_blocks(
             builder.repo_ids.insert(file.repo_id);
             builder.occurrences.push(DuplicateSpanOccurrence {
                 repo_id: file.repo_id,
-                repo_label: repo_labels
-                    .get(file.repo_id)
-                    .cloned()
-                    .unwrap_or_else(|| "<unknown>".to_string()),
+                repo_label: repo_label_owned(repo_labels, file.repo_id),
                 path: file.path.clone(),
                 start_line: node.start_line,
                 end_line: node.end_line,
@@ -312,10 +305,7 @@ pub(super) fn detect_duplicate_ast_subtrees(
                         preview: String::new(),
                         occurrences: vec![DuplicateSpanOccurrence {
                             repo_id: file.repo_id,
-                            repo_label: repo_labels
-                                .get(file.repo_id)
-                                .cloned()
-                                .unwrap_or_else(|| "<unknown>".to_string()),
+                            repo_label: repo_label_owned(repo_labels, file.repo_id),
                             path: file.path.clone(),
                             start_line: node.start_line,
                             end_line: node.end_line,
@@ -333,10 +323,7 @@ pub(super) fn detect_duplicate_ast_subtrees(
             builder.repo_ids.insert(file.repo_id);
             builder.occurrences.push(DuplicateSpanOccurrence {
                 repo_id: file.repo_id,
-                repo_label: repo_labels
-                    .get(file.repo_id)
-                    .cloned()
-                    .unwrap_or_else(|| "<unknown>".to_string()),
+                repo_label: repo_label_owned(repo_labels, file.repo_id),
                 path: file.path.clone(),
                 start_line: node.start_line,
                 end_line: node.end_line,
@@ -432,10 +419,7 @@ pub(super) fn find_similar_blocks_minhash(
             blocks.push(BlockSig {
                 occ: DuplicateSpanOccurrence {
                     repo_id: file.repo_id,
-                    repo_label: repo_labels
-                        .get(file.repo_id)
-                        .cloned()
-                        .unwrap_or_else(|| "<unknown>".to_string()),
+                    repo_label: repo_label_owned(repo_labels, file.repo_id),
                     path: file.path.clone(),
                     start_line: node.start_line,
                     end_line: node.end_line,
@@ -551,10 +535,7 @@ pub(super) fn find_similar_blocks_simhash(
             blocks.push(BlockHash {
                 occ: DuplicateSpanOccurrence {
                     repo_id: file.repo_id,
-                    repo_label: repo_labels
-                        .get(file.repo_id)
-                        .cloned()
-                        .unwrap_or_else(|| "<unknown>".to_string()),
+                    repo_label: repo_label_owned(repo_labels, file.repo_id),
                     path: file.path.clone(),
                     start_line: node.start_line,
                     end_line: node.end_line,

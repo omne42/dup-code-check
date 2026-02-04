@@ -113,18 +113,17 @@ pub(crate) fn whitespace_insensitive_fingerprint(bytes: &[u8]) -> WhitespaceInse
 }
 
 pub(crate) fn normalize_for_code_spans(bytes: &[u8]) -> NormalizedText {
-    let text = String::from_utf8_lossy(bytes);
     let mut line: u32 = 1;
     let mut chars = Vec::new();
     let mut line_map = Vec::new();
 
-    for ch in text.chars() {
-        if ch == '\n' {
+    for &b in bytes {
+        if b == b'\n' {
             line = line.saturating_add(1);
             continue;
         }
-        if ch.is_alphanumeric() || ch == '_' {
-            chars.push(ch as u32);
+        if b.is_ascii_alphanumeric() || b == b'_' {
+            chars.push(u32::from(b));
             line_map.push(line);
         }
     }

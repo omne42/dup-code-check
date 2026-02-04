@@ -80,6 +80,19 @@ _c
 }
 
 #[test]
+fn normalize_for_code_spans_keeps_only_ascii_word_chars() {
+    let input = "你好a_b1é2\n";
+    let normalized = normalize_for_code_spans(input.as_bytes());
+    let as_string: String = normalized
+        .chars
+        .iter()
+        .filter_map(|&cp| char::from_u32(cp))
+        .collect();
+    assert_eq!(as_string, "a_b12");
+    assert_eq!(normalized.line_map, vec![1, 1, 1, 1, 1]);
+}
+
+#[test]
 fn finds_duplicate_code_spans_with_line_numbers() -> io::Result<()> {
     let repo_a = temp_dir("span_a");
     let repo_b = temp_dir("span_b");
@@ -444,6 +457,18 @@ fn scanning_skips_permission_denied_files() -> io::Result<()> {
     {
         use std::os::unix::fs::PermissionsExt;
 
+        struct RestorePerm {
+            path: PathBuf,
+            mode: u32,
+        }
+
+        impl Drop for RestorePerm {
+            fn drop(&mut self) {
+                let perms = fs::Permissions::from_mode(self.mode);
+                let _ = fs::set_permissions(&self.path, perms);
+            }
+        }
+
         let root = temp_dir("perm_denied");
         fs::create_dir_all(&root)?;
         fs::write(
@@ -455,17 +480,25 @@ c",
 
         let secret_path = root.join("secret.txt");
         fs::write(&secret_path, "ab	c")?;
+        let _guard = RestorePerm {
+            path: secret_path.clone(),
+            mode: 0o644,
+        };
 
         let mut perms = fs::metadata(&secret_path)?.permissions();
         perms.set_mode(0o000);
         fs::set_permissions(&secret_path, perms)?;
 
+        // This test only makes sense when the environment enforces PermissionDenied on unreadable
+        // files. When running as `root`, `chmod 000` is not sufficient.
+        match fs::File::open(&secret_path) {
+            Ok(_) => return Ok(()),
+            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {}
+            Err(_) => return Ok(()),
+        }
+
         let options = ScanOptions::default();
         let groups = find_duplicate_files(std::slice::from_ref(&root), &options)?;
-
-        let mut perms = fs::metadata(&secret_path)?.permissions();
-        perms.set_mode(0o644);
-        fs::set_permissions(&secret_path, perms)?;
 
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].files.len(), 2);

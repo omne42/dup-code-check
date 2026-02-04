@@ -3,7 +3,7 @@ use std::io;
 
 use crate::types::{DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanStats};
 use crate::util::{NormalizedFileView, fnv1a64, make_preview, whitespace_insensitive_fingerprint};
-use crate::winnowing::detect_duplicate_span_groups_winnowing;
+use crate::winnowing::{WinnowingParams, detect_duplicate_span_groups_winnowing};
 
 type FileDuplicateKey = (u64, usize, u64, [u8; 16], [u8; 16]);
 
@@ -135,10 +135,12 @@ pub(crate) fn detect_duplicate_code_spans_winnowing<'a>(
 
     detect_duplicate_span_groups_winnowing(
         files,
-        min_match_len,
-        fingerprint_len,
-        window_size,
-        options.cross_repo_only,
+        WinnowingParams {
+            min_len: min_match_len,
+            fingerprint_len,
+            window_size,
+            cross_repo_only: options.cross_repo_only,
+        },
         |_file_id, _start, _len| true,
         |_file_id, _start_line, _end_line, sample| make_preview(sample, 80),
         stats,

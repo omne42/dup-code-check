@@ -78,6 +78,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan: when `git check-ignore` fails during streaming, fall back to the walker (avoid early aborts / double-scans).
 - CLI: resolve roots by directly `canonicalize()`-ing user paths (preserve symlink semantics).
 - Report: reduce memory usage by avoiding storing full file text for previews (generate previews from files on demand).
+- Rust: refactor the winnowing detector API to pass params as a struct (no behavior change).
+- Normalization: code-span and line-span detectors now keep only ASCII word chars (`[A-Za-z0-9_]`) to match the docs.
+- Report: avoid extra `String` allocations when scanning/tokenizing files for `--report`.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
@@ -118,6 +121,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: improve fatal-skip warnings with a reason summary and actionable hints when `--stats` is not enabled.
 - CLI: fatal-skip warnings now include JSON-compatible `scanStats` keys (camelCase), with snake_case aliases.
 - Core: reduce the risk of false file-duplicate grouping due to hash collisions by adding prefix/suffix samples to fingerprints.
+- Tests: make the PermissionDenied scanning test robust in environments where `chmod 000` is ineffective (e.g. running as root).
 - Core: re-verify whitespace-normalized file contents before emitting file-duplicate groups (avoid false positives from hash collisions or file changes).
 - Scan budgets: binary files no longer bypass `maxFiles` / `maxTotalBytes`, and binary detection avoids reading entire binaries.
 - Scan budgets: enforce `maxTotalBytes` / `maxFileSize` during reads to avoid budget overruns when files grow mid-scan.

@@ -78,6 +78,9 @@
 - 扫描：流式模式下 `git check-ignore` 失败时回退到 walker（避免提前中止/重复扫描）。
 - CLI：root 路径直接使用 `canonicalize()` 解析（保留 symlink 语义）。
 - Report：不再为 preview 保存全量文本，按需从文件生成 preview，降低内存占用。
+- Rust：重构 winnowing 检测器 API，把参数收敛为一个 struct（无行为变化）。
+- 归一化：code-span 与 line-span 检测器现在仅保留 ASCII 的“词字符”（`[A-Za-z0-9_]`），与文档一致。
+- Report：在 `--report` 扫描/分词过程中避免额外的 `String` 分配，降低内存与拷贝开销。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
@@ -122,3 +125,4 @@
 - 扫描预算：二进制文件不会再绕过 `maxFiles` / `maxTotalBytes`，且二进制检测会避免读完整文件。
 - 扫描预算：在读取过程中也会强制 `maxTotalBytes` / `maxFileSize`，避免扫描期间文件增长导致预算超出。
 - Report：截断包含非 ASCII 字符的 preview 时不再 panic。
+- 测试：当运行环境下 `chmod 000` 无法触发 `PermissionDenied`（例如 root）时，`PermissionDenied` 扫描测试会跳过，避免误报失败。

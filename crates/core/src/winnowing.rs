@@ -23,6 +23,14 @@ struct MatchKey {
 
 const MAX_BUCKET: usize = 512;
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct WinnowingParams {
+    pub(crate) min_len: usize,
+    pub(crate) fingerprint_len: usize,
+    pub(crate) window_size: usize,
+    pub(crate) cross_repo_only: bool,
+}
+
 fn truncate_bucket_by_repo<'a>(
     mut occs: Vec<FingerprintOcc>,
     files: &[NormalizedFileView<'a>],
@@ -68,27 +76,29 @@ fn truncate_bucket_by_repo<'a>(
     out
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn detect_duplicate_span_groups_winnowing<'a>(
     files: &[NormalizedFileView<'a>],
-    min_len: usize,
-    fingerprint_len: usize,
-    window_size: usize,
-    cross_repo_only: bool,
+    params: WinnowingParams,
     accept_match: impl Fn(usize, usize, usize) -> bool,
     preview_from_occurrence: impl Fn(usize, u32, u32, &[u32]) -> String,
     stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
-    if files.is_empty() || min_len == 0 || fingerprint_len == 0 || window_size == 0 {
+    if files.is_empty()
+        || params.min_len == 0
+        || params.fingerprint_len == 0
+        || params.window_size == 0
+    {
         return Vec::new();
     }
 
     let mut fingerprints: HashMap<u64, Vec<FingerprintOcc>> = HashMap::new();
     for (file_id, file) in files.iter().enumerate() {
-        if file.normalized.len() < min_len {
+        if file.normalized.len() < params.min_len {
             continue;
         }
-        for (hash, pos) in winnowed_fingerprints(file.normalized, fingerprint_len, window_size) {
+        for (hash, pos) in
+            winnowed_fingerprints(file.normalized, params.fingerprint_len, params.window_size)
+        {
             fingerprints
                 .entry(hash)
                 .or_default()
@@ -118,7 +128,7 @@ pub(crate) fn detect_duplicate_span_groups_winnowing<'a>(
                 if a.file_id == b.file_id && a.pos == b.pos {
                     continue;
                 }
-                if cross_repo_only && files[a.file_id].repo_id == files[b.file_id].repo_id {
+                if params.cross_repo_only && files[a.file_id].repo_id == files[b.file_id].repo_id {
                     continue;
                 }
 
@@ -127,13 +137,13 @@ pub(crate) fn detect_duplicate_span_groups_winnowing<'a>(
                     a.pos,
                     files[b.file_id].normalized,
                     b.pos,
-                    fingerprint_len,
+                    params.fingerprint_len,
                 ) {
                     Some(v) => v,
                     None => continue,
                 };
 
-                if len < min_len {
+                if len < params.min_len {
                     continue;
                 }
                 if !accept_match(a.file_id, start_a, len) || !accept_match(b.file_id, start_b, len)
@@ -202,7 +212,7 @@ pub(crate) fn detect_duplicate_span_groups_winnowing<'a>(
         }
     }
 
-    finalize_span_groups(groups, cross_repo_only)
+    finalize_span_groups(groups, params.cross_repo_only)
 }
 
 pub(crate) fn finalize_span_groups(

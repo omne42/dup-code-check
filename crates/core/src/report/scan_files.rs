@@ -79,9 +79,9 @@ pub(super) fn scan_text_files_for_report(
                 file_groups.push_bytes(&bytes, file);
 
                 // 2) Text-based detectors
-                let text = String::from_utf8_lossy(&bytes).to_string();
+                let text = String::from_utf8_lossy(&bytes);
                 let code_norm = normalize_for_code_spans(&bytes);
-                let line_norm = normalize_lines_for_dup_detection(&text);
+                let line_norm = normalize_lines_for_dup_detection(&bytes);
                 let tokenized = tokenize_for_dup_detection(&text);
                 let blocks = parse_brace_blocks(&tokenized.tokens, &tokenized.token_lines);
 
@@ -141,7 +141,7 @@ struct LineNormalizedText {
     line_lens: Vec<usize>,
 }
 
-fn normalize_lines_for_dup_detection(text: &str) -> LineNormalizedText {
+fn normalize_lines_for_dup_detection(bytes: &[u8]) -> LineNormalizedText {
     let mut line: u32 = 1;
     let mut current: Vec<u32> = Vec::new();
 
@@ -149,8 +149,8 @@ fn normalize_lines_for_dup_detection(text: &str) -> LineNormalizedText {
     let mut line_lines = Vec::new();
     let mut line_lens = Vec::new();
 
-    for ch in text.chars() {
-        if ch == '\n' {
+    for &b in bytes {
+        if b == b'\n' {
             if !current.is_empty() {
                 line_lens.push(current.len());
                 line_tokens.push(fold_u64_to_u32(fnv1a64_u32(&current)));
@@ -160,8 +160,8 @@ fn normalize_lines_for_dup_detection(text: &str) -> LineNormalizedText {
             line = line.saturating_add(1);
             continue;
         }
-        if ch.is_alphanumeric() || ch == '_' {
-            current.push(ch as u32);
+        if b.is_ascii_alphanumeric() || b == b'_' {
+            current.push(u32::from(b));
         }
     }
 

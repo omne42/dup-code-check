@@ -5,7 +5,9 @@ use crate::types::{
     DuplicateSpanGroup, DuplicateSpanOccurrence, ScanOptions, ScanStats, SimilarityPair,
 };
 use crate::util::{NormalizedFileView, SpanGroupBuilder, fnv1a64_u32, fold_u64_to_u32};
-use crate::winnowing::{detect_duplicate_span_groups_winnowing, finalize_span_groups};
+use crate::winnowing::{
+    WinnowingParams, detect_duplicate_span_groups_winnowing, finalize_span_groups,
+};
 
 use super::ScannedTextFile;
 use super::util::{fill_missing_previews_from_files, sort_span_groups_for_report};
@@ -67,10 +69,13 @@ pub(super) fn detect_duplicate_line_spans(
 
     let mut out = detect_duplicate_span_groups_with_len_filter(
         &normalized,
-        2,
-        2,
-        8,
-        options.cross_repo_only,
+        WinnowingParams {
+            min_len: 2,
+            fingerprint_len: 2,
+            window_size: 8,
+            cross_repo_only: options.cross_repo_only,
+        },
+        options.max_report_items,
         |file_id, start, len| {
             let lens = file_line_lens[file_id];
             let mut total = 0usize;
@@ -83,7 +88,6 @@ pub(super) fn detect_duplicate_line_spans(
             false
         },
         |_file_id, _start_line, _end_line| String::new(),
-        options.max_report_items,
         stats,
     );
     fill_missing_previews_from_files(files, &mut out, 120);
@@ -118,13 +122,15 @@ pub(super) fn detect_duplicate_token_spans(
 
     let mut out = detect_duplicate_span_groups_with_len_filter(
         &normalized,
-        min_token_len,
-        fingerprint_len,
-        window_size,
-        options.cross_repo_only,
+        WinnowingParams {
+            min_len: min_token_len,
+            fingerprint_len,
+            window_size,
+            cross_repo_only: options.cross_repo_only,
+        },
+        options.max_report_items,
         |_file_id, _start, _len| true,
         |_file_id, _start_line, _end_line| String::new(),
-        options.max_report_items,
         stats,
     );
     fill_missing_previews_from_files(files, &mut out, 120);
@@ -311,16 +317,12 @@ pub(super) fn detect_duplicate_ast_subtrees(
     out
 }
 
-#[allow(clippy::too_many_arguments)]
 fn detect_duplicate_span_groups_with_len_filter<'a>(
     files: &[NormalizedFileView<'a>],
-    min_len: usize,
-    fingerprint_len: usize,
-    window_size: usize,
-    cross_repo_only: bool,
+    winnowing: WinnowingParams,
+    max_items: usize,
     accept_match: impl Fn(usize, usize, usize) -> bool,
     preview_from_occurrence: impl Fn(usize, u32, u32) -> String,
-    max_items: usize,
     stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
     if max_items == 0 || files.is_empty() {
@@ -329,10 +331,7 @@ fn detect_duplicate_span_groups_with_len_filter<'a>(
 
     let mut out = detect_duplicate_span_groups_winnowing(
         files,
-        min_len,
-        fingerprint_len,
-        window_size,
-        cross_repo_only,
+        winnowing,
         accept_match,
         |file_id, start_line, end_line, _sample| {
             preview_from_occurrence(file_id, start_line, end_line)

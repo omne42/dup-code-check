@@ -13,7 +13,16 @@ const binaryPath = path.join(repoRoot, 'bin', binaryName);
 
 function newestMtimeMs(p) {
   try {
-    const st = fs.statSync(p);
+    const st = fs.lstatSync(p);
+    if (st.isSymbolicLink()) {
+      try {
+        const real = fs.statSync(p);
+        if (real.isFile()) return real.mtimeMs;
+      } catch {
+        // ignore
+      }
+      return 0;
+    }
     if (st.isFile()) return st.mtimeMs;
     if (st.isDirectory()) {
       let max = st.mtimeMs;

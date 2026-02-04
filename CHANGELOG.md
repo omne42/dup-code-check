@@ -21,6 +21,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - GitHub Actions: CI (Linux/macOS/Windows), docs (GitHub Pages), and release (GitHub Release + npm publish).
 - Docs: bilingual (EN/ZH) with cross-links.
 - Docs: add `/llms.en.txt` + `/llms.zh-CN.txt` bundles and an `LLMs` docs page.
+- Tests: add regression coverage for safe relative-path validation and mid-read budget/file-size enforcement.
 
 ### Changed
 - Rename project: `dup-check` → `dup-code-check`.
@@ -91,6 +92,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI now errors when `--report` and `--code-spans` are both specified.
 - CLI: `--cross-repo-only` now errors when fewer than 2 roots are provided.
 - Scanning now skips `PermissionDenied` and walker traversal errors instead of aborting.
+- Scanning now skips per-file read I/O failures instead of aborting.
 - CLI now catches runtime scan failures and exits with code 1.
 - Remove unstable rustfmt config options to avoid warnings on stable toolchains.
 - `--max-report-items` now applies consistently across all report sections and prefers larger groups.
@@ -108,7 +110,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Git integration: treat non-UTF-8 output from `git check-ignore` as a fallback trigger.
 - npm build: improve Cargo build failure diagnostics.
 - npm build: resolve `cargo` from PATH excluding `node_modules/.bin` (supply-chain hardening).
+- npm build: avoid running non-executable or world-writable `cargo` binaries found on PATH (Unix).
 - Node smoke: verify the wrapper can execute `--version` when deciding whether to rebuild.
+- Node smoke: avoid following symlink directories when probing source mtimes (more stable in unusual worktrees).
 - npm package: include `rust-toolchain.toml` so installs use the pinned Rust toolchain.
 - CLI: localize `Number.MAX_SAFE_INTEGER` errors for integer options.
 - CLI: improve fatal-skip warnings with a reason summary and actionable hints when `--stats` is not enabled.
@@ -116,4 +120,5 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Core: reduce the risk of false file-duplicate grouping due to hash collisions by adding prefix/suffix samples to fingerprints.
 - Core: re-verify whitespace-normalized file contents before emitting file-duplicate groups (avoid false positives from hash collisions or file changes).
 - Scan budgets: binary files no longer bypass `maxFiles` / `maxTotalBytes`, and binary detection avoids reading entire binaries.
+- Scan budgets: enforce `maxTotalBytes` / `maxFileSize` during reads to avoid budget overruns when files grow mid-scan.
 - Report: avoid panics when truncating previews containing non-ASCII characters.

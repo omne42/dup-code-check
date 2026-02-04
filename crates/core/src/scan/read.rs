@@ -1,11 +1,32 @@
 use std::fs;
 use std::io;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use crate::types::{ScanOptions, ScanStats};
 use crate::util::fnv1a64;
 
 use super::RepoFile;
+
+#[cfg(test)]
+type BeforeOpenHook = std::cell::RefCell<Option<Box<dyn FnMut(&Path)>>>;
+
+#[cfg(test)]
+thread_local! {
+    static TEST_BEFORE_OPEN_HOOK: BeforeOpenHook = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+pub(super) fn with_test_before_open_hook<R>(
+    hook: impl FnMut(&Path) + 'static,
+    f: impl FnOnce() -> R,
+) -> R {
+    TEST_BEFORE_OPEN_HOOK.with(|slot| {
+        let prev = slot.replace(Some(Box::new(hook)));
+        let out = f();
+        slot.replace(prev);
+        out
+    })
+}
 
 pub(crate) fn make_rel_path(root: &Path, abs_path: &Path) -> String {
     match abs_path.strip_prefix(root) {
@@ -109,7 +130,10 @@ pub(crate) fn read_repo_file_bytes_with_path(
             stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
             return Ok(None);
         }
-        Err(err) => return Err(err),
+        Err(_) => {
+            stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+            return Ok(None);
+        }
     };
 
     if let Some(max_file_size) = options.max_file_size
@@ -127,6 +151,13 @@ pub(crate) fn read_repo_file_bytes_with_path(
         return Ok(None);
     }
 
+    #[cfg(test)]
+    TEST_BEFORE_OPEN_HOOK.with(|slot| {
+        if let Some(hook) = slot.borrow_mut().as_mut() {
+            hook(&read_path);
+        }
+    });
+
     let mut file = match fs::File::open(&read_path) {
         Ok(f) => f,
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
@@ -137,7 +168,10 @@ pub(crate) fn read_repo_file_bytes_with_path(
             stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
             return Ok(None);
         }
-        Err(err) => return Err(err),
+        Err(_) => {
+            stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+            return Ok(None);
+        }
     };
 
     #[cfg(unix)]
@@ -154,7 +188,10 @@ pub(crate) fn read_repo_file_bytes_with_path(
                 stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
                 return Ok(None);
             }
-            Err(err) => return Err(err),
+            Err(_) => {
+                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+                return Ok(None);
+            }
         };
         if (metadata.dev(), metadata.ino()) != (opened.dev(), opened.ino()) {
             stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
@@ -164,48 +201,84 @@ pub(crate) fn read_repo_file_bytes_with_path(
 
     use std::io::Read;
 
-    let mut bytes: Vec<u8> = Vec::with_capacity(metadata.len().min(1024 * 1024) as usize);
-    let mut total_read = 0usize;
+    let metadata_len = metadata.len();
+    let max_file_size = options.max_file_size;
+    let max_total_bytes = options.max_total_bytes;
+
+    let mut bytes: Vec<u8> = Vec::with_capacity(metadata_len.min(1024 * 1024) as usize);
+    let mut total_read: u64 = 0;
     let mut buf = [0u8; 16 * 1024];
     loop {
-        let n = file.read(&mut buf)?;
+        let mut limit = buf.len() as u64;
+
+        if let Some(max_file_size) = max_file_size {
+            let cap = max_file_size.saturating_add(1);
+            let remaining = cap.saturating_sub(total_read);
+            if remaining == 0 {
+                stats.scanned_files = stats.scanned_files.saturating_add(1);
+                stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read);
+                stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
+                return Ok(None);
+            }
+            limit = limit.min(remaining);
+        }
+
+        if let Some(max_total_bytes) = max_total_bytes {
+            let remaining_budget =
+                max_total_bytes.saturating_sub(stats.scanned_bytes.saturating_add(total_read));
+            if remaining_budget == 0 {
+                if total_read == metadata_len {
+                    break;
+                }
+                stats.scanned_files = stats.scanned_files.saturating_add(1);
+                stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read);
+                stats.skipped_budget_max_total_bytes =
+                    stats.skipped_budget_max_total_bytes.saturating_add(1);
+                return Ok(None);
+            }
+            limit = limit.min(remaining_budget);
+        }
+
+        let n = match file.read(&mut buf[..limit as usize]) {
+            Ok(n) => n,
+            Err(_) => {
+                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+                if total_read > 0 {
+                    stats.scanned_files = stats.scanned_files.saturating_add(1);
+                    stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read);
+                }
+                return Ok(None);
+            }
+        };
         if n == 0 {
             break;
         }
-        total_read = total_read.saturating_add(n);
+
+        let new_total_read = total_read.saturating_add(n as u64);
         if buf[..n].contains(&0) {
             stats.scanned_files = stats.scanned_files.saturating_add(1);
-            stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read as u64);
+            stats.scanned_bytes = stats.scanned_bytes.saturating_add(new_total_read);
             stats.skipped_binary = stats.skipped_binary.saturating_add(1);
             return Ok(None);
         }
+
+        if let Some(max_file_size) = max_file_size
+            && new_total_read > max_file_size
+        {
+            stats.scanned_files = stats.scanned_files.saturating_add(1);
+            stats.scanned_bytes = stats.scanned_bytes.saturating_add(new_total_read);
+            stats.skipped_too_large = stats.skipped_too_large.saturating_add(1);
+            return Ok(None);
+        }
+
         bytes.extend_from_slice(&buf[..n]);
+        total_read = new_total_read;
     }
 
     stats.scanned_files = stats.scanned_files.saturating_add(1);
-    stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read as u64);
+    stats.scanned_bytes = stats.scanned_bytes.saturating_add(total_read);
 
     Ok(Some((bytes, read_path)))
-}
-
-fn is_safe_relative_path(raw: &str) -> bool {
-    if raw.is_empty() {
-        return false;
-    }
-    let path = Path::new(raw);
-    if path.is_absolute() {
-        return false;
-    }
-    for component in path.components() {
-        match component {
-            Component::Normal(_) => {}
-            Component::CurDir
-            | Component::ParentDir
-            | Component::RootDir
-            | Component::Prefix(_) => return false,
-        }
-    }
-    true
 }
 
 pub(crate) fn read_repo_file_bytes_for_verification(
@@ -215,7 +288,7 @@ pub(crate) fn read_repo_file_bytes_for_verification(
     follow_symlinks: bool,
     max_file_size: Option<u64>,
 ) -> io::Result<Option<Vec<u8>>> {
-    if !is_safe_relative_path(rel_path) {
+    if !super::is_safe_relative_path(rel_path) {
         return Ok(None);
     }
 
@@ -285,7 +358,7 @@ pub(crate) fn read_repo_file_bytes_for_verification(
         {
             return Ok(None);
         }
-        Err(err) => return Err(err),
+        Err(_) => return Ok(None),
     };
 
     #[cfg(unix)]
@@ -302,7 +375,7 @@ pub(crate) fn read_repo_file_bytes_for_verification(
             {
                 return Ok(None);
             }
-            Err(err) => return Err(err),
+            Err(_) => return Ok(None),
         };
         if (metadata.dev(), metadata.ino()) != (opened.dev(), opened.ino()) {
             return Ok(None);
@@ -312,6 +385,36 @@ pub(crate) fn read_repo_file_bytes_for_verification(
     use std::io::Read;
 
     let mut bytes: Vec<u8> = Vec::with_capacity(metadata.len().min(1024 * 1024) as usize);
-    file.read_to_end(&mut bytes)?;
+    let mut total_read: u64 = 0;
+    let mut buf = [0u8; 16 * 1024];
+    loop {
+        let mut limit = buf.len() as u64;
+        if let Some(max_file_size) = max_file_size {
+            let cap = max_file_size.saturating_add(1);
+            let remaining = cap.saturating_sub(total_read);
+            if remaining == 0 {
+                return Ok(None);
+            }
+            limit = limit.min(remaining);
+        }
+
+        let n = match file.read(&mut buf[..limit as usize]) {
+            Ok(n) => n,
+            Err(_) => return Ok(None),
+        };
+        if n == 0 {
+            break;
+        }
+
+        let new_total_read = total_read.saturating_add(n as u64);
+        if let Some(max_file_size) = max_file_size
+            && new_total_read > max_file_size
+        {
+            return Ok(None);
+        }
+
+        bytes.extend_from_slice(&buf[..n]);
+        total_read = new_total_read;
+    }
     Ok(Some(bytes))
 }

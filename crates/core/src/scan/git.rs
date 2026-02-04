@@ -6,7 +6,7 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
 use std::ops::ControlFlow;
-use std::path::{Component, Path};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use crate::types::{ScanOptions, ScanStats};
@@ -122,26 +122,6 @@ where
 
     // Stream `git ls-files` in small batches to avoid collecting the full file list in memory.
     visit_repo_files_via_git_streaming(repo, options, stats, on_file)
-}
-
-fn is_safe_relative_path(raw: &str) -> bool {
-    if raw.is_empty() {
-        return false;
-    }
-    let path = Path::new(raw);
-    if path.is_absolute() {
-        return false;
-    }
-    for component in path.components() {
-        match component {
-            Component::Normal(_) => {}
-            Component::CurDir
-            | Component::ParentDir
-            | Component::RootDir
-            | Component::Prefix(_) => return false,
-        }
-    }
-    true
 }
 
 fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<String>> {
@@ -372,7 +352,7 @@ where
         if ignored.contains(rel) {
             continue;
         }
-        if !is_safe_relative_path(rel) {
+        if !super::is_safe_relative_path(rel) {
             stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
             continue;
         }

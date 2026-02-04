@@ -9,6 +9,101 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::fs;
 
 #[test]
+fn safe_relative_path_rejects_unsafe_paths() {
+    assert!(is_safe_relative_path("a.txt"));
+    assert!(is_safe_relative_path("dir/file.txt"));
+
+    assert!(!is_safe_relative_path(""));
+    assert!(!is_safe_relative_path("../a.txt"));
+    assert!(!is_safe_relative_path("a/../b.txt"));
+    assert!(!is_safe_relative_path("./a.txt"));
+
+    #[cfg(unix)]
+    assert!(!is_safe_relative_path("/etc/passwd"));
+
+    #[cfg(windows)]
+    assert!(!is_safe_relative_path("C:\\\\Windows\\\\System32"));
+}
+
+#[test]
+fn read_repo_file_bytes_enforces_max_file_size_during_read() -> io::Result<()> {
+    let root = temp_dir("read_repo_file_bytes_enforces_max_file_size_during_read");
+    fs::create_dir_all(&root)?;
+
+    let path = root.join("a.txt");
+    fs::write(&path, b"aaaaaaaaaa")?;
+
+    let repo_file = RepoFile {
+        repo_id: 0,
+        repo_label: "test".to_string(),
+        root: root.clone(),
+        abs_path: path.clone(),
+    };
+
+    let options = ScanOptions {
+        max_file_size: Some(20),
+        ..ScanOptions::default()
+    };
+
+    let mut stats = ScanStats::default();
+    let out = read::with_test_before_open_hook(
+        |read_path| {
+            use std::io::Write;
+
+            let mut file = fs::OpenOptions::new().append(true).open(read_path).unwrap();
+            file.write_all(&[b'a'; 32]).unwrap();
+        },
+        || read_repo_file_bytes_with_path(&repo_file, None, &options, &mut stats),
+    )?;
+
+    assert!(out.is_none());
+    assert_eq!(stats.skipped_too_large, 1);
+    assert_eq!(stats.scanned_files, 1);
+    assert_eq!(stats.scanned_bytes, 21);
+
+    Ok(())
+}
+
+#[test]
+fn read_repo_file_bytes_enforces_max_total_bytes_during_read() -> io::Result<()> {
+    let root = temp_dir("read_repo_file_bytes_enforces_max_total_bytes_during_read");
+    fs::create_dir_all(&root)?;
+
+    let path = root.join("a.txt");
+    fs::write(&path, b"aaaaaaaaaa")?;
+
+    let repo_file = RepoFile {
+        repo_id: 0,
+        repo_label: "test".to_string(),
+        root: root.clone(),
+        abs_path: path.clone(),
+    };
+
+    let options = ScanOptions {
+        max_total_bytes: Some(25),
+        ..ScanOptions::default()
+    };
+
+    let mut stats = ScanStats::default();
+    let out = read::with_test_before_open_hook(
+        |read_path| {
+            use std::io::Write;
+
+            let mut file = fs::OpenOptions::new().append(true).open(read_path).unwrap();
+            file.write_all(&[b'a'; 64]).unwrap();
+        },
+        || read_repo_file_bytes_with_path(&repo_file, None, &options, &mut stats),
+    )?;
+
+    assert!(out.is_none());
+    assert_eq!(stats.skipped_budget_max_total_bytes, 1);
+    assert_eq!(stats.scanned_files, 1);
+    assert_eq!(stats.scanned_bytes, 25);
+
+    Ok(())
+}
+
+#[test]
 fn git_streaming_check_ignore_failure_falls_back_to_walker_without_double_scan() -> io::Result<()> {
     #[cfg(unix)]
     {

@@ -21,6 +21,7 @@
 - GitHub Actions：CI（Linux/macOS/Windows）、文档（GitHub Pages）与发布（GitHub Release + npm publish）。
 - 文档：中英双语（EN/ZH），并提供互相跳转链接。
 - 文档：新增 `/llms.en.txt` + `/llms.zh-CN.txt` 合集，并补充 `LLMs` 文档页。
+- 测试：增加安全相对路径校验与“读取过程中”预算/文件大小上限的回归覆盖。
 
 ### Changed
 - 项目重命名：`dup-check` → `dup-code-check`。
@@ -91,6 +92,7 @@
 - CLI：当同时指定 `--report` 与 `--code-spans` 时将报错。
 - CLI：`--cross-repo-only` 现在要求至少 2 个 root，否则会报错。
 - 扫描会跳过 `PermissionDenied` 和 walker traversal errors，而不是直接中止。
+- 扫描现在会把单文件读取 I/O 错误计为跳过，而不是中止整个扫描。
 - CLI 现在会捕获运行期扫描失败并以退出码 1 退出。
 - 移除 unstable rustfmt 配置，避免 stable toolchain 警告。
 - `--max-report-items` 现在在所有报告 section 中一致生效，并优先保留更大的 group。
@@ -108,7 +110,9 @@
 - Git 集成：当 `git check-ignore` 输出包含非 UTF-8 路径时触发回退。
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。
 - npm 构建：查找 `cargo` 时会排除 `node_modules/.bin`（供应链加固）。
+- npm 构建：Unix 下避免执行 PATH 中不可执行或 world-writable 的 `cargo` 二进制（加固）。
 - Node smoke：在决定是否需要重建时额外验证 wrapper 可执行 `--version`。
+- Node smoke：探测源码 mtime 时不再跟随 symlink 目录，避免异常 worktree 下递归/循环。
 - npm 包：包含 `rust-toolchain.toml`，使安装时使用固定的 Rust toolchain。
 - CLI：本地化 `Number.MAX_SAFE_INTEGER` 相关整数参数错误信息。
 - CLI：致命跳过 warning 会输出原因摘要与可操作建议（未启用 `--stats` 时会提示使用 `--stats` 查看完整统计）。
@@ -116,4 +120,5 @@
 - Core：为降低哈希碰撞导致的重复文件误分组风险，fingerprint 额外加入 prefix/suffix 样本。
 - Core：在输出重复文件组前会重新校验去空白后的文件内容，避免哈希碰撞或文件变化导致误报。
 - 扫描预算：二进制文件不会再绕过 `maxFiles` / `maxTotalBytes`，且二进制检测会避免读完整文件。
+- 扫描预算：在读取过程中也会强制 `maxTotalBytes` / `maxFileSize`，避免扫描期间文件增长导致预算超出。
 - Report：截断包含非 ASCII 字符的 preview 时不再 panic。

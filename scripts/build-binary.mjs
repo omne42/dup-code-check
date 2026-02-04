@@ -17,6 +17,17 @@ function resolveCargoExe() {
   const sep = process.platform === 'win32' ? ';' : ':';
   const entries = pathVar.split(sep).filter(Boolean);
 
+  function isSafeExecutable(st) {
+    if (!st.isFile()) return false;
+    if (process.platform === 'win32') return true;
+
+    const mode = st.mode & 0o777;
+    if ((mode & 0o111) === 0) return false;
+    // Avoid executing a world-writable binary from PATH.
+    if ((mode & 0o002) !== 0) return false;
+    return true;
+  }
+
   const candidates = process.platform === 'win32' ? ['cargo.exe', 'cargo'] : ['cargo'];
   for (const dir of entries) {
     if (isNodeModulesBinDir(dir)) continue;
@@ -24,7 +35,7 @@ function resolveCargoExe() {
       const exe = path.join(dir, name);
       try {
         const st = fs.statSync(exe);
-        if (st.isFile()) return exe;
+        if (isSafeExecutable(st)) return exe;
       } catch {
         // ignore
       }

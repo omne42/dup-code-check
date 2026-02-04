@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::types::{ScanOptions, ScanStats};
 
@@ -78,4 +78,26 @@ fn ignore_dirs_contains(ignore_dirs: &HashSet<String>, name: &str) -> bool {
     {
         false
     }
+}
+
+fn is_safe_relative_path(raw: &str) -> bool {
+    if raw.is_empty() {
+        return false;
+    }
+    let path = Path::new(raw);
+    if path.is_absolute() {
+        return false;
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => {}
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => {
+                return false;
+            }
+        }
+    }
+    true
 }

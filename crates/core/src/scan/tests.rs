@@ -104,79 +104,6 @@ fn read_repo_file_bytes_enforces_max_total_bytes_during_read() -> io::Result<()>
 }
 
 #[test]
-fn git_streaming_check_ignore_failure_falls_back_to_walker_without_double_scan() -> io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::collections::HashSet;
-        use std::os::unix::fs::PermissionsExt;
-
-        const FILES: usize = 600;
-
-        let root = temp_dir("git_streaming_check_ignore_failure");
-        let git_dir = root.join(".git");
-        fs::create_dir_all(&git_dir)?;
-
-        let mut rels = Vec::with_capacity(FILES);
-        for idx in 0..FILES {
-            let name = format!("f{idx:04}.txt");
-            fs::write(root.join(&name), "x")?;
-            rels.push(name);
-        }
-
-        let list_path = git_dir.join("filelist.txt");
-        fs::write(&list_path, rels.join("\n"))?;
-        let count_path = git_dir.join("check_ignore_count.txt");
-
-        let fake_git_path = git_dir.join("fake_git.sh");
-        fs::write(
-            &fake_git_path,
-            fake_git_script(&root, &list_path, &count_path),
-        )?;
-        let mut perms = fs::metadata(&fake_git_path)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&fake_git_path, perms)?;
-
-        let repo = Repo {
-            id: 0,
-            root: root.clone(),
-            label: "test".to_string(),
-        };
-        let options = ScanOptions {
-            max_files: Some(FILES + 10),
-            ..ScanOptions::default()
-        };
-
-        let mut stats = ScanStats::default();
-        let mut visited: Vec<String> = Vec::new();
-        let flow = git::with_test_git_exe(&fake_git_path, || {
-            visit_repo_files(&repo, &options, &mut stats, |stats, file| {
-                stats.scanned_files = stats.scanned_files.saturating_add(1);
-                visited.push(make_rel_path(&root, &file.abs_path));
-                Ok(ControlFlow::Continue(()))
-            })
-        })?;
-
-        assert_eq!(flow, ControlFlow::Continue(()));
-        assert_eq!(visited.len(), FILES);
-        let unique: HashSet<&str> = visited.iter().map(String::as_str).collect();
-        assert_eq!(unique.len(), FILES);
-        assert_eq!(stats.candidate_files, FILES as u64);
-        assert_eq!(stats.skipped_walk_errors, 1);
-
-        // 1st batch: check-ignore -> exit 1 (no ignores), 2nd batch: exit 2 (failure).
-        // After the failure we should fall back to the walker (and avoid calling check-ignore again).
-        let count: usize = fs::read_to_string(&count_path)
-            .unwrap_or_default()
-            .trim()
-            .parse()
-            .unwrap_or(0);
-        assert_eq!(count, 2);
-    }
-
-    Ok(())
-}
-
-#[test]
 fn git_bin_override_validation_is_restrictive() -> io::Result<()> {
     assert_eq!(git::validate_git_bin_override(OsString::from("git")), None);
     assert_eq!(git::validate_git_bin_override(OsString::from("git/")), None);
@@ -348,11 +275,10 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_after_scanning_started() -> 
             fs::write(root.join(&name), "x")?;
         }
 
-        let count_path = git_dir.join("check_ignore_count.txt");
         let fake_git_path = git_dir.join("fake_git.sh");
         fs::write(
             &fake_git_path,
-            fake_git_script_non_utf8_after_started(&root, &count_path, FILES),
+            fake_git_script_non_utf8_after_started(&root, FILES),
         )?;
         let mut perms = fs::metadata(&fake_git_path)?.permissions();
         perms.set_mode(0o755);
@@ -382,13 +308,6 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_after_scanning_started() -> 
         assert_eq!(stats.skipped_walk_errors, 1);
         assert_eq!(stats.candidate_files, FILES as u64);
         assert_eq!(visited.len(), FILES);
-
-        let count: usize = fs::read_to_string(&count_path)
-            .unwrap_or_default()
-            .trim()
-            .parse()
-            .unwrap_or(0);
-        assert_eq!(count, 1);
     }
 
     Ok(())
@@ -418,65 +337,6 @@ fn read_repo_file_bytes_counts_binary_reads_in_scan_stats() -> io::Result<()> {
     assert!(stats.scanned_bytes > 0);
 
     Ok(())
-}
-
-fn fake_git_script(repo: &Path, list: &Path, count_file: &Path) -> String {
-    let repo = sh_single_quote(repo.to_string_lossy().as_ref());
-    let list = sh_single_quote(list.to_string_lossy().as_ref());
-    let count_file = sh_single_quote(count_file.to_string_lossy().as_ref());
-    format!(
-        r#"#!/bin/sh
-set -eu
-
-repo=""
-if [ "${{1:-}}" = "-C" ]; then
-  repo="${{2:-}}"
-  shift 2
-fi
-
-cmd="${{1:-}}"
-if [ -z "$cmd" ]; then
-  exit 2
-fi
-shift
-
-target_repo={repo}
-file_list={list}
-count_file={count_file}
-
-if [ "$repo" = "$target_repo" ]; then
-  case "$cmd" in
-    ls-files)
-      while IFS= read -r line || [ -n "$line" ]; do
-        printf '%s\0' "$line"
-      done < "$file_list"
-      exit 0
-      ;;
-    check-ignore)
-      n=0
-      if [ -f "$count_file" ]; then
-        n="$(cat "$count_file" 2>/dev/null || true)"
-      fi
-      case "$n" in
-        ''|*[!0-9]*) n=0 ;;
-      esac
-      n=$((n+1))
-      echo "$n" > "$count_file"
-      cat >/dev/null
-      if [ "$n" -ge 2 ]; then
-        exit 2
-      fi
-      exit 1
-      ;;
-  esac
-fi
-
-if [ -n "$repo" ]; then
-  exec git -C "$repo" "$cmd" "$@"
-fi
-exec git "$cmd" "$@"
-"#
-    )
 }
 
 fn fake_git_script_non_utf8(repo: &Path, marker: &Path) -> String {
@@ -517,9 +377,8 @@ exit 2
     )
 }
 
-fn fake_git_script_non_utf8_after_started(repo: &Path, count_file: &Path, files: usize) -> String {
+fn fake_git_script_non_utf8_after_started(repo: &Path, files: usize) -> String {
     let repo = sh_single_quote(repo.to_string_lossy().as_ref());
-    let count_file = sh_single_quote(count_file.to_string_lossy().as_ref());
     format!(
         r#"#!/bin/sh
 set -eu
@@ -537,7 +396,6 @@ fi
 shift
 
 target_repo={repo}
-count_file={count_file}
 files={files}
 
 if [ "$repo" = "$target_repo" ]; then
@@ -552,19 +410,6 @@ if [ "$repo" = "$target_repo" ]; then
         i=$((i+1))
       done
       exit 0
-      ;;
-    check-ignore)
-      n=0
-      if [ -f "$count_file" ]; then
-        n="$(cat "$count_file" 2>/dev/null || true)"
-      fi
-      case "$n" in
-        ''|*[!0-9]*) n=0 ;;
-      esac
-      n=$((n+1))
-      echo "$n" > "$count_file"
-      cat >/dev/null
-      exit 1
       ;;
   esac
 fi

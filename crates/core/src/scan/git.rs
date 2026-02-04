@@ -1,10 +1,8 @@
-use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
-use std::io::Write;
 use std::ops::ControlFlow;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -124,49 +122,6 @@ where
     visit_repo_files_via_git_streaming(repo, options, stats, on_file)
 }
 
-fn git_check_ignore(root: &Path, rel_paths: &[String]) -> io::Result<HashSet<String>> {
-    let mut child = Command::new(git_exe())
-        .arg("-C")
-        .arg(root)
-        .args(["check-ignore", "-z", "--stdin"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()?;
-
-    {
-        let Some(mut stdin) = child.stdin.take() else {
-            return Err(io::Error::other("git check-ignore stdin not available"));
-        };
-        for rel in rel_paths {
-            stdin.write_all(rel.as_bytes())?;
-            stdin.write_all(&[0])?;
-        }
-    }
-
-    let output = child.wait_with_output()?;
-    if output.status.code() == Some(1) {
-        return Ok(HashSet::new());
-    }
-    if !output.status.success() {
-        return Err(io::Error::other(format!(
-            "git check-ignore failed (status={:?})",
-            output.status.code()
-        )));
-    }
-
-    let mut out = HashSet::new();
-    for part in output.stdout.split(|b| *b == 0) {
-        if part.is_empty() {
-            continue;
-        }
-        let path = std::str::from_utf8(part)
-            .map_err(|_| io::Error::other("git check-ignore returned a non-UTF-8 path"))?;
-        out.insert(path.to_string());
-    }
-    Ok(out)
-}
-
 fn visit_repo_files_via_git_streaming<F>(
     repo: &Repo,
     options: &ScanOptions,
@@ -199,15 +154,14 @@ where
         return Ok(None);
     };
 
-    // Read paths in small batches, run a batched `git check-ignore`, and stop early when scan
-    // budgets are hit (e.g. `maxFiles`).
+    // Read paths in small batches to avoid collecting a full file list in memory, and stop early
+    // when scan budgets are hit (e.g. `maxFiles`).
     const BATCH_SIZE: usize = 256;
     let mut batch: Vec<String> = Vec::with_capacity(BATCH_SIZE);
     let mut reader = BufReader::new(stdout);
     let mut bytes: Vec<u8> = Vec::new();
 
     let mut started = false;
-    let mut check_ignore_ok = true;
 
     loop {
         bytes.clear();
@@ -249,7 +203,6 @@ where
             on_file,
             &batch,
             &mut started,
-            &mut check_ignore_ok,
         ) {
             Ok(flow) => flow,
             Err(err) => {
@@ -267,9 +220,6 @@ where
             ControlFlow::Break(()) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                if !check_ignore_ok {
-                    return Ok(None);
-                }
                 return Ok(Some(ControlFlow::Break(())));
             }
         }
@@ -283,7 +233,6 @@ where
             on_file,
             &batch,
             &mut started,
-            &mut check_ignore_ok,
         ) {
             Ok(flow) => flow,
             Err(err) => {
@@ -300,9 +249,6 @@ where
             ControlFlow::Break(()) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                if !check_ignore_ok {
-                    return Ok(None);
-                }
                 return Ok(Some(ControlFlow::Break(())));
             }
         }
@@ -323,7 +269,6 @@ fn visit_repo_files_via_git_batch<F>(
     on_file: &mut F,
     rel_paths: &[String],
     started: &mut bool,
-    check_ignore_ok: &mut bool,
 ) -> io::Result<ControlFlow<()>>
 where
     F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
@@ -332,26 +277,7 @@ where
         return Ok(ControlFlow::Continue(()));
     }
 
-    let ignored = if *check_ignore_ok {
-        match git_check_ignore(&repo.root, rel_paths) {
-            Ok(ignored) => ignored,
-            Err(_) => {
-                if !*started {
-                    return Err(io::Error::other("git check-ignore failed"));
-                }
-                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
-                *check_ignore_ok = false;
-                return Ok(ControlFlow::Break(()));
-            }
-        }
-    } else {
-        HashSet::new()
-    };
-
     for rel in rel_paths {
-        if ignored.contains(rel) {
-            continue;
-        }
         if !super::is_safe_relative_path(rel) {
             stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
             continue;

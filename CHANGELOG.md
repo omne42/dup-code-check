@@ -75,16 +75,16 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Tokenizer: treat `#` as a comment only at line start (after optional whitespace).
 - CI: docs build now runs with `LLMS_STRICT=1`.
 - CI: pin Rust toolchain to `1.92.0` (match `rust-toolchain.toml`).
-- Scan: when `git check-ignore` fails during streaming, fall back to the walker (avoid early aborts / double-scans).
+- Scan: when Git streaming enumeration fails, fall back to the walker (avoid early aborts / double-scans).
 - CLI: resolve roots by directly `canonicalize()`-ing user paths (preserve symlink semantics).
 - Report: reduce memory usage by avoiding storing full file text for previews (generate previews from files on demand).
 - Rust: refactor the winnowing detector API to pass params as a struct (no behavior change).
 - Normalization: code-span and line-span detectors now keep only ASCII word chars (`[A-Za-z0-9_]`) to match the docs.
 - Report: avoid extra `String` allocations when scanning/tokenizing files for `--report`.
+- Scan: remove the redundant `git check-ignore` step in the Git fast path (less overhead; same results).
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
-- Avoid panics in `git check-ignore` integration; fall back when it fails.
 - Avoid leaking absolute paths in results when path prefix stripping fails.
 - Avoid potential panics in winnowing match selection on unexpected empty windows.
 - `--follow-symlinks` now works reliably by using the walker path when enabled.
@@ -107,10 +107,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - npm install: make the `dup-code-check` bin work on Windows by launching the platform binary from the Node wrapper.
 - Docs: document `maxFiles` stop behavior and `skippedBudgetMaxFiles` semantics.
 - CLI: `--version` now respects `--` (treats `--version` after `--` as a root).
-- Scan pipeline: when `git check-ignore` fails during streaming, fall back to the walker (fail closed) instead of continuing without ignore filtering.
+- Scan pipeline: when `git ls-files` exits non-zero during streaming, fall back to the walker (fail closed).
 - Scan pipeline: when `git ls-files` outputs non-UTF-8 paths in streaming mode, fall back to the walker (even after scanning has started).
 - npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.
-- Git integration: treat non-UTF-8 output from `git check-ignore` as a fallback trigger.
 - npm build: improve Cargo build failure diagnostics.
 - npm build: resolve `cargo` from PATH excluding `node_modules/.bin` (supply-chain hardening).
 - npm build: avoid running non-executable or world-writable `cargo` binaries found on PATH (Unix).

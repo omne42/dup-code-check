@@ -75,16 +75,16 @@
 - Tokenizer：仅在行首（允许前置空白）把 `#` 视为注释。
 - CI：docs build 默认启用 `LLMS_STRICT=1`。
 - CI：固定 Rust toolchain 为 `1.92.0`（与 `rust-toolchain.toml` 对齐）。
-- 扫描：流式模式下 `git check-ignore` 失败时回退到 walker（避免提前中止/重复扫描）。
+- 扫描：Git 流式枚举失败时回退到 walker（避免提前中止/重复扫描）。
 - CLI：root 路径直接使用 `canonicalize()` 解析（保留 symlink 语义）。
 - Report：不再为 preview 保存全量文本，按需从文件生成 preview，降低内存占用。
 - Rust：重构 winnowing 检测器 API，把参数收敛为一个 struct（无行为变化）。
 - 归一化：code-span 与 line-span 检测器现在仅保留 ASCII 的“词字符”（`[A-Za-z0-9_]`），与文档一致。
 - Report：在 `--report` 扫描/分词过程中避免额外的 `String` 分配，降低内存与拷贝开销。
+- 扫描：Git 快路径移除冗余的 `git check-ignore` 步骤（开销更低；结果不变）。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
-- 避免 `git check-ignore` 集成中的 panic；失败时会 fallback。
 - 当前缀剥离失败时避免在结果里泄漏绝对路径。
 - 避免 winnowing 在异常空窗口情况下可能触发的 panic。
 - `--follow-symlinks` 现在通过使用 walker path 更可靠。
@@ -107,10 +107,9 @@
 - npm 安装：通过 Node wrapper 启动平台二进制，使 Windows 上的 `dup-code-check` 可用。
 - 文档：补充 `maxFiles` 停止行为与 `skippedBudgetMaxFiles` 字段语义。
 - CLI：`--version` 现在会尊重 `--`（`--` 之后的 `--version` 会被当作 root 而不是参数）。
-- 扫描流程：在流式模式下 `git check-ignore` 失败时回退到 walker（fail closed），避免在 ignore 失效时继续扫描。
+- 扫描流程：流式模式下 `git ls-files` 非 0 退出时回退到 walker（fail closed）。
 - 扫描流程：流式模式遇到 `git ls-files` 输出非 UTF-8 路径时回退到 walker（包括扫描已开始的情况）。
 - npm 构建：当 `bin/dup-code-check.mjs` wrapper 缺失时，提前失败并输出更清晰的错误信息。
-- Git 集成：当 `git check-ignore` 输出包含非 UTF-8 路径时触发回退。
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。
 - npm 构建：查找 `cargo` 时会排除 `node_modules/.bin`（供应链加固）。
 - npm 构建：Unix 下避免执行 PATH 中不可执行或 world-writable 的 `cargo` 二进制（加固）。

@@ -52,9 +52,6 @@ pub(crate) struct Repo {
 
 #[derive(Debug, Clone)]
 pub(crate) struct RepoFile {
-    pub(crate) repo_id: usize,
-    pub(crate) repo_label: String,
-    pub(crate) root: PathBuf,
     pub(crate) abs_path: PathBuf,
 }
 

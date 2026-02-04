@@ -68,12 +68,12 @@ pub(super) fn scan_text_files_for_report(
                     return Ok(std::ops::ControlFlow::Continue(()));
                 };
 
-                let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
+                let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
 
                 // 1) File duplicates (whitespace-insensitive)
                 let file = DuplicateFile {
-                    repo_id: repo_file.repo_id,
-                    repo_label: repo_file.repo_label.clone(),
+                    repo_id: repo.id,
+                    repo_label: repo.label.clone(),
                     path: rel_path.clone(),
                 };
                 file_groups.push_bytes(&bytes, file);
@@ -86,8 +86,8 @@ pub(super) fn scan_text_files_for_report(
                 let blocks = parse_brace_blocks(&tokenized.tokens, &tokenized.token_lines);
 
                 files.push(ScannedTextFile {
-                    repo_id: repo_file.repo_id,
-                    repo_label: repo_file.repo_label,
+                    repo_id: repo.id,
+                    repo_label: repo.label.clone(),
                     path: rel_path,
                     abs_path: read_path,
                     code_chars: code_norm.chars,

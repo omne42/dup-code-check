@@ -12,6 +12,14 @@ use crate::winnowing::{
 use super::ScannedTextFile;
 use super::util::{fill_missing_previews_from_files, sort_span_groups_for_report};
 
+fn splitmix64(mut x: u64) -> u64 {
+    x = x.wrapping_add(0x9e3779b97f4a7c15);
+    let mut z = x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
+
 pub(super) fn detect_duplicate_code_spans(
     files: &[ScannedTextFile],
     options: &ScanOptions,
@@ -352,14 +360,6 @@ pub(super) fn find_similar_blocks_minhash(
     const BAND_SIZE: usize = 4;
     const BANDS: usize = SIG_SIZE / BAND_SIZE;
 
-    fn splitmix64(mut x: u64) -> u64 {
-        x = x.wrapping_add(0x9e3779b97f4a7c15);
-        let mut z = x;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
-        z ^ (z >> 31)
-    }
-
     let seeds: [u64; SIG_SIZE] = {
         let mut out = [0u64; SIG_SIZE];
         let mut s = 0x1234_5678_9abc_def0u64;
@@ -475,14 +475,6 @@ pub(super) fn find_similar_blocks_simhash(
     const SHINGLE: usize = 5;
     const BANDS: usize = 4;
     const BAND_BITS: u32 = 16;
-
-    fn splitmix64(mut x: u64) -> u64 {
-        x = x.wrapping_add(0x9e3779b97f4a7c15);
-        let mut z = x;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
-        z ^ (z >> 31)
-    }
 
     #[derive(Debug)]
     struct BlockHash {

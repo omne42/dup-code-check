@@ -184,12 +184,7 @@ where
         }
 
         stats.candidate_files = stats.candidate_files.saturating_add(1);
-        let file = RepoFile {
-            repo_id: repo.id,
-            repo_label: repo.label.clone(),
-            root: repo.root.clone(),
-            abs_path,
-        };
+        let file = RepoFile { abs_path };
 
         match on_file_cb(stats, file)? {
             ControlFlow::Continue(()) => {}

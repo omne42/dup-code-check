@@ -67,10 +67,10 @@ pub fn find_duplicate_files_with_stats(
                     return Ok(std::ops::ControlFlow::Continue(()));
                 };
 
-                let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
+                let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
                 let file = DuplicateFile {
-                    repo_id: repo_file.repo_id,
-                    repo_label: repo_file.repo_label.clone(),
+                    repo_id: repo.id,
+                    repo_label: repo.label.clone(),
                     path: rel_path,
                 };
 
@@ -174,10 +174,10 @@ pub fn find_duplicate_code_spans_with_stats(
                     return Ok(std::ops::ControlFlow::Continue(()));
                 }
 
-                let rel_path = make_rel_path(&repo_file.root, &repo_file.abs_path);
+                let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
                 files.push(NormalizedFile {
-                    repo_id: repo_file.repo_id,
-                    repo_label: repo_file.repo_label,
+                    repo_id: repo.id,
+                    repo_label: repo.label.clone(),
                     rel_path,
                     normalized: normalized.chars,
                     line_map: normalized.line_map,

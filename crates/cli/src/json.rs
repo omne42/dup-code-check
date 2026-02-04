@@ -21,8 +21,8 @@ pub(crate) struct JsonScanStats {
     pub(crate) skipped_bucket_truncated: u64,
 }
 
-impl From<ScanStats> for JsonScanStats {
-    fn from(stats: ScanStats) -> Self {
+impl From<&ScanStats> for JsonScanStats {
+    fn from(stats: &ScanStats) -> Self {
         Self {
             candidate_files: stats.candidate_files,
             scanned_files: stats.scanned_files,
@@ -38,6 +38,12 @@ impl From<ScanStats> for JsonScanStats {
             skipped_budget_max_total_bytes: stats.skipped_budget_max_total_bytes,
             skipped_bucket_truncated: stats.skipped_bucket_truncated,
         }
+    }
+}
+
+impl From<ScanStats> for JsonScanStats {
+    fn from(stats: ScanStats) -> Self {
+        Self::from(&stats)
     }
 }
 

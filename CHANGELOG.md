@@ -81,8 +81,11 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Rust: refactor the winnowing detector API to pass params as a struct (no behavior change).
 - Normalization: code-span and line-span detectors now keep only ASCII word chars (`[A-Za-z0-9_]`) to match the docs.
 - Report: avoid extra `String` allocations when scanning/tokenizing files for `--report`.
+- Scan: reduce per-file allocations by keeping `RepoFile` lightweight (avoid cloning repo root/label per candidate file).
 - Scan: remove the redundant `git check-ignore` step in the Git fast path (less overhead; same results).
 - Scan stats: add `gitFastPathFallbacks` to record when the Git fast path falls back to the walker.
+- Report: de-duplicate the `splitmix64` helper for similar-block detectors (no behavior change).
+- CLI: avoid cloning scan stats when emitting JSON (`--json --stats`).
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

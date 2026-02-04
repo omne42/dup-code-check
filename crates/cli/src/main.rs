@@ -85,7 +85,7 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
             if parsed.stats {
                 write_json(&serde_json::json!({
                     "report": report,
-                    "scanStats": Some(JsonScanStats::from(scan_stats.clone())),
+                    "scanStats": Some(JsonScanStats::from(&scan_stats)),
                 }))?;
             } else {
                 write_json(&report)?;
@@ -106,7 +106,7 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
             if parsed.stats {
                 write_json(&serde_json::json!({
                     "groups": groups,
-                    "scanStats": Some(JsonScanStats::from(scan_stats.clone())),
+                    "scanStats": Some(JsonScanStats::from(&scan_stats)),
                 }))?;
             } else {
                 write_json(&groups)?;
@@ -125,7 +125,7 @@ fn run(parsed: &ParsedArgs, roots: &[PathBuf]) -> io::Result<i32> {
         if parsed.stats {
             write_json(&serde_json::json!({
                 "groups": groups,
-                "scanStats": Some(JsonScanStats::from(scan_stats.clone())),
+                "scanStats": Some(JsonScanStats::from(&scan_stats)),
             }))?;
         } else {
             write_json(&groups)?;

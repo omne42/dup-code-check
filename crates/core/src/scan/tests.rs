@@ -34,9 +34,6 @@ fn read_repo_file_bytes_enforces_max_file_size_during_read() -> io::Result<()> {
     fs::write(&path, b"aaaaaaaaaa")?;
 
     let repo_file = RepoFile {
-        repo_id: 0,
-        repo_label: "test".to_string(),
-        root: root.clone(),
         abs_path: path.clone(),
     };
 
@@ -73,9 +70,6 @@ fn read_repo_file_bytes_enforces_max_total_bytes_during_read() -> io::Result<()>
     fs::write(&path, b"aaaaaaaaaa")?;
 
     let repo_file = RepoFile {
-        repo_id: 0,
-        repo_label: "test".to_string(),
-        root: root.clone(),
         abs_path: path.clone(),
     };
 
@@ -322,12 +316,7 @@ fn read_repo_file_bytes_counts_binary_reads_in_scan_stats() -> io::Result<()> {
     let path = root.join("bin.dat");
     fs::write(&path, b"hello\0world")?;
 
-    let repo_file = RepoFile {
-        repo_id: 0,
-        repo_label: "test".to_string(),
-        root: root.clone(),
-        abs_path: path,
-    };
+    let repo_file = RepoFile { abs_path: path };
 
     let options = ScanOptions::default();
     let mut stats = ScanStats::default();

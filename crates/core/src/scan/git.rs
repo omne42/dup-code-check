@@ -119,7 +119,11 @@ where
     }
 
     // Stream `git ls-files` in small batches to avoid collecting the full file list in memory.
-    visit_repo_files_via_git_streaming(repo, options, stats, on_file)
+    let out = visit_repo_files_via_git_streaming(repo, options, stats, on_file)?;
+    if out.is_none() {
+        stats.git_fast_path_fallbacks = stats.git_fast_path_fallbacks.saturating_add(1);
+    }
+    Ok(out)
 }
 
 fn visit_repo_files_via_git_streaming<F>(

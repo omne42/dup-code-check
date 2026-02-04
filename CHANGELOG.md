@@ -82,6 +82,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Normalization: code-span and line-span detectors now keep only ASCII word chars (`[A-Za-z0-9_]`) to match the docs.
 - Report: avoid extra `String` allocations when scanning/tokenizing files for `--report`.
 - Scan: remove the redundant `git check-ignore` step in the Git fast path (less overhead; same results).
+- Scan stats: add `gitFastPathFallbacks` to record when the Git fast path falls back to the walker.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

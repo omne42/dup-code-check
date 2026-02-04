@@ -42,6 +42,7 @@ pub struct ScanStats {
     pub candidate_files: u64,
     pub scanned_files: u64,
     pub scanned_bytes: u64,
+    pub git_fast_path_fallbacks: u64,
     pub skipped_not_found: u64,
     pub skipped_permission_denied: u64,
     pub skipped_too_large: u64,

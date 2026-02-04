@@ -68,6 +68,7 @@ With `--json --stats`:
 `scanStats` fields include:
 
 - `candidateFiles`, `scannedFiles`, `scannedBytes`
+- `gitFastPathFallbacks`: non-zero when the scan attempted the Git fast path and had to fall back to the filesystem walker
 - `skippedNotFound`, `skippedPermissionDenied`, `skippedTooLarge`, `skippedBinary`, `skippedOutsideRoot`, `skippedWalkErrors`
 - `skippedBudgetMaxFiles`: non-zero when the scan stopped early due to the `maxFiles` budget
 - `skippedBudgetMaxTotalBytes`: skipped due to `maxTotalBytes` (reading would exceed the total bytes budget)

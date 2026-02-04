@@ -112,6 +112,12 @@ pub(crate) fn format_scan_stats(localization: Localization, stats: &ScanStats) -
         "candidates={} scanned={} bytes={}\n",
         stats.candidate_files, stats.scanned_files, stats.scanned_bytes
     ));
+    if stats.git_fast_path_fallbacks > 0 {
+        out.push_str(&format!(
+            "git_fast_path_fallbacks={}\n",
+            stats.git_fast_path_fallbacks
+        ));
+    }
 
     let mut skips: Vec<(&str, u64)> = vec![
         ("not_found", stats.skipped_not_found),

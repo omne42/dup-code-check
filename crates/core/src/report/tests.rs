@@ -407,6 +407,7 @@ c",
         };
         let outcome_files =
             crate::find_duplicate_files_with_stats(std::slice::from_ref(&root), &options_files)?;
+        assert_eq!(outcome_files.stats.git_fast_path_fallbacks, 0);
         assert_eq!(outcome_files.stats.skipped_permission_denied, 0);
         assert!(outcome_files.stats.skipped_budget_max_files > 0);
 
@@ -417,6 +418,7 @@ c",
         };
         let outcome_bytes =
             crate::find_duplicate_files_with_stats(std::slice::from_ref(&root), &options_bytes)?;
+        assert_eq!(outcome_bytes.stats.git_fast_path_fallbacks, 0);
         assert_eq!(outcome_bytes.stats.skipped_permission_denied, 0);
         assert!(outcome_bytes.stats.skipped_budget_max_total_bytes > 0);
     }

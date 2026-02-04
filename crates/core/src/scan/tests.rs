@@ -252,6 +252,7 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Res
         assert_eq!(flow, ControlFlow::Continue(()));
         assert!(visited.iter().any(|p| p == "a.txt"));
         assert!(marker_path.exists());
+        assert_eq!(stats.git_fast_path_fallbacks, 1);
         assert_eq!(stats.skipped_walk_errors, 0);
     }
 
@@ -305,6 +306,7 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_after_scanning_started() -> 
         })?;
 
         assert_eq!(flow, ControlFlow::Continue(()));
+        assert_eq!(stats.git_fast_path_fallbacks, 1);
         assert_eq!(stats.skipped_walk_errors, 1);
         assert_eq!(stats.candidate_files, FILES as u64);
         assert_eq!(visited.len(), FILES);

@@ -72,6 +72,7 @@ interface DuplicateSpanGroup {
 - `candidateFiles`：候选文件数（收集到的路径数量）
 - `scannedFiles`：实际读取并处理的文件数
 - `scannedBytes`：实际读取的总字节数
+- `gitFastPathFallbacks`：Git 快路径回退次数（尝试使用 Git 快路径但回退到 walker 时为非 0）
 - `skippedNotFound`：扫描时遇到 `NotFound`（文件被删/变更）
 - `skippedPermissionDenied`：权限不足
 - `skippedTooLarge`：超过 `maxFileSize`

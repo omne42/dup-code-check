@@ -5,7 +5,6 @@ use crate::types::DuplicateSpanOccurrence;
 #[derive(Debug)]
 pub(crate) struct NormalizedFile {
     pub(crate) repo_id: usize,
-    pub(crate) repo_label: String,
     pub(crate) rel_path: String,
     pub(crate) normalized: Vec<u32>,
     pub(crate) line_map: Vec<u32>,

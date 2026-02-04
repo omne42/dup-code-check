@@ -21,6 +21,7 @@ fn splitmix64(mut x: u64) -> u64 {
 }
 
 pub(super) fn detect_duplicate_code_spans(
+    repo_labels: &[String],
     files: &[ScannedTextFile],
     options: &ScanOptions,
     stats: &mut ScanStats,
@@ -34,7 +35,10 @@ pub(super) fn detect_duplicate_code_spans(
         }
         normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: &file.repo_label,
+            repo_label: repo_labels
+                .get(file.repo_id)
+                .map(|label| label.as_str())
+                .unwrap_or("<unknown>"),
             rel_path: &file.path,
             normalized: &file.code_chars,
             line_map: &file.code_char_lines,
@@ -52,6 +56,7 @@ pub(super) fn detect_duplicate_code_spans(
 }
 
 pub(super) fn detect_duplicate_line_spans(
+    repo_labels: &[String],
     files: &[ScannedTextFile],
     options: &ScanOptions,
     stats: &mut ScanStats,
@@ -67,7 +72,10 @@ pub(super) fn detect_duplicate_line_spans(
         }
         normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: &file.repo_label,
+            repo_label: repo_labels
+                .get(file.repo_id)
+                .map(|label| label.as_str())
+                .unwrap_or("<unknown>"),
             rel_path: &file.path,
             normalized: &file.line_tokens,
             line_map: &file.line_token_lines,
@@ -103,6 +111,7 @@ pub(super) fn detect_duplicate_line_spans(
 }
 
 pub(super) fn detect_duplicate_token_spans(
+    repo_labels: &[String],
     files: &[ScannedTextFile],
     options: &ScanOptions,
     stats: &mut ScanStats,
@@ -121,7 +130,10 @@ pub(super) fn detect_duplicate_token_spans(
         }
         normalized.push(NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: &file.repo_label,
+            repo_label: repo_labels
+                .get(file.repo_id)
+                .map(|label| label.as_str())
+                .unwrap_or("<unknown>"),
             rel_path: &file.path,
             normalized: &file.tokens,
             line_map: &file.token_lines,
@@ -146,6 +158,7 @@ pub(super) fn detect_duplicate_token_spans(
 }
 
 pub(super) fn detect_duplicate_blocks(
+    repo_labels: &[String],
     files: &[ScannedTextFile],
     options: &ScanOptions,
 ) -> Vec<DuplicateSpanGroup> {
@@ -177,7 +190,10 @@ pub(super) fn detect_duplicate_blocks(
                         preview: String::new(),
                         occurrences: vec![DuplicateSpanOccurrence {
                             repo_id: file.repo_id,
-                            repo_label: file.repo_label.clone(),
+                            repo_label: repo_labels
+                                .get(file.repo_id)
+                                .cloned()
+                                .unwrap_or_else(|| "<unknown>".to_string()),
                             path: file.path.clone(),
                             start_line: node.start_line,
                             end_line: node.end_line,
@@ -195,7 +211,10 @@ pub(super) fn detect_duplicate_blocks(
             builder.repo_ids.insert(file.repo_id);
             builder.occurrences.push(DuplicateSpanOccurrence {
                 repo_id: file.repo_id,
-                repo_label: file.repo_label.clone(),
+                repo_label: repo_labels
+                    .get(file.repo_id)
+                    .cloned()
+                    .unwrap_or_else(|| "<unknown>".to_string()),
                 path: file.path.clone(),
                 start_line: node.start_line,
                 end_line: node.end_line,
@@ -211,6 +230,7 @@ pub(super) fn detect_duplicate_blocks(
 }
 
 pub(super) fn detect_duplicate_ast_subtrees(
+    repo_labels: &[String],
     files: &[ScannedTextFile],
     options: &ScanOptions,
 ) -> Vec<DuplicateSpanGroup> {
@@ -292,7 +312,10 @@ pub(super) fn detect_duplicate_ast_subtrees(
                         preview: String::new(),
                         occurrences: vec![DuplicateSpanOccurrence {
                             repo_id: file.repo_id,
-                            repo_label: file.repo_label.clone(),
+                            repo_label: repo_labels
+                                .get(file.repo_id)
+                                .cloned()
+                                .unwrap_or_else(|| "<unknown>".to_string()),
                             path: file.path.clone(),
                             start_line: node.start_line,
                             end_line: node.end_line,
@@ -310,7 +333,10 @@ pub(super) fn detect_duplicate_ast_subtrees(
             builder.repo_ids.insert(file.repo_id);
             builder.occurrences.push(DuplicateSpanOccurrence {
                 repo_id: file.repo_id,
-                repo_label: file.repo_label.clone(),
+                repo_label: repo_labels
+                    .get(file.repo_id)
+                    .cloned()
+                    .unwrap_or_else(|| "<unknown>".to_string()),
                 path: file.path.clone(),
                 start_line: node.start_line,
                 end_line: node.end_line,
@@ -352,6 +378,7 @@ fn detect_duplicate_span_groups_with_len_filter<'a>(
 }
 
 pub(super) fn find_similar_blocks_minhash(
+    repo_labels: &[String],
     files: &[ScannedTextFile],
     options: &ScanOptions,
 ) -> Vec<SimilarityPair> {
@@ -405,7 +432,10 @@ pub(super) fn find_similar_blocks_minhash(
             blocks.push(BlockSig {
                 occ: DuplicateSpanOccurrence {
                     repo_id: file.repo_id,
-                    repo_label: file.repo_label.clone(),
+                    repo_label: repo_labels
+                        .get(file.repo_id)
+                        .cloned()
+                        .unwrap_or_else(|| "<unknown>".to_string()),
                     path: file.path.clone(),
                     start_line: node.start_line,
                     end_line: node.end_line,
@@ -469,6 +499,7 @@ pub(super) fn find_similar_blocks_minhash(
 }
 
 pub(super) fn find_similar_blocks_simhash(
+    repo_labels: &[String],
     files: &[ScannedTextFile],
     options: &ScanOptions,
 ) -> Vec<SimilarityPair> {
@@ -520,7 +551,10 @@ pub(super) fn find_similar_blocks_simhash(
             blocks.push(BlockHash {
                 occ: DuplicateSpanOccurrence {
                     repo_id: file.repo_id,
-                    repo_label: file.repo_label.clone(),
+                    repo_label: repo_labels
+                        .get(file.repo_id)
+                        .cloned()
+                        .unwrap_or_else(|| "<unknown>".to_string()),
                     path: file.path.clone(),
                     start_line: node.start_line,
                     end_line: node.end_line,

@@ -6,9 +6,7 @@ use crate::scan::{
     Repo, make_rel_path, read_repo_file_bytes, read_repo_file_bytes_for_verification, repo_label,
     validate_roots, visit_repo_files,
 };
-use crate::types::{
-    DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanOutcome, ScanStats,
-};
+use crate::types::{DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanOutcome, ScanStats};
 use crate::util::{NormalizedFile, NormalizedFileView, normalize_for_code_spans};
 
 pub fn find_duplicate_files(
@@ -68,13 +66,7 @@ pub fn find_duplicate_files_with_stats(
                 };
 
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
-                let file = DuplicateFile {
-                    repo_id: repo.id,
-                    repo_label: repo.label.clone(),
-                    path: rel_path,
-                };
-
-                groups.push_bytes(&bytes, file);
+                groups.push_bytes(&bytes, repo.id, rel_path);
 
                 Ok(std::ops::ControlFlow::Continue(()))
             })?
@@ -83,23 +75,32 @@ pub fn find_duplicate_files_with_stats(
         }
     }
 
-    let mut out = groups.into_groups_verified(options.cross_repo_only, |file| {
-        let Some(repo) = repos.get(file.repo_id) else {
-            return Ok(None);
-        };
-        let canonical_root = canonical_roots
-            .as_ref()
-            .and_then(|roots| roots.get(file.repo_id))
-            .map(|p| p.as_path());
+    let mut out = groups.into_groups_verified(
+        options.cross_repo_only,
+        |repo_id, path| {
+            let Some(repo) = repos.get(repo_id) else {
+                return Ok(None);
+            };
+            let canonical_root = canonical_roots
+                .as_ref()
+                .and_then(|roots| roots.get(repo_id))
+                .map(|p| p.as_path());
 
-        read_repo_file_bytes_for_verification(
-            &repo.root,
-            &file.path,
-            canonical_root,
-            options.follow_symlinks,
-            options.max_file_size,
-        )
-    })?;
+            read_repo_file_bytes_for_verification(
+                &repo.root,
+                path,
+                canonical_root,
+                options.follow_symlinks,
+                options.max_file_size,
+            )
+        },
+        |repo_id| {
+            repos
+                .get(repo_id)
+                .map(|repo| repo.label.clone())
+                .unwrap_or_else(|| "<unknown>".to_string())
+        },
+    )?;
 
     out.sort_by(|a, b| {
         (a.content_hash, a.normalized_len, a.files.len()).cmp(&(
@@ -177,7 +178,6 @@ pub fn find_duplicate_code_spans_with_stats(
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
                 files.push(NormalizedFile {
                     repo_id: repo.id,
-                    repo_label: repo.label.clone(),
                     rel_path,
                     normalized: normalized.chars,
                     line_map: normalized.line_map,
@@ -194,7 +194,10 @@ pub fn find_duplicate_code_spans_with_stats(
         .iter()
         .map(|file| NormalizedFileView {
             repo_id: file.repo_id,
-            repo_label: &file.repo_label,
+            repo_label: repos
+                .get(file.repo_id)
+                .map(|repo| repo.label.as_str())
+                .unwrap_or("<unknown>"),
             rel_path: &file.rel_path,
             normalized: &file.normalized,
             line_map: &file.line_map,

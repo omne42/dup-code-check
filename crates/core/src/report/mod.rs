@@ -15,7 +15,6 @@ use crate::types::{DuplicationReport, ScanOptions, ScanOutcome, ScanStats};
 #[derive(Debug)]
 struct ScannedTextFile {
     repo_id: usize,
-    repo_label: String,
     path: String,
     abs_path: PathBuf,
     code_chars: Vec<u32>,
@@ -68,16 +67,20 @@ pub fn generate_duplication_report_with_stats(
     }
 
     let mut stats = ScanStats::default();
-    let (files, file_duplicates) =
+    let (repo_labels, files, file_duplicates) =
         scan_files::scan_text_files_for_report(roots, options, &mut stats)?;
 
-    let code_span_duplicates = detect::detect_duplicate_code_spans(&files, options, &mut stats);
-    let line_span_duplicates = detect::detect_duplicate_line_spans(&files, options, &mut stats);
-    let token_span_duplicates = detect::detect_duplicate_token_spans(&files, options, &mut stats);
-    let block_duplicates = detect::detect_duplicate_blocks(&files, options);
-    let ast_subtree_duplicates = detect::detect_duplicate_ast_subtrees(&files, options);
-    let similar_blocks_minhash = detect::find_similar_blocks_minhash(&files, options);
-    let similar_blocks_simhash = detect::find_similar_blocks_simhash(&files, options);
+    let code_span_duplicates =
+        detect::detect_duplicate_code_spans(&repo_labels, &files, options, &mut stats);
+    let line_span_duplicates =
+        detect::detect_duplicate_line_spans(&repo_labels, &files, options, &mut stats);
+    let token_span_duplicates =
+        detect::detect_duplicate_token_spans(&repo_labels, &files, options, &mut stats);
+    let block_duplicates = detect::detect_duplicate_blocks(&repo_labels, &files, options);
+    let ast_subtree_duplicates =
+        detect::detect_duplicate_ast_subtrees(&repo_labels, &files, options);
+    let similar_blocks_minhash = detect::find_similar_blocks_minhash(&repo_labels, &files, options);
+    let similar_blocks_simhash = detect::find_similar_blocks_simhash(&repo_labels, &files, options);
 
     Ok(ScanOutcome {
         result: DuplicationReport {

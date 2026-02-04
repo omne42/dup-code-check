@@ -7,7 +7,7 @@ use crate::scan::{
     repo_label, visit_repo_files,
 };
 use crate::tokenize::{parse_brace_blocks, tokenize_for_dup_detection};
-use crate::types::{DuplicateFile, DuplicateGroup, ScanOptions, ScanStats};
+use crate::types::{DuplicateGroup, ScanOptions, ScanStats};
 use crate::util::{fnv1a64_u32, fold_u64_to_u32, normalize_for_code_spans};
 
 use super::ScannedTextFile;
@@ -19,7 +19,7 @@ pub(super) fn scan_text_files_for_report(
     roots: &[PathBuf],
     options: &ScanOptions,
     stats: &mut ScanStats,
-) -> io::Result<(Vec<ScannedTextFile>, Vec<DuplicateGroup>)> {
+) -> io::Result<(Vec<String>, Vec<ScannedTextFile>, Vec<DuplicateGroup>)> {
     let mut scan_options = options.clone();
     scan_options.max_total_bytes = Some(
         scan_options
@@ -36,6 +36,7 @@ pub(super) fn scan_text_files_for_report(
             label: repo_label(root, id),
         })
         .collect();
+    let repo_labels: Vec<String> = repos.iter().map(|repo| repo.label.clone()).collect();
 
     let canonical_roots = if options.follow_symlinks {
         Some(
@@ -71,12 +72,7 @@ pub(super) fn scan_text_files_for_report(
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
 
                 // 1) File duplicates (whitespace-insensitive)
-                let file = DuplicateFile {
-                    repo_id: repo.id,
-                    repo_label: repo.label.clone(),
-                    path: rel_path.clone(),
-                };
-                file_groups.push_bytes(&bytes, file);
+                file_groups.push_bytes(&bytes, repo.id, rel_path.clone());
 
                 // 2) Text-based detectors
                 let text = String::from_utf8_lossy(&bytes);
@@ -87,7 +83,6 @@ pub(super) fn scan_text_files_for_report(
 
                 files.push(ScannedTextFile {
                     repo_id: repo.id,
-                    repo_label: repo.label.clone(),
                     path: rel_path,
                     abs_path: read_path,
                     code_chars: code_norm.chars,
@@ -110,28 +105,36 @@ pub(super) fn scan_text_files_for_report(
     let follow_symlinks = scan_options.follow_symlinks;
     let max_file_size = scan_options.max_file_size;
     let canonical_roots = canonical_roots.as_deref();
-    let mut file_duplicates =
-        file_groups.into_groups_verified(options.cross_repo_only, |file| {
-            let Some(repo) = repos.get(file.repo_id) else {
+    let mut file_duplicates = file_groups.into_groups_verified(
+        options.cross_repo_only,
+        |repo_id, path| {
+            let Some(repo) = repos.get(repo_id) else {
                 return Ok(None);
             };
             let canonical_root = canonical_roots
-                .and_then(|roots| roots.get(file.repo_id))
+                .and_then(|roots| roots.get(repo_id))
                 .map(|p| p.as_path());
 
             read_repo_file_bytes_for_verification(
                 &repo.root,
-                &file.path,
+                path,
                 canonical_root,
                 follow_symlinks,
                 max_file_size,
             )
-        })?;
+        },
+        |repo_id| {
+            repos
+                .get(repo_id)
+                .map(|repo| repo.label.clone())
+                .unwrap_or_else(|| "<unknown>".to_string())
+        },
+    )?;
 
     sort_duplicate_groups_for_report(&mut file_duplicates);
     file_duplicates.truncate(options.max_report_items);
 
-    Ok((files, file_duplicates))
+    Ok((repo_labels, files, file_duplicates))
 }
 
 #[derive(Debug)]

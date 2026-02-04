@@ -82,6 +82,7 @@
 - 归一化：code-span 与 line-span 检测器现在仅保留 ASCII 的“词字符”（`[A-Za-z0-9_]`），与文档一致。
 - Report：在 `--report` 扫描/分词过程中避免额外的 `String` 分配，降低内存与拷贝开销。
 - 扫描：保持 `RepoFile` 更轻量，避免为每个候选文件 clone repo root/label（减少分配）。
+- Core/Report：扫描阶段不再为每个文件重复存储 repo label（在构造输出结果时按 repoId 再映射）。
 - 扫描：Git 快路径移除冗余的 `git check-ignore` 步骤（开销更低；结果不变）。
 - 扫描统计：新增 `gitFastPathFallbacks`，用于标记 Git 快路径回退到 walker 的次数。
 - Report：相似块检测器的 `splitmix64` helper 去重（无行为变化）。

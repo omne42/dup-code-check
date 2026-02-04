@@ -8,8 +8,14 @@ use crate::winnowing::{WinnowingParams, detect_duplicate_span_groups_winnowing};
 type FileDuplicateKey = (u64, usize, u64, [u8; 16], [u8; 16]);
 
 #[derive(Debug)]
+struct FileCandidate {
+    repo_id: usize,
+    path: String,
+}
+
+#[derive(Debug)]
 struct FileGroupBuilder {
-    files: Vec<DuplicateFile>,
+    files: Vec<FileCandidate>,
     repo_ids: HashSet<usize>,
 }
 
@@ -19,7 +25,7 @@ pub(crate) struct FileDuplicateGrouper {
 }
 
 impl FileDuplicateGrouper {
-    pub(crate) fn push_bytes(&mut self, bytes: &[u8], file: DuplicateFile) {
+    pub(crate) fn push_bytes(&mut self, bytes: &[u8], repo_id: usize, path: String) {
         let fp = whitespace_insensitive_fingerprint(bytes);
         let key = (
             fp.content_hash,
@@ -31,16 +37,16 @@ impl FileDuplicateGrouper {
 
         match self.groups.get_mut(&key) {
             Some(existing) => {
-                existing.repo_ids.insert(file.repo_id);
-                existing.files.push(file);
+                existing.repo_ids.insert(repo_id);
+                existing.files.push(FileCandidate { repo_id, path });
             }
             None => {
                 let mut repo_ids = HashSet::new();
-                repo_ids.insert(file.repo_id);
+                repo_ids.insert(repo_id);
                 self.groups.insert(
                     key,
                     FileGroupBuilder {
-                        files: vec![file],
+                        files: vec![FileCandidate { repo_id, path }],
                         repo_ids,
                     },
                 );
@@ -48,13 +54,15 @@ impl FileDuplicateGrouper {
         }
     }
 
-    pub(crate) fn into_groups_verified<R>(
+    pub(crate) fn into_groups_verified<R, L>(
         self,
         cross_repo_only: bool,
         mut read_bytes: R,
+        mut repo_label_for: L,
     ) -> io::Result<Vec<DuplicateGroup>>
     where
-        R: FnMut(&DuplicateFile) -> io::Result<Option<Vec<u8>>>,
+        R: FnMut(usize, &str) -> io::Result<Option<Vec<u8>>>,
+        L: FnMut(usize) -> String,
     {
         fn normalize_ascii_whitespace(bytes: &[u8]) -> Vec<u8> {
             let mut out = Vec::with_capacity(bytes.len());
@@ -75,9 +83,9 @@ impl FileDuplicateGrouper {
                 continue;
             }
 
-            let mut verified: Vec<(Vec<u8>, Vec<DuplicateFile>, HashSet<usize>)> = Vec::new();
+            let mut verified: Vec<(Vec<u8>, Vec<FileCandidate>, HashSet<usize>)> = Vec::new();
             for file in builder.files {
-                let Some(bytes) = read_bytes(&file)? else {
+                let Some(bytes) = read_bytes(file.repo_id, &file.path)? else {
                     continue;
                 };
                 if bytes.contains(&0) {
@@ -110,6 +118,14 @@ impl FileDuplicateGrouper {
                 let normalized_len = normalized.len();
 
                 files.sort_by(|a, b| (a.repo_id, &a.path).cmp(&(b.repo_id, &b.path)));
+                let files = files
+                    .into_iter()
+                    .map(|file| DuplicateFile {
+                        repo_id: file.repo_id,
+                        repo_label: repo_label_for(file.repo_id),
+                        path: file.path,
+                    })
+                    .collect();
                 out.push(DuplicateGroup {
                     content_hash,
                     normalized_len,
@@ -156,22 +172,8 @@ mod tests {
     #[test]
     fn file_duplicates_are_verified_against_bytes() {
         let mut groups = FileDuplicateGrouper::default();
-        groups.push_bytes(
-            b"abc",
-            DuplicateFile {
-                repo_id: 0,
-                repo_label: "repo0".to_string(),
-                path: "a.txt".to_string(),
-            },
-        );
-        groups.push_bytes(
-            b"abc",
-            DuplicateFile {
-                repo_id: 0,
-                repo_label: "repo0".to_string(),
-                path: "b.txt".to_string(),
-            },
-        );
+        groups.push_bytes(b"abc", 0, "a.txt".to_string());
+        groups.push_bytes(b"abc", 0, "b.txt".to_string());
 
         let mut content = HashMap::new();
         content.insert("a.txt".to_string(), b"abc".to_vec());
@@ -179,7 +181,11 @@ mod tests {
         content.insert("b.txt".to_string(), b"xyz".to_vec());
 
         let verified = groups
-            .into_groups_verified(false, |file| Ok(content.get(&file.path).cloned()))
+            .into_groups_verified(
+                false,
+                |_repo_id, path| Ok(content.get(path).cloned()),
+                |_repo_id| "repo0".to_string(),
+            )
             .expect("verification should not fail");
 
         assert!(verified.is_empty());

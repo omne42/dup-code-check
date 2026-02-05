@@ -101,6 +101,8 @@ Affects:
 
 Default `50`.
 
+> Must be `>= 1`. Core APIs reject `0` with an `InvalidInput` error.
+
 ### `minTokenLen` / `--min-token-len`
 
 Affects token/block detectors in report mode:
@@ -113,13 +115,19 @@ Affects token/block detectors in report mode:
 
 Default `50`.
 
+> Must be `>= 1`. Core APIs reject `0` with an `InvalidInput` error.
+
 ### `similarityThreshold` / `--similarity-threshold`
 
 Similarity detectors (MinHash/SimHash). Default `0.85` (range `0..1`).
 
+> Core APIs validate this range and reject invalid values.
+
 ### `simhashMaxDistance` / `--simhash-max-distance`
 
 SimHash maximum Hamming distance (default `3`, range `0..64`).
+
+> Core APIs validate this range and reject invalid values.
 
 ## Output controls (only for `--report`)
 

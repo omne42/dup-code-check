@@ -67,6 +67,10 @@
 - 文档：在《排障》中说明 `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT` / `DUP_CODE_CHECK_GIT_BIN`。
 - Core：将 `ScanOptions` 标记为 `#[non_exhaustive]`（用 `ScanOptions::default()` 构造后再覆盖字段）。
 - Core：将 `ScanStats` 标记为 `#[non_exhaustive]`（用 `ScanStats::default()` 构造后再更新字段）。
+- Core/CLI：通过 `#![forbid(unsafe_code)]` 禁止 `unsafe` 代码。
+- Core：新增 `ScanStats::has_fatal_skips()` 并在 CLI 中复用，避免语义漂移。
+- Core：在 report/code-spans API 中校验 scan options（无效阈值会快速失败）。
+- 文档：补充说明 Core API 会校验选项的取值范围。
 - Report：默认设置 `maxTotalBytes` 预算（256 MiB）以限制内存占用；可用 `--max-total-bytes` 覆盖。
 - 文档：在 `--help` 与 README 中说明 `--report` 模式默认 `--max-total-bytes` 预算。
 - CLI：root 路径使用 `canonicalize()`（失败则报错），降低符号链接歧义。

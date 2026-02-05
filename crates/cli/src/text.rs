@@ -5,24 +5,12 @@ use crate::json::{
     JsonDuplicateGroup, JsonDuplicateSpanGroup, JsonDuplicationReport, JsonSimilarityPair,
 };
 
-pub(crate) fn has_fatal_skips(stats: &ScanStats) -> bool {
-    stats.skipped_permission_denied > 0
-        || stats.skipped_outside_root > 0
-        || stats.skipped_relativize_failed > 0
-        || stats.skipped_walk_errors > 0
-        || stats.skipped_bucket_truncated > 0
-        || stats.skipped_budget_max_files > 0
-        || stats.skipped_budget_max_total_bytes > 0
-        || stats.skipped_budget_max_normalized_chars > 0
-        || stats.skipped_budget_max_tokens > 0
-}
-
 pub(crate) fn format_fatal_skip_warning(
     localization: Localization,
     stats: &ScanStats,
     has_stats: bool,
 ) -> String {
-    if !has_fatal_skips(stats) {
+    if !stats.has_fatal_skips() {
         return String::new();
     }
 
@@ -352,14 +340,14 @@ mod tests {
     fn bucket_truncated_is_fatal_skip() {
         let mut stats = ScanStats::default();
         stats.skipped_bucket_truncated = 1;
-        assert!(has_fatal_skips(&stats));
+        assert!(stats.has_fatal_skips());
     }
 
     #[test]
     fn relativize_failed_is_fatal_skip() {
         let mut stats = ScanStats::default();
         stats.skipped_relativize_failed = 1;
-        assert!(has_fatal_skips(&stats));
+        assert!(stats.has_fatal_skips());
     }
 
     #[test]

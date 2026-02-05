@@ -151,6 +151,36 @@ fn scan_stats_counts_bucket_truncation() -> io::Result<()> {
 }
 
 #[test]
+fn code_spans_reject_min_match_len_zero() -> io::Result<()> {
+    let root = temp_dir("invalid_min_match_len");
+    fs::create_dir_all(&root)?;
+
+    let options = ScanOptions {
+        min_match_len: 0,
+        ..ScanOptions::default()
+    };
+
+    let err = find_duplicate_code_spans_with_stats(&[root], &options).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    Ok(())
+}
+
+#[test]
+fn report_rejects_invalid_similarity_threshold() -> io::Result<()> {
+    let root = temp_dir("invalid_similarity_threshold");
+    fs::create_dir_all(&root)?;
+
+    let options = ScanOptions {
+        similarity_threshold: 2.0,
+        ..ScanOptions::default()
+    };
+
+    let err = generate_duplication_report_with_stats(&[root], &options).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    Ok(())
+}
+
+#[test]
 fn report_respects_gitignore() -> io::Result<()> {
     let root = temp_dir("gitignore");
     fs::create_dir_all(&root)?;

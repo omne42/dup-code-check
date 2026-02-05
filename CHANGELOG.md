@@ -67,6 +67,10 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Docs: document `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT` / `DUP_CODE_CHECK_GIT_BIN` in Troubleshooting.
 - Core: mark `ScanOptions` as `#[non_exhaustive]` (construct via `ScanOptions::default()` and override fields).
 - Core: mark `ScanStats` as `#[non_exhaustive]` (construct via `ScanStats::default()` and update fields).
+- Core/CLI: forbid `unsafe` code via `#![forbid(unsafe_code)]`.
+- Core: add `ScanStats::has_fatal_skips()` and reuse it in the CLI.
+- Core: validate scan options in report/code-spans APIs (fail fast on invalid thresholds).
+- Docs: clarify that core APIs validate option ranges.
 - Report: set a default `maxTotalBytes` budget (256 MiB) to bound memory use; override via `--max-total-bytes`.
 - Docs: mention the `--report` default `--max-total-bytes` budget in `--help` and `README`.
 - CLI: resolve roots via `canonicalize()` (fail if it fails) to reduce symlink ambiguity.

@@ -101,6 +101,8 @@ dup-code-check --follow-symlinks .
 
 默认 `50`。
 
+> 必须 `>= 1`。Core API 会把 `0` 视为无效输入并返回 `InvalidInput` 错误。
+
 ### `minTokenLen` / `--min-token-len`
 
 影响报告模式中基于 token/block 的检测器：
@@ -113,13 +115,19 @@ dup-code-check --follow-symlinks .
 
 默认 `50`。
 
+> 必须 `>= 1`。Core API 会把 `0` 视为无效输入并返回 `InvalidInput` 错误。
+
 ### `similarityThreshold` / `--similarity-threshold`
 
 影响相似度检测器（MinHash/SimHash）。默认 `0.85`（范围 `0..1`）。
 
+> Core API 会校验该范围并拒绝无效值。
+
 ### `simhashMaxDistance` / `--simhash-max-distance`
 
 影响 SimHash：最大允许的汉明距离（默认 `3`，范围 `0..64`）。
+
+> Core API 会校验该范围并拒绝无效值。
 
 ## 输出控制（仅 `--report`）
 

@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 mod args;
 mod json;
 mod path;
@@ -12,7 +14,7 @@ use crate::json::{JsonScanStats, map_duplicate_groups, map_report, map_span_grou
 use crate::path::resolve_path;
 use crate::text::{
     format_fatal_skip_warning, format_scan_stats, format_text, format_text_code_spans,
-    format_text_report, has_fatal_skips,
+    format_text_report,
 };
 
 fn args_before_dashdash(args: &[String]) -> &[String] {
@@ -145,7 +147,7 @@ fn finalize_scan(
         eprint!("{}", format_scan_stats(parsed.localization, scan_stats));
     }
 
-    if has_fatal_skips(scan_stats) {
+    if scan_stats.has_fatal_skips() {
         eprint!(
             "{}",
             format_fatal_skip_warning(
@@ -156,7 +158,7 @@ fn finalize_scan(
         );
     }
 
-    if parsed.strict && has_fatal_skips(scan_stats) {
+    if parsed.strict && scan_stats.has_fatal_skips() {
         if !parsed.stats {
             eprint!("{}", format_scan_stats(parsed.localization, scan_stats));
         }

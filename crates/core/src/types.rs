@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::io;
 use std::sync::Arc;
 
 /// Scan configuration shared by the CLI and the core APIs.
@@ -47,6 +48,57 @@ impl Default for ScanOptions {
     }
 }
 
+impl ScanOptions {
+    /// Validate scan options (including report/similarity detectors).
+    ///
+    /// This is primarily useful for library callers; the CLI already validates most inputs.
+    pub fn validate(&self) -> io::Result<()> {
+        self.validate_for_report()
+    }
+
+    pub(crate) fn validate_for_file_duplicates(&self) -> io::Result<()> {
+        Ok(())
+    }
+
+    pub(crate) fn validate_for_code_spans(&self) -> io::Result<()> {
+        if self.min_match_len == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "min_match_len must be >= 1",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate_for_report(&self) -> io::Result<()> {
+        self.validate_for_code_spans()?;
+
+        if self.min_token_len == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "min_token_len must be >= 1",
+            ));
+        }
+
+        let threshold = self.similarity_threshold;
+        if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "similarity_threshold must be finite and in 0..=1",
+            ));
+        }
+
+        if self.simhash_max_distance > 64 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "simhash_max_distance must be in 0..=64",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 /// Scan statistics collected during scanning/report generation.
 ///
 /// This struct is `#[non_exhaustive]` so new counters can be added without breaking callers.
@@ -70,6 +122,21 @@ pub struct ScanStats {
     pub skipped_budget_max_normalized_chars: u64,
     pub skipped_budget_max_tokens: u64,
     pub skipped_bucket_truncated: u64,
+}
+
+impl ScanStats {
+    #[must_use]
+    pub fn has_fatal_skips(&self) -> bool {
+        self.skipped_permission_denied > 0
+            || self.skipped_outside_root > 0
+            || self.skipped_relativize_failed > 0
+            || self.skipped_walk_errors > 0
+            || self.skipped_bucket_truncated > 0
+            || self.skipped_budget_max_files > 0
+            || self.skipped_budget_max_total_bytes > 0
+            || self.skipped_budget_max_normalized_chars > 0
+            || self.skipped_budget_max_tokens > 0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

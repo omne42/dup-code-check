@@ -29,6 +29,7 @@ pub fn find_duplicate_files_with_stats(
     }
 
     validate_roots(roots)?;
+    options.validate_for_file_duplicates()?;
 
     let repos: Vec<Repo> = roots
         .iter()
@@ -136,6 +137,7 @@ pub fn find_duplicate_code_spans_with_stats(
     }
 
     validate_roots(roots)?;
+    options.validate_for_code_spans()?;
 
     let min_match_len = options.min_match_len.max(1);
 

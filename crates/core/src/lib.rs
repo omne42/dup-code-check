@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 mod dedupe;
 mod duplicates;
 mod report;

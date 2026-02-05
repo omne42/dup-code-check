@@ -135,3 +135,4 @@
 - Core：重复文件校验改为使用相对 `PathBuf`（支持非 UTF-8 路径），避免依赖 lossy UTF-8 字符串导致无法复核。
 - Core：当前缀剥离失败（`strip_prefix`）这种异常情况发生时，将其计为 `skippedOutsideRoot`（致命跳过），不再静默丢弃候选项。
 - CI：在 Linux 上新增 `cargo clippy --workspace --all-targets -- -D warnings` 硬门。
+- CLI：澄清 `skippedOutsideRoot` 致命跳过 warning 的含义（除符号链接外，也可能是 path/root 不匹配导致无法相对化）。

@@ -58,8 +58,8 @@ pub(crate) fn format_fatal_skip_warning(
         "skippedOutsideRoot",
         "outside_root",
         stats.skipped_outside_root,
-        "some symlink targets resolved outside roots; consider disabling --follow-symlinks or fixing symlinks.",
-        "部分符号链接解析后位于 root 之外；可考虑关闭 --follow-symlinks 或修复符号链接。",
+        "some paths were skipped because they resolved outside roots (e.g. --follow-symlinks) or could not be made relative to a root; consider disabling --follow-symlinks or fixing the path/root setup.",
+        "部分路径被跳过：解析后位于 root 之外（例如启用 --follow-symlinks），或无法相对化到某个 root；可考虑关闭 --follow-symlinks 或修复路径/root 配置。",
     );
     push_item(
         &mut out,

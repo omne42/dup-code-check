@@ -135,3 +135,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Core: file-duplicate verification now uses relative `PathBuf` (non-UTF-8 safe) instead of lossy UTF-8 strings.
 - Core: treat unexpected path prefix stripping failures as `skippedOutsideRoot` (fatal skip) instead of silently dropping candidates.
 - CI: add a `cargo clippy --workspace --all-targets -- -D warnings` gate on Linux.
+- CLI: clarify `skippedOutsideRoot` fatal-skip warning (may include non-symlink path/root mismatches).

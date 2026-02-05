@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::dedupe::{FileDuplicateGrouper, detect_duplicate_code_spans_winnowing};
 use crate::scan::{
-    Repo, make_rel_path, read_repo_file_bytes, read_repo_file_bytes_for_verification, repo_label,
-    validate_roots, visit_repo_files,
+    Repo, read_repo_file_bytes, read_repo_file_bytes_for_verification, repo_label, validate_roots,
+    visit_repo_files,
 };
 use crate::types::{DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanOutcome, ScanStats};
 use crate::util::{NormalizedCodeFile, NormalizedCodeFileView, normalize_for_code_spans};
@@ -192,7 +192,14 @@ pub fn find_duplicate_code_spans_with_stats(
                     total_normalized_chars = next_total;
                 }
 
-                let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
+                let rel_path = match repo_file.abs_path.strip_prefix(&repo.root) {
+                    Ok(rel) => rel.to_string_lossy().replace('\\', "/"),
+                    Err(_) => {
+                        stats.skipped_relativize_failed =
+                            stats.skipped_relativize_failed.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Continue(()));
+                    }
+                };
                 files.push(NormalizedCodeFile {
                     repo_id: repo.id,
                     repo_label: Arc::clone(&repo.label),

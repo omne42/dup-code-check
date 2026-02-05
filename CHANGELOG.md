@@ -106,6 +106,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan: de-duplicate safe-relative-path validation helpers.
 - Scan: avoid per-file `ScanOptions::default()` allocations during verification reads.
 - Report: reduce peak memory for block/AST-subtree grouping by avoiding storing full token samples.
+- Report: reduce the risk of AST-subtree hash collisions by incorporating full 64-bit child hashes in subtree signatures.
 - Tokenizer: simplify ASCII classification by using `u8` helpers (no behavior change).
 
 ### Fixed
@@ -135,6 +136,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Docs: document `maxFiles` stop behavior and `skippedBudgetMaxFiles` semantics.
 - CLI: `--version` now respects `--` (treats `--version` after `--` as a root).
 - Scan pipeline: when `git ls-files` exits non-zero during streaming, fall back to the walker (fail closed).
+- Scan pipeline: when Git streaming hits stdout/wait I/O errors, fall back to the walker instead of aborting.
 - Scan pipeline: on non-Unix platforms, when `git ls-files` outputs non-UTF-8 paths in streaming mode, fall back to the walker (even after scanning has started).
 - npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.
 - npm build: improve Cargo build failure diagnostics.
@@ -155,6 +157,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Core: reduce output allocations by sharing `repoLabel` / `path` strings via `Arc<str>` (cheap clones).
 - Core: file-duplicate verification now uses relative `PathBuf` (non-UTF-8 safe) instead of lossy UTF-8 strings.
 - Core: treat unexpected path prefix stripping failures as `skippedRelativizeFailed` (fatal skip) instead of silently dropping candidates.
+- Core/code spans: treat unexpected path prefix stripping failures as `skippedRelativizeFailed` (fatal skip) instead of emitting `<external:...>` placeholder paths.
 - CI: add a `cargo clippy --workspace --all-targets -- -D warnings` gate on Linux.
 - CLI: add `skippedRelativizeFailed` fatal-skip reporting, and clarify that `skippedOutsideRoot` refers to symlink targets outside roots.
 - CLI: clarify that `--strict` also covers `skippedRelativizeFailed`.

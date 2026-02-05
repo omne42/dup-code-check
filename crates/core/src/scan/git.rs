@@ -169,7 +169,22 @@ where
 
     loop {
         bytes.clear();
-        let n = reader.read_until(0, &mut bytes)?;
+        let n = match reader.read_until(0, &mut bytes) {
+            Ok(n) => n,
+            Err(_) => {
+                // Fail closed: fall back to the walker so scans keep working under transient
+                // process/stdout errors.
+                //
+                // If we already started scanning, record a walk error so strict mode can report
+                // the scan as incomplete.
+                if started {
+                    stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+                }
+                let _ = child.kill();
+                let _ = child.wait();
+                return Ok(None);
+            }
+        };
         if n == 0 {
             break;
         }
@@ -268,7 +283,17 @@ where
         }
     }
 
-    let status = child.wait()?;
+    let status = match child.wait() {
+        Ok(status) => status,
+        Err(_) => {
+            if started {
+                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+            }
+            let _ = child.kill();
+            let _ = child.wait();
+            return Ok(None);
+        }
+    };
     if !status.success() {
         return Ok(None);
     }

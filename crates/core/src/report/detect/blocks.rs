@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::types::{DuplicateSpanGroup, DuplicateSpanOccurrence, ScanOptions};
-use crate::util::{fnv1a64_u32, fold_u64_to_u32};
+use crate::util::fnv1a64_u32;
 
 use super::super::ScannedTextFile;
 use super::super::util::{fill_missing_previews_from_files, sort_span_groups_for_report};
@@ -180,32 +180,41 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
             let mut hash2 = 0u64;
             let mut repr_len = 0usize;
 
-            let mut push = |v: u32| {
+            fn push_u32(hash1: &mut u64, hash2: &mut u64, repr_len: &mut usize, v: u32) {
                 for b in v.to_le_bytes() {
-                    hash1 ^= u64::from(b);
-                    hash1 = hash1.wrapping_mul(FNV_PRIME);
+                    *hash1 ^= u64::from(b);
+                    *hash1 = hash1.wrapping_mul(FNV_PRIME);
                 }
-                hash2 = hash2
+                *hash2 = hash2
                     .wrapping_mul(BASE)
                     .wrapping_add(u64::from(v).wrapping_add(1));
-                repr_len = repr_len.saturating_add(1);
-            };
+                *repr_len = repr_len.saturating_add(1);
+            }
+
+            fn push_u64(hash1: &mut u64, hash2: &mut u64, repr_len: &mut usize, v: u64) {
+                for b in v.to_le_bytes() {
+                    *hash1 ^= u64::from(b);
+                    *hash1 = hash1.wrapping_mul(FNV_PRIME);
+                }
+                *hash2 = hash2.wrapping_mul(BASE).wrapping_add(v.wrapping_add(1));
+                *repr_len = repr_len.saturating_add(1);
+            }
 
             let mut idx = start;
             for (c_start, c_end, cid) in children {
                 while idx < c_start && idx < node.end_token {
-                    push(file.tokens[idx]);
+                    push_u32(&mut hash1, &mut hash2, &mut repr_len, file.tokens[idx]);
                     idx += 1;
                 }
                 if idx == c_start {
                     let child_hash = hashes[cid].unwrap_or(0);
-                    push(50_000);
-                    push(fold_u64_to_u32(child_hash));
+                    push_u32(&mut hash1, &mut hash2, &mut repr_len, 50_000);
+                    push_u64(&mut hash1, &mut hash2, &mut repr_len, child_hash);
                     idx = c_end.saturating_add(1);
                 }
             }
             while idx < node.end_token {
-                push(file.tokens[idx]);
+                push_u32(&mut hash1, &mut hash2, &mut repr_len, file.tokens[idx]);
                 idx += 1;
             }
 
@@ -218,7 +227,7 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
             // NOTE: We use (hash1, len, hash2) as an approximate equivalence key to avoid
             // materializing the full subtree representation. Collisions are theoretically
             // possible, but should be vanishingly unlikely with two independent 64-bit hashes
-            // plus length.
+            // plus length and full 64-bit child hashes included in the parent representation.
             let content_hash = hash1;
             let key = (content_hash, repr_len, hash2);
             let builder = groups.entry(key).or_insert_with(|| ReportSpanGroupBuilder {

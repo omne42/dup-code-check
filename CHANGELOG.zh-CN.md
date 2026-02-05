@@ -106,6 +106,7 @@
 - 扫描：安全相对路径校验 helper 去重。
 - 扫描：校验读取阶段避免为每个文件构造 `ScanOptions::default()`（减少分配）。
 - Report：block/AST-subtree 分组阶段避免保存完整 token 样本，降低峰值内存。
+- Report：AST-subtree 签名加入完整 64-bit 子哈希，进一步降低哈希碰撞导致的误报风险。
 - Tokenizer：用 `u8` helper 简化 ASCII 分类（无行为变化）。
 
 ### Fixed
@@ -135,6 +136,7 @@
 - 文档：补充 `maxFiles` 停止行为与 `skippedBudgetMaxFiles` 字段语义。
 - CLI：`--version` 现在会尊重 `--`（`--` 之后的 `--version` 会被当作 root 而不是参数）。
 - 扫描流程：流式模式下 `git ls-files` 非 0 退出时回退到 walker（fail closed）。
+- 扫描流程：流式模式下读取 stdout / wait 子进程触发 I/O 错误时回退到 walker（不再直接中止扫描）。
 - 扫描流程：在非 Unix 平台上，流式模式遇到 `git ls-files` 输出非 UTF-8 路径时回退到 walker（包括扫描已开始的情况）。
 - npm 构建：当 `bin/dup-code-check.mjs` wrapper 缺失时，提前失败并输出更清晰的错误信息。
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。
@@ -155,6 +157,7 @@
 - Core：通过 `Arc<str>` 共享输出中的 `repoLabel` / `path` 字符串，减少分配与拷贝成本（clone 变便宜）。
 - Core：重复文件校验改为使用相对 `PathBuf`（支持非 UTF-8 路径），避免依赖 lossy UTF-8 字符串导致无法复核。
 - Core：当前缀剥离失败（`strip_prefix`）这种异常情况发生时，将其计为 `skippedRelativizeFailed`（致命跳过），不再静默丢弃候选项。
+- Core/code spans：当前缀剥离失败（`strip_prefix`）这种异常情况发生时，将其计为 `skippedRelativizeFailed`（致命跳过），不再输出 `<external:...>` 占位路径。
 - CI：在 Linux 上新增 `cargo clippy --workspace --all-targets -- -D warnings` 硬门。
 - CLI：新增 `skippedRelativizeFailed` 致命跳过输出，并澄清 `skippedOutsideRoot` 指的是“符号链接解析后位于 root 之外”。
 - CLI：说明 `--strict` 同样包含 `skippedRelativizeFailed`。

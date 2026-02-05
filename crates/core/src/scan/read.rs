@@ -3,6 +3,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::types::{ScanOptions, ScanStats};
+#[cfg(test)]
 use crate::util::fnv1a64;
 
 use super::RepoFile;
@@ -28,6 +29,7 @@ pub(super) fn with_test_before_open_hook<R>(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn make_rel_path(root: &Path, abs_path: &Path) -> String {
     match abs_path.strip_prefix(root) {
         Ok(rel) => rel.to_string_lossy().replace('\\', "/"),

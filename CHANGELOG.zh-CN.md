@@ -136,3 +136,4 @@
 - Core：当前缀剥离失败（`strip_prefix`）这种异常情况发生时，将其计为 `skippedRelativizeFailed`（致命跳过），不再静默丢弃候选项。
 - CI：在 Linux 上新增 `cargo clippy --workspace --all-targets -- -D warnings` 硬门。
 - CLI：新增 `skippedRelativizeFailed` 致命跳过输出，并澄清 `skippedOutsideRoot` 指的是“符号链接解析后位于 root 之外”。
+- CLI：说明 `--strict` 同样包含 `skippedRelativizeFailed`。

@@ -136,3 +136,4 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Core: treat unexpected path prefix stripping failures as `skippedRelativizeFailed` (fatal skip) instead of silently dropping candidates.
 - CI: add a `cargo clippy --workspace --all-targets -- -D warnings` gate on Linux.
 - CLI: add `skippedRelativizeFailed` fatal-skip reporting, and clarify that `skippedOutsideRoot` refers to symlink targets outside roots.
+- CLI: clarify that `--strict` also covers `skippedRelativizeFailed`.

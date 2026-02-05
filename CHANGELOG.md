@@ -105,6 +105,8 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - File duplicates: speed up verification grouping for large candidate sets (avoid quadratic behavior).
 - Scan: de-duplicate safe-relative-path validation helpers.
 - Scan: avoid per-file `ScanOptions::default()` allocations during verification reads.
+- Report: reduce peak memory for block/AST-subtree grouping by avoiding storing full token samples.
+- Tokenizer: simplify ASCII classification by using `u8` helpers (no behavior change).
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).
@@ -119,6 +121,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: `--cross-repo-only` now errors when fewer than 2 roots are provided.
 - Scanning now skips `PermissionDenied` and walker traversal errors instead of aborting.
 - Git fast path now counts unexpected metadata errors as walk errors instead of aborting.
+- Git fast path now supports non-UTF-8 paths on Unix instead of forcing a walker fallback.
 - Scanning now skips per-file read I/O failures instead of aborting.
 - CLI now catches runtime scan failures and exits with code 1.
 - Remove unstable rustfmt config options to avoid warnings on stable toolchains.

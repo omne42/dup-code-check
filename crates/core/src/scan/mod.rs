@@ -78,6 +78,7 @@ fn ignore_dirs_contains(ignore_dirs: &HashSet<String>, name: &str) -> bool {
     }
 }
 
+#[cfg(test)]
 fn is_safe_relative_path(raw: &str) -> bool {
     if raw.is_empty() {
         return false;

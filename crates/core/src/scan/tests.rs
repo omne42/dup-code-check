@@ -217,12 +217,17 @@ fn git_bin_override_requires_opt_in() -> io::Result<()> {
 fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Result<()> {
     #[cfg(unix)]
     {
+        use std::os::unix::ffi::OsStringExt;
         use std::os::unix::fs::PermissionsExt;
 
         let root = temp_dir("git_streaming_non_utf8_fallback");
         fs::create_dir_all(root.join(".git"))?;
 
         fs::write(root.join("a.txt"), "x")?;
+        fs::write(
+            root.join(PathBuf::from(OsString::from_vec(vec![0xff]))),
+            "x",
+        )?;
 
         let marker_path = root.join(".git").join("git_called");
         let fake_git_path = root.join(".git").join("fake_git.sh");
@@ -256,7 +261,8 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Res
         assert_eq!(flow, ControlFlow::Continue(()));
         assert!(visited.iter().any(|p| p == "a.txt"));
         assert!(marker_path.exists());
-        assert_eq!(stats.git_fast_path_fallbacks, 1);
+        assert_eq!(stats.git_fast_path_fallbacks, 0);
+        assert_eq!(stats.candidate_files, 2);
         assert_eq!(stats.skipped_walk_errors, 0);
     }
 
@@ -310,8 +316,9 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_after_scanning_started() -> 
         })?;
 
         assert_eq!(flow, ControlFlow::Continue(()));
-        assert_eq!(stats.git_fast_path_fallbacks, 1);
-        assert_eq!(stats.skipped_walk_errors, 1);
+        assert_eq!(stats.git_fast_path_fallbacks, 0);
+        assert_eq!(stats.skipped_not_found, 1);
+        assert_eq!(stats.skipped_walk_errors, 0);
         assert_eq!(stats.candidate_files, FILES as u64);
         assert_eq!(visited.len(), FILES);
     }
@@ -420,7 +427,8 @@ if [ "$repo" = "$target_repo" ]; then
   case "$cmd" in
     ls-files)
       : > "$marker"
-      # Output a non-UTF-8 path to force the streaming scanner to fall back to the walker.
+      # Output a non-UTF-8 path to ensure the streaming scanner can handle it.
+      printf 'a.txt\0'
       printf '\377\0'
       exit 0
       ;;

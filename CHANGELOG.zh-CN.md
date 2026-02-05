@@ -105,6 +105,8 @@
 - 重复文件：加速大候选集的校验分组（避免 O(n^2)）。
 - 扫描：安全相对路径校验 helper 去重。
 - 扫描：校验读取阶段避免为每个文件构造 `ScanOptions::default()`（减少分配）。
+- Report：block/AST-subtree 分组阶段避免保存完整 token 样本，降低峰值内存。
+- Tokenizer：用 `u8` helper 简化 ASCII 分类（无行为变化）。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。
@@ -119,6 +121,7 @@
 - CLI：`--cross-repo-only` 现在要求至少 2 个 root，否则会报错。
 - 扫描会跳过 `PermissionDenied` 和 walker traversal errors，而不是直接中止。
 - Git 快路径现在会把意外的 metadata 错误计为 walk_errors，而不是直接中止扫描。
+- Git 快路径在 Unix 上支持非 UTF-8 路径，不再因解码失败而回退到 walker。
 - 扫描现在会把单文件读取 I/O 错误计为跳过，而不是中止整个扫描。
 - CLI 现在会捕获运行期扫描失败并以退出码 1 退出。
 - 移除 unstable rustfmt 配置，避免 stable toolchain 警告。

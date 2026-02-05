@@ -2,12 +2,69 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::types::{DuplicateSpanGroup, DuplicateSpanOccurrence, ScanOptions};
-use crate::util::{SpanGroupBuilder, fnv1a64_u32, fold_u64_to_u32};
-use crate::winnowing::finalize_span_groups;
+use crate::util::{fnv1a64_u32, fold_u64_to_u32};
 
 use super::super::ScannedTextFile;
 use super::super::util::{fill_missing_previews_from_files, sort_span_groups_for_report};
 use super::repo_label_arc;
+
+#[derive(Debug, Clone, Copy)]
+struct SampleRef {
+    file_id: usize,
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug)]
+struct ReportSpanGroupBuilder {
+    content_hash: u64,
+    normalized_len: usize,
+    preview: String,
+    occurrences: Vec<DuplicateSpanOccurrence>,
+    occurrence_keys: HashSet<(usize, usize)>,
+    repo_ids: HashSet<usize>,
+    sample_ref: Option<SampleRef>,
+}
+
+fn finalize_report_span_groups(
+    groups: impl IntoIterator<Item = ReportSpanGroupBuilder>,
+    cross_repo_only: bool,
+) -> Vec<DuplicateSpanGroup> {
+    let mut out = Vec::new();
+    for mut builder in groups {
+        if builder.occurrences.len() <= 1 {
+            continue;
+        }
+        if cross_repo_only && builder.repo_ids.len() < 2 {
+            continue;
+        }
+
+        builder.occurrences.sort_by(|a, b| {
+            (
+                a.repo_id,
+                a.repo_label.as_ref(),
+                a.path.as_ref(),
+                a.start_line,
+                a.end_line,
+            )
+                .cmp(&(
+                    b.repo_id,
+                    b.repo_label.as_ref(),
+                    b.path.as_ref(),
+                    b.start_line,
+                    b.end_line,
+                ))
+        });
+
+        out.push(DuplicateSpanGroup {
+            content_hash: builder.content_hash,
+            normalized_len: builder.normalized_len,
+            preview: builder.preview,
+            occurrences: builder.occurrences,
+        });
+    }
+    out
+}
 
 pub(in crate::report) fn detect_duplicate_blocks(
     repo_labels: &[Arc<str>],
@@ -16,7 +73,7 @@ pub(in crate::report) fn detect_duplicate_blocks(
 ) -> Vec<DuplicateSpanGroup> {
     let min_token_len = options.min_token_len.max(1);
 
-    let mut groups: HashMap<(u64, usize), Vec<SpanGroupBuilder>> = HashMap::new();
+    let mut groups: HashMap<(u64, usize), Vec<ReportSpanGroupBuilder>> = HashMap::new();
 
     for (file_id, file) in files.iter().enumerate() {
         for node in &file.blocks {
@@ -32,13 +89,19 @@ pub(in crate::report) fn detect_duplicate_blocks(
             let key = (content_hash, slice.len());
             let bucket = groups.entry(key).or_default();
 
-            let builder = match bucket.iter_mut().find(|g| g.sample == slice) {
+            let builder = match bucket.iter_mut().find(|g| {
+                let Some(sample_ref) = g.sample_ref else {
+                    return false;
+                };
+                let repr_file = &files[sample_ref.file_id];
+                let repr = &repr_file.tokens[sample_ref.start..sample_ref.end];
+                repr == slice
+            }) {
                 Some(existing) => existing,
                 None => {
-                    bucket.push(SpanGroupBuilder {
+                    bucket.push(ReportSpanGroupBuilder {
                         content_hash,
                         normalized_len: slice.len(),
-                        sample: slice.to_vec(),
                         preview: String::new(),
                         occurrences: vec![DuplicateSpanOccurrence {
                             repo_id: file.repo_id,
@@ -49,6 +112,11 @@ pub(in crate::report) fn detect_duplicate_blocks(
                         }],
                         occurrence_keys: HashSet::from([(file_id, node.start_token)]),
                         repo_ids: HashSet::from([file.repo_id]),
+                        sample_ref: Some(SampleRef {
+                            file_id,
+                            start,
+                            end: node.end_token,
+                        }),
                     });
                     continue;
                 }
@@ -68,7 +136,8 @@ pub(in crate::report) fn detect_duplicate_blocks(
         }
     }
 
-    let mut out = finalize_span_groups(groups, options.cross_repo_only);
+    let mut out =
+        finalize_report_span_groups(groups.into_values().flatten(), options.cross_repo_only);
     sort_span_groups_for_report(&mut out);
     out.truncate(options.max_report_items);
     fill_missing_previews_from_files(files, &mut out, 120);
@@ -82,16 +151,10 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
 ) -> Vec<DuplicateSpanGroup> {
     let min_token_len = options.min_token_len.max(1);
 
-    #[derive(Debug, Clone)]
-    struct NodeRepr {
-        hash: u64,
-        repr: Vec<u32>,
-    }
-
-    let mut groups: HashMap<(u64, usize), Vec<SpanGroupBuilder>> = HashMap::new();
+    let mut groups: HashMap<(u64, usize, u64), ReportSpanGroupBuilder> = HashMap::new();
 
     for (file_id, file) in files.iter().enumerate() {
-        let mut reprs: Vec<Option<NodeRepr>> = vec![None; file.blocks.len()];
+        let mut hashes: Vec<Option<u64>> = vec![None; file.blocks.len()];
         let mut by_depth: Vec<usize> = (0..file.blocks.len()).collect();
         by_depth.sort_by_key(|&i| std::cmp::Reverse(file.blocks[i].depth));
 
@@ -102,73 +165,73 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
                 continue;
             }
 
-            let mut children: Vec<(usize, usize, usize)> = node
-                .children
-                .iter()
-                .map(|&cid| {
-                    let c = &file.blocks[cid];
-                    (c.start_token, c.end_token, cid)
-                })
-                .collect();
+            let mut children: Vec<(usize, usize, usize)> = Vec::with_capacity(node.children.len());
+            for &cid in &node.children {
+                let c = &file.blocks[cid];
+                children.push((c.start_token, c.end_token, cid));
+            }
             children.sort_by_key(|c| c.0);
 
-            let mut repr = Vec::new();
+            const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+            const FNV_PRIME: u64 = 0x100000001b3;
+            const BASE: u64 = 911382323;
+
+            let mut hash1 = FNV_OFFSET_BASIS;
+            let mut hash2 = 0u64;
+            let mut repr_len = 0usize;
+
+            let mut push = |v: u32| {
+                for b in v.to_le_bytes() {
+                    hash1 ^= u64::from(b);
+                    hash1 = hash1.wrapping_mul(FNV_PRIME);
+                }
+                hash2 = hash2
+                    .wrapping_mul(BASE)
+                    .wrapping_add(u64::from(v).wrapping_add(1));
+                repr_len = repr_len.saturating_add(1);
+            };
+
             let mut idx = start;
             for (c_start, c_end, cid) in children {
                 while idx < c_start && idx < node.end_token {
-                    repr.push(file.tokens[idx]);
+                    push(file.tokens[idx]);
                     idx += 1;
                 }
                 if idx == c_start {
-                    let child_hash = reprs[cid].as_ref().map(|r| r.hash).unwrap_or(0);
-                    repr.push(50_000);
-                    repr.push(fold_u64_to_u32(child_hash));
+                    let child_hash = hashes[cid].unwrap_or(0);
+                    push(50_000);
+                    push(fold_u64_to_u32(child_hash));
                     idx = c_end.saturating_add(1);
                 }
             }
             while idx < node.end_token {
-                repr.push(file.tokens[idx]);
+                push(file.tokens[idx]);
                 idx += 1;
             }
 
-            let hash = fnv1a64_u32(&repr);
-            reprs[node_id] = Some(NodeRepr { hash, repr });
+            hashes[node_id] = Some(hash1);
 
-            let repr_len = reprs[node_id].as_ref().map(|r| r.repr.len()).unwrap_or(0);
             if repr_len < min_token_len {
                 continue;
             }
 
-            let content_hash = hash;
-            let key = (content_hash, repr_len);
-            let bucket = groups.entry(key).or_default();
-
-            let builder = match bucket.iter_mut().find(|g| {
-                reprs[node_id].as_ref().map(|r| r.repr.as_slice()) == Some(g.sample.as_slice())
-            }) {
-                Some(existing) => existing,
-                None => {
-                    bucket.push(SpanGroupBuilder {
-                        content_hash,
-                        normalized_len: repr_len,
-                        sample: reprs[node_id]
-                            .as_ref()
-                            .map(|r| r.repr.clone())
-                            .unwrap_or_default(),
-                        preview: String::new(),
-                        occurrences: vec![DuplicateSpanOccurrence {
-                            repo_id: file.repo_id,
-                            repo_label: repo_label_arc(repo_labels, file.repo_id),
-                            path: Arc::clone(&file.path),
-                            start_line: node.start_line,
-                            end_line: node.end_line,
-                        }],
-                        occurrence_keys: HashSet::from([(file_id, node.start_token)]),
-                        repo_ids: HashSet::from([file.repo_id]),
-                    });
-                    continue;
-                }
-            };
+            let content_hash = hash1;
+            let key = (content_hash, repr_len, hash2);
+            let builder = groups.entry(key).or_insert_with(|| ReportSpanGroupBuilder {
+                content_hash,
+                normalized_len: repr_len,
+                preview: String::new(),
+                occurrences: vec![DuplicateSpanOccurrence {
+                    repo_id: file.repo_id,
+                    repo_label: repo_label_arc(repo_labels, file.repo_id),
+                    path: Arc::clone(&file.path),
+                    start_line: node.start_line,
+                    end_line: node.end_line,
+                }],
+                occurrence_keys: HashSet::from([(file_id, node.start_token)]),
+                repo_ids: HashSet::from([file.repo_id]),
+                sample_ref: None,
+            });
 
             if !builder.occurrence_keys.insert((file_id, node.start_token)) {
                 continue;
@@ -184,7 +247,7 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
         }
     }
 
-    let mut out = finalize_span_groups(groups, options.cross_repo_only);
+    let mut out = finalize_report_span_groups(groups.into_values(), options.cross_repo_only);
     sort_span_groups_for_report(&mut out);
     out.truncate(options.max_report_items);
     fill_missing_previews_from_files(files, &mut out, 120);

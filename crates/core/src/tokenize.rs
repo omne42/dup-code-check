@@ -134,12 +134,12 @@ pub(crate) fn tokenize_for_dup_detection(text: &str) -> TokenizedText {
             continue;
         }
 
-        if (b as char).is_ascii_alphabetic() || b == b'_' {
+        if b.is_ascii_alphabetic() || b == b'_' {
             let start = i;
             i += 1;
             while i < bytes.len() {
                 let c = bytes[i];
-                if (c as char).is_ascii_alphanumeric() || c == b'_' {
+                if c.is_ascii_alphanumeric() || c == b'_' {
                     i += 1;
                 } else {
                     break;
@@ -152,9 +152,9 @@ pub(crate) fn tokenize_for_dup_detection(text: &str) -> TokenizedText {
             continue;
         }
 
-        if (b as char).is_ascii_digit() {
+        if b.is_ascii_digit() {
             i += 1;
-            while i < bytes.len() && ((bytes[i] as char).is_ascii_digit() || bytes[i] == b'.') {
+            while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
                 i += 1;
             }
             tokens.push(TOK_NUM);

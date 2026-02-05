@@ -4,7 +4,7 @@ use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::ops::ControlFlow;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::types::{ScanOptions, ScanStats};
@@ -161,7 +161,7 @@ where
     // Read paths in small batches to avoid collecting a full file list in memory, and stop early
     // when scan budgets are hit (e.g. `maxFiles`).
     const BATCH_SIZE: usize = 256;
-    let mut batch: Vec<String> = Vec::with_capacity(BATCH_SIZE);
+    let mut batch: Vec<PathBuf> = Vec::with_capacity(BATCH_SIZE);
     let mut reader = BufReader::new(stdout);
     let mut bytes: Vec<u8> = Vec::new();
 
@@ -181,17 +181,27 @@ where
         }
 
         let rel = match std::str::from_utf8(&bytes) {
-            Ok(s) => s.to_string(),
+            Ok(s) => PathBuf::from(s),
             Err(_) => {
-                if !started {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::ffi::OsStringExt;
+
+                    PathBuf::from(OsString::from_vec(bytes.clone()))
+                }
+
+                #[cfg(not(unix))]
+                {
+                    if !started {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Ok(None);
+                    }
+                    stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
                     let _ = child.kill();
                     let _ = child.wait();
                     return Ok(None);
                 }
-                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
-                let _ = child.kill();
-                let _ = child.wait();
-                return Ok(None);
             }
         };
 
@@ -271,7 +281,7 @@ fn visit_repo_files_via_git_batch<F>(
     options: &ScanOptions,
     stats: &mut ScanStats,
     on_file: &mut F,
-    rel_paths: &[String],
+    rel_paths: &[PathBuf],
     started: &mut bool,
 ) -> io::Result<ControlFlow<()>>
 where
@@ -282,14 +292,27 @@ where
     }
 
     for rel in rel_paths {
-        if !super::is_safe_relative_path(rel) {
+        if !super::is_safe_relative_path_buf(rel) {
             stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
             continue;
         }
 
-        let mut segs = rel.split('/');
-        segs.next_back();
-        if segs.any(|seg| ignore_dirs_contains(&options.ignore_dirs, seg)) {
+        let mut ignored = false;
+        if let Some(parent) = rel.parent() {
+            for component in parent.components() {
+                let Component::Normal(name) = component else {
+                    continue;
+                };
+                let Some(name) = name.to_str() else {
+                    continue;
+                };
+                if ignore_dirs_contains(&options.ignore_dirs, name) {
+                    ignored = true;
+                    break;
+                }
+            }
+        }
+        if ignored {
             continue;
         }
 

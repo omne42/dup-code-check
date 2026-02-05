@@ -64,7 +64,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Core: tighten `DUP_CODE_CHECK_GIT_BIN` override validation (absolute path required; must exist and be a file).
 - Core: further tighten `DUP_CODE_CHECK_GIT_BIN` override validation (must not be a symlink; must be executable and not group/world-writable on Unix).
 - Core: require `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` to honor `DUP_CODE_CHECK_GIT_BIN` (opt-in).
+- Docs: document `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT` / `DUP_CODE_CHECK_GIT_BIN` in Troubleshooting.
 - Core: mark `ScanOptions` as `#[non_exhaustive]` (construct via `ScanOptions::default()` and override fields).
+- Core: mark `ScanStats` as `#[non_exhaustive]` (construct via `ScanStats::default()` and update fields).
 - Report: set a default `maxTotalBytes` budget (256 MiB) to bound memory use; override via `--max-total-bytes`.
 - Docs: mention the `--report` default `--max-total-bytes` budget in `--help` and `README`.
 - CLI: resolve roots via `canonicalize()` (fail if it fails) to reduce symlink ambiguity.
@@ -73,6 +75,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan stats: record detector bucket truncation as `skippedBucketTruncated`.
 - Core: reduce memory usage for file-duplicate grouping by avoiding storing full normalized samples.
 - Core: split the scan module into smaller files (no behavior change).
+- Report: split `report/detect` into smaller modules (no behavior change).
 - CLI: treat `skippedBucketTruncated` as a fatal skip (scan incomplete) for warnings/`--strict`.
 - CLI: `--strict` now treats `outside_root` traversal skips as fatal (scan incomplete).
 - Scan: `ignoreDirs` matching is case-insensitive on Windows (ASCII).
@@ -108,6 +111,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI now errors when `--report` and `--code-spans` are both specified.
 - CLI: `--cross-repo-only` now errors when fewer than 2 roots are provided.
 - Scanning now skips `PermissionDenied` and walker traversal errors instead of aborting.
+- Git fast path now counts unexpected metadata errors as walk errors instead of aborting.
 - Scanning now skips per-file read I/O failures instead of aborting.
 - CLI now catches runtime scan failures and exits with code 1.
 - Remove unstable rustfmt config options to avoid warnings on stable toolchains.

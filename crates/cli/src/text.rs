@@ -350,28 +350,22 @@ mod tests {
 
     #[test]
     fn bucket_truncated_is_fatal_skip() {
-        let stats = ScanStats {
-            skipped_bucket_truncated: 1,
-            ..ScanStats::default()
-        };
+        let mut stats = ScanStats::default();
+        stats.skipped_bucket_truncated = 1;
         assert!(has_fatal_skips(&stats));
     }
 
     #[test]
     fn relativize_failed_is_fatal_skip() {
-        let stats = ScanStats {
-            skipped_relativize_failed: 1,
-            ..ScanStats::default()
-        };
+        let mut stats = ScanStats::default();
+        stats.skipped_relativize_failed = 1;
         assert!(has_fatal_skips(&stats));
     }
 
     #[test]
     fn fatal_skip_warning_is_actionable_en() {
-        let stats = ScanStats {
-            skipped_bucket_truncated: 3,
-            ..ScanStats::default()
-        };
+        let mut stats = ScanStats::default();
+        stats.skipped_bucket_truncated = 3;
         let msg = format_fatal_skip_warning(Localization::En, &stats, false);
         assert!(msg.contains("skippedBucketTruncated=3"));
         assert!(msg.contains("(bucket_truncated)"));
@@ -381,10 +375,8 @@ mod tests {
 
     #[test]
     fn fatal_skip_warning_is_actionable_zh() {
-        let stats = ScanStats {
-            skipped_budget_max_files: 1,
-            ..ScanStats::default()
-        };
+        let mut stats = ScanStats::default();
+        stats.skipped_budget_max_files = 1;
         let msg = format_fatal_skip_warning(Localization::Zh, &stats, false);
         assert!(msg.contains("skippedBudgetMaxFiles=1"));
         assert!(msg.contains("(budget_max_files)"));

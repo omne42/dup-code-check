@@ -304,7 +304,10 @@ where
                 stats.skipped_permission_denied = stats.skipped_permission_denied.saturating_add(1);
                 continue;
             }
-            Err(err) => return Err(err),
+            Err(_) => {
+                stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
+                continue;
+            }
         };
 
         if meta.file_type().is_symlink() && !options.follow_symlinks {

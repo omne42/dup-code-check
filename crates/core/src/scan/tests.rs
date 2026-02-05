@@ -320,6 +320,60 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_after_scanning_started() -> 
 }
 
 #[test]
+fn git_streaming_metadata_error_is_counted_and_skipped() -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        let root = temp_dir("git_streaming_metadata_error_is_skipped");
+        let git_dir = root.join(".git");
+        fs::create_dir_all(&git_dir)?;
+
+        fs::write(root.join("a.txt"), "x")?;
+
+        // Force a `symlink_metadata` error that is neither `NotFound` nor `PermissionDenied`.
+        // `loop/any.txt` will fail with ELOOP ("too many levels of symbolic links") on Unix.
+        symlink("loop", root.join("loop"))?;
+
+        let fake_git_path = git_dir.join("fake_git.sh");
+        fs::write(
+            &fake_git_path,
+            fake_git_script_paths(&root, "a.txt\\0loop/any.txt\\0"),
+        )?;
+        let mut perms = fs::metadata(&fake_git_path)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&fake_git_path, perms)?;
+
+        let repo = Repo {
+            id: 0,
+            root: root.clone(),
+            label: "test".into(),
+        };
+        let options = ScanOptions {
+            max_files: Some(10),
+            ..ScanOptions::default()
+        };
+
+        let mut stats = ScanStats::default();
+        let mut visited: Vec<String> = Vec::new();
+        let flow = git::with_test_git_exe(&fake_git_path, || {
+            visit_repo_files(&repo, &options, &mut stats, |_stats, file| {
+                visited.push(make_rel_path(&root, &file.abs_path));
+                Ok(ControlFlow::Continue(()))
+            })
+        })?;
+
+        assert_eq!(flow, ControlFlow::Continue(()));
+        assert_eq!(visited, vec!["a.txt"]);
+        assert_eq!(stats.candidate_files, 1);
+        assert_eq!(stats.git_fast_path_fallbacks, 0);
+        assert_eq!(stats.skipped_walk_errors, 1);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn read_repo_file_bytes_counts_binary_reads_in_scan_stats() -> io::Result<()> {
     let root = temp_dir("read_repo_file_bytes_binary_counts");
     fs::create_dir_all(&root)?;
@@ -410,6 +464,40 @@ if [ "$repo" = "$target_repo" ]; then
         printf 'f%04d.txt\0' "$i"
         i=$((i+1))
       done
+      exit 0
+      ;;
+  esac
+fi
+
+exit 2
+"#
+    )
+}
+
+fn fake_git_script_paths(repo: &Path, output: &str) -> String {
+    let repo = sh_single_quote(repo.to_string_lossy().as_ref());
+    format!(
+        r#"#!/bin/sh
+set -eu
+
+repo=""
+if [ "${{1:-}}" = "-C" ]; then
+  repo="${{2:-}}"
+  shift 2
+fi
+
+cmd="${{1:-}}"
+if [ -z "$cmd" ]; then
+  exit 2
+fi
+shift
+
+target_repo={repo}
+
+if [ "$repo" = "$target_repo" ]; then
+  case "$cmd" in
+    ls-files)
+      printf '{output}'
       exit 0
       ;;
   esac

@@ -64,7 +64,9 @@
 - Core：收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（仅允许绝对路径；且要求文件存在）。
 - Core：进一步收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（不允许 symlink；Unix 下必须可执行且不可被组/其他用户写入）。
 - Core：只有在 `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` 时才会启用 `DUP_CODE_CHECK_GIT_BIN`（显式 opt-in）。
+- 文档：在《排障》中说明 `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT` / `DUP_CODE_CHECK_GIT_BIN`。
 - Core：将 `ScanOptions` 标记为 `#[non_exhaustive]`（用 `ScanOptions::default()` 构造后再覆盖字段）。
+- Core：将 `ScanStats` 标记为 `#[non_exhaustive]`（用 `ScanStats::default()` 构造后再更新字段）。
 - Report：默认设置 `maxTotalBytes` 预算（256 MiB）以限制内存占用；可用 `--max-total-bytes` 覆盖。
 - 文档：在 `--help` 与 README 中说明 `--report` 模式默认 `--max-total-bytes` 预算。
 - CLI：root 路径使用 `canonicalize()`（失败则报错），降低符号链接歧义。
@@ -73,6 +75,7 @@
 - 扫描统计：新增 `skippedBucketTruncated`，用于标记检测器 fingerprint bucket 被截断（防爆保护）。
 - Core：重复文件分组不再保存完整归一化样本，显著降低大仓库内存占用。
 - Core：将 scan 模块拆分为更小的文件（无行为变化）。
+- Report：将 `report/detect` 拆分为更小的模块（无行为变化）。
 - CLI：将 `skippedBucketTruncated` 视为“扫描不完整”（致命跳过），从而影响 warning/`--strict` 退出码。
 - CLI：`--strict` 现在会把 `outside_root` 视为“扫描不完整”（遍历跳过），从而退出非 0。
 - 扫描：Windows 下 `ignoreDirs` 按 ASCII 做大小写不敏感匹配。
@@ -108,6 +111,7 @@
 - CLI：当同时指定 `--report` 与 `--code-spans` 时将报错。
 - CLI：`--cross-repo-only` 现在要求至少 2 个 root，否则会报错。
 - 扫描会跳过 `PermissionDenied` 和 walker traversal errors，而不是直接中止。
+- Git 快路径现在会把意外的 metadata 错误计为 walk_errors，而不是直接中止扫描。
 - 扫描现在会把单文件读取 I/O 错误计为跳过，而不是中止整个扫描。
 - CLI 现在会捕获运行期扫描失败并以退出码 1 退出。
 - 移除 unstable rustfmt 配置，避免 stable toolchain 警告。

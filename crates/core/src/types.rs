@@ -47,7 +47,12 @@ impl Default for ScanOptions {
     }
 }
 
+/// Scan statistics collected during scanning/report generation.
+///
+/// This struct is `#[non_exhaustive]` so new counters can be added without breaking callers.
+/// Construct it via `ScanStats::default()` and then read/update fields as needed.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ScanStats {
     pub candidate_files: u64,
     pub scanned_files: u64,

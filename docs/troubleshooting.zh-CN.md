@@ -96,3 +96,19 @@ dup-code-check --no-gitignore .
 - 确保 Rust toolchain 与 Node 版本满足要求
 
 由于环境差异较大，建议优先在 CI 中用容器/固定镜像构建，或使用 WSL。
+
+## 7) 覆盖 `git` 可执行文件（高级）
+
+默认情况下，扫描器会从 `PATH` 调用 `git` 来加速在 Git 仓库内的文件枚举。如果 `git` 缺失或无法执行，扫描器会回退到文件系统 walker（结果仍然正确，通常只是更慢）。
+
+如果你**必须**使用特定的 `git` 二进制，可以通过环境变量覆盖：
+
+- 设置 `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1`（显式 opt-in）
+- 设置 `DUP_CODE_CHECK_GIT_BIN=/absolute/path/to/git`（绝对路径）
+
+这个覆盖入口是刻意收紧的：
+
+- 路径必须是绝对路径
+- 必须存在且是普通文件
+- 不允许 symlink
+- Unix 下必须可执行，且不可被组/其他用户写入

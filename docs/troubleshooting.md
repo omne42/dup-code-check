@@ -99,3 +99,19 @@ If building from source fails on Windows, you typically need:
 - compatible Rust toolchain and Node versions
 
 Due to environment differences, prefer building in CI with pinned images/containers, or use WSL.
+
+## 7) Overriding the `git` executable (advanced)
+
+By default the scanner invokes `git` from `PATH` to speed up file enumeration inside Git repos. If `git` is missing or can’t be executed, the scanner falls back to the filesystem walker (still correct, usually just slower).
+
+If you *must* use a specific `git` binary, you can override it via environment variables:
+
+- set `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` (explicit opt-in)
+- set `DUP_CODE_CHECK_GIT_BIN=/absolute/path/to/git`
+
+The override is intentionally strict:
+
+- the path must be absolute
+- it must exist and be a file
+- it must not be a symlink
+- on Unix: it must be executable and must not be group/world-writable

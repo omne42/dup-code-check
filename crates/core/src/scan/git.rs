@@ -145,6 +145,11 @@ where
         }
     }
 
+    fn kill_and_wait_retriable(child: &mut std::process::Child) {
+        let _ = child.kill();
+        let _ = wait_retriable(child);
+    }
+
     let mut child = match Command::new(git_exe())
         .arg("-C")
         .arg(&repo.root)
@@ -197,8 +202,7 @@ where
                 if started {
                     stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
                 }
-                let _ = child.kill();
-                let _ = wait_retriable(&mut child);
+                kill_and_wait_retriable(&mut child);
                 return Ok(None);
             }
         };
@@ -225,13 +229,11 @@ where
                 #[cfg(not(unix))]
                 {
                     if !started {
-                        let _ = child.kill();
-                        let _ = child.wait();
+                        kill_and_wait_retriable(&mut child);
                         return Ok(None);
                     }
                     stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    kill_and_wait_retriable(&mut child);
                     return Ok(None);
                 }
             }
@@ -253,8 +255,7 @@ where
             Ok(flow) => flow,
             Err(err) => {
                 if !started {
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    kill_and_wait_retriable(&mut child);
                     return Ok(None);
                 }
                 return Err(err);
@@ -264,8 +265,7 @@ where
         match flow {
             ControlFlow::Continue(()) => {}
             ControlFlow::Break(()) => {
-                let _ = child.kill();
-                let _ = child.wait();
+                kill_and_wait_retriable(&mut child);
                 return Ok(Some(ControlFlow::Break(())));
             }
         }
@@ -283,8 +283,7 @@ where
             Ok(flow) => flow,
             Err(err) => {
                 if !started {
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    kill_and_wait_retriable(&mut child);
                     return Ok(None);
                 }
                 return Err(err);
@@ -293,8 +292,7 @@ where
         match flow {
             ControlFlow::Continue(()) => {}
             ControlFlow::Break(()) => {
-                let _ = child.kill();
-                let _ = child.wait();
+                kill_and_wait_retriable(&mut child);
                 return Ok(Some(ControlFlow::Break(())));
             }
         }
@@ -306,8 +304,7 @@ where
             if started {
                 stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
             }
-            let _ = child.kill();
-            let _ = wait_retriable(&mut child);
+            kill_and_wait_retriable(&mut child);
             return Ok(None);
         }
     };

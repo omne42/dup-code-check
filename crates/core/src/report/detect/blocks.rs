@@ -175,6 +175,8 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
             const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
             const FNV_PRIME: u64 = 0x100000001b3;
             const BASE: u64 = 911382323;
+            // Marker inserted before each child hash in the subtree signature.
+            // Keep it outside the normal token range to avoid ambiguity.
             const CHILD_MARKER: u32 = 50_000;
 
             let mut hash1 = FNV_OFFSET_BASIS;

@@ -135,6 +135,16 @@ fn visit_repo_files_via_git_streaming<F>(
 where
     F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
 {
+    fn wait_retriable(child: &mut std::process::Child) -> io::Result<std::process::ExitStatus> {
+        loop {
+            match child.wait() {
+                Ok(status) => return Ok(status),
+                Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
+                Err(err) => return Err(err),
+            }
+        }
+    }
+
     let mut child = match Command::new(git_exe())
         .arg("-C")
         .arg(&repo.root)
@@ -169,7 +179,14 @@ where
 
     loop {
         bytes.clear();
-        let n = match reader.read_until(0, &mut bytes) {
+        let n = loop {
+            match reader.read_until(0, &mut bytes) {
+                Ok(n) => break Ok(n),
+                Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
+                Err(err) => break Err(err),
+            }
+        };
+        let n = match n {
             Ok(n) => n,
             Err(_) => {
                 // Fail closed: fall back to the walker so scans keep working under transient
@@ -181,7 +198,7 @@ where
                     stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
                 }
                 let _ = child.kill();
-                let _ = child.wait();
+                let _ = wait_retriable(&mut child);
                 return Ok(None);
             }
         };
@@ -283,14 +300,14 @@ where
         }
     }
 
-    let status = match child.wait() {
+    let status = match wait_retriable(&mut child) {
         Ok(status) => status,
         Err(_) => {
             if started {
                 stats.skipped_walk_errors = stats.skipped_walk_errors.saturating_add(1);
             }
             let _ = child.kill();
-            let _ = child.wait();
+            let _ = wait_retriable(&mut child);
             return Ok(None);
         }
     };

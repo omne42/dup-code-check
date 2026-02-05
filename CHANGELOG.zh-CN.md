@@ -136,7 +136,7 @@
 - 文档：补充 `maxFiles` 停止行为与 `skippedBudgetMaxFiles` 字段语义。
 - CLI：`--version` 现在会尊重 `--`（`--` 之后的 `--version` 会被当作 root 而不是参数）。
 - 扫描流程：流式模式下 `git ls-files` 非 0 退出时回退到 walker（fail closed）。
-- 扫描流程：流式模式下读取 stdout / wait 子进程触发 I/O 错误时回退到 walker（不再直接中止扫描）。
+- 扫描流程：Git 快路径流式枚举遇到 `Interrupted` 会重试；其它 stdout / wait I/O 错误则回退到 walker（fail closed，不再直接中止扫描）。
 - 扫描流程：在非 Unix 平台上，流式模式遇到 `git ls-files` 输出非 UTF-8 路径时回退到 walker（包括扫描已开始的情况）。
 - npm 构建：当 `bin/dup-code-check.mjs` wrapper 缺失时，提前失败并输出更清晰的错误信息。
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。

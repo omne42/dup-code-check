@@ -175,6 +175,7 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
             const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
             const FNV_PRIME: u64 = 0x100000001b3;
             const BASE: u64 = 911382323;
+            const CHILD_MARKER: u32 = 50_000;
 
             let mut hash1 = FNV_OFFSET_BASIS;
             let mut hash2 = 0u64;
@@ -208,7 +209,7 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
                 }
                 if idx == c_start {
                     let child_hash = hashes[cid].unwrap_or(0);
-                    push_u32(&mut hash1, &mut hash2, &mut repr_len, 50_000);
+                    push_u32(&mut hash1, &mut hash2, &mut repr_len, CHILD_MARKER);
                     push_u64(&mut hash1, &mut hash2, &mut repr_len, child_hash);
                     idx = c_end.saturating_add(1);
                 }

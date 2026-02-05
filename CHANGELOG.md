@@ -136,7 +136,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Docs: document `maxFiles` stop behavior and `skippedBudgetMaxFiles` semantics.
 - CLI: `--version` now respects `--` (treats `--version` after `--` as a root).
 - Scan pipeline: when `git ls-files` exits non-zero during streaming, fall back to the walker (fail closed).
-- Scan pipeline: when Git streaming hits stdout/wait I/O errors, fall back to the walker instead of aborting.
+- Scan pipeline: retry interrupted stdout reads/waits in Git streaming enumeration; other I/O errors still fall back to the walker (fail closed).
 - Scan pipeline: on non-Unix platforms, when `git ls-files` outputs non-UTF-8 paths in streaming mode, fall back to the walker (even after scanning has started).
 - npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.
 - npm build: improve Cargo build failure diagnostics.

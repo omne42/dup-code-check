@@ -144,4 +144,5 @@
 - CLI：说明 `--strict` 同样包含 `skippedRelativizeFailed`。
 - 文档：在 output/troubleshooting 等页面补充 `skippedRelativizeFailed` / `relativize_failed` 的说明。
 - 文档：在 output 文档中澄清 `--strict` 同样包含 `outside_root`。
+- 文档：修正 output 文档中 `--strict` 语义（bucket 截断 + `maxNormalizedChars` / `maxTokens`），并补充 `skippedBudgetMaxNormalizedChars` / `skippedBudgetMaxTokens` 字段。
 - Core：将输出中的 `Arc<str>` 字段隐藏在 accessor 方法之后（1.0 前的 API 清理）。

@@ -73,6 +73,22 @@ Total bytes budget: if reading a file would make `scannedBytes + fileSize > maxT
 
 Skips files larger than `n` bytes (default `10 MiB`). Counted in `scanStats.skippedTooLarge`.
 
+### `maxNormalizedChars` / `--max-normalized-chars`
+
+Stops scanning once the total stored **normalized code characters** would exceed `n`. When hit, the scan ends early and `scanStats.skippedBudgetMaxNormalizedChars` becomes non-zero.
+
+Used by `--code-spans` and `--report` (text-based detectors).
+
+> With `--strict`, hitting `maxNormalizedChars` is treated as an “incomplete scan” and will fail.
+
+### `maxTokens` / `--max-tokens`
+
+Stops scanning once the total stored **tokens** would exceed `n` (report mode). When hit, the scan ends early and `scanStats.skippedBudgetMaxTokens` becomes non-zero.
+
+> With `--strict`, hitting `maxTokens` is treated as an “incomplete scan” and will fail.
+
+> In `--report` mode, if `maxNormalizedChars` / `maxTokens` are unset, defaults are derived from `maxTotalBytes` to bound memory use.
+
 ## Detector thresholds
 
 ### `minMatchLen` / `--min-match-len`

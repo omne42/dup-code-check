@@ -74,13 +74,12 @@ pub fn find_duplicate_files_with_stats(
                         return Ok(std::ops::ControlFlow::Continue(()));
                     }
                 };
-                let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
-                groups.push_bytes(
-                    &bytes,
-                    repo.id,
-                    rel_path_for_verification,
-                    Arc::from(rel_path),
+                let rel_path = Arc::<str>::from(
+                    rel_path_for_verification
+                        .to_string_lossy()
+                        .replace('\\', "/"),
                 );
+                groups.push_bytes(&bytes, repo.id, rel_path_for_verification, rel_path);
 
                 Ok(std::ops::ControlFlow::Continue(()))
             })?

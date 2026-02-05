@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::dedupe::FileDuplicateGrouper;
 use crate::scan::{
-    Repo, make_rel_path, read_repo_file_bytes_for_verification, read_repo_file_bytes_with_path,
-    repo_label, visit_repo_files,
+    Repo, read_repo_file_bytes_for_verification, read_repo_file_bytes_with_path, repo_label,
+    visit_repo_files,
 };
 use crate::tokenize::{parse_brace_blocks, tokenize_for_dup_detection};
 use crate::types::{DuplicateGroup, ScanOptions, ScanStats};
@@ -99,7 +99,11 @@ pub(super) fn scan_text_files_for_report(
                     }
                 };
 
-                let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
+                let rel_path = Arc::<str>::from(
+                    rel_path_for_verification
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                );
 
                 // Text-based detectors
                 let text = String::from_utf8_lossy(&bytes);
@@ -132,12 +136,12 @@ pub(super) fn scan_text_files_for_report(
                     &bytes,
                     repo.id,
                     rel_path_for_verification,
-                    Arc::from(rel_path.clone()),
+                    Arc::clone(&rel_path),
                 );
 
                 files.push(ScannedTextFile {
                     repo_id: repo.id,
-                    path: Arc::from(rel_path),
+                    path: rel_path,
                     abs_path: read_path,
                     code_chars: code_norm.chars,
                     code_line_starts: code_norm.line_starts,

@@ -73,6 +73,22 @@ dup-code-check --follow-symlinks .
 
 跳过大于 `n` 字节的文件（默认 `10 MiB`）。被跳过的文件会计入 `scanStats.skippedTooLarge`。
 
+### `maxNormalizedChars` / `--max-normalized-chars`
+
+当累计保存的**归一化后的 code-span 字符**将超过 `n` 时停止扫描。触发后会提前结束扫描，`scanStats.skippedBudgetMaxNormalizedChars` 会变为非 0。
+
+用于 `--code-spans` 与 `--report`（文本类检测器）。
+
+> `--strict` 模式下，触发 `maxNormalizedChars` 会被视为“扫描不完整”，从而退出非 0。
+
+### `maxTokens` / `--max-tokens`
+
+当累计保存的 **token** 数将超过 `n` 时停止扫描（报告模式）。触发后会提前结束扫描，`scanStats.skippedBudgetMaxTokens` 会变为非 0。
+
+> `--strict` 模式下，触发 `maxTokens` 会被视为“扫描不完整”，从而退出非 0。
+
+> 在 `--report` 模式下，若未设置 `maxNormalizedChars` / `maxTokens`，会从 `maxTotalBytes` 推导默认值，以限制内存开销。
+
 ## 检测阈值
 
 ### `minMatchLen` / `--min-match-len`

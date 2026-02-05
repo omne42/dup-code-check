@@ -14,6 +14,9 @@ Public types may change between versions.
 In particular, some output structs use `Arc<str>` for `repo_label` / `path` to reduce allocations
 and make cloning cheap when generating large reports.
 
+These fields are not exposed directly; use accessor methods (e.g. `repo_label()` / `path()`)
+instead of accessing struct fields.
+
 ## License
 
 MIT

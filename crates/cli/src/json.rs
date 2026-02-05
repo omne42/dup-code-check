@@ -118,9 +118,9 @@ pub(crate) fn map_duplicate_groups(
                 .files
                 .into_iter()
                 .map(|f| JsonDuplicateFile {
-                    repo_id: f.repo_id,
-                    repo_label: f.repo_label.as_ref().to_string(),
-                    path: f.path.as_ref().to_string(),
+                    repo_id: f.repo_id(),
+                    repo_label: f.repo_label().to_string(),
+                    path: f.path().to_string(),
                 })
                 .collect(),
         })
@@ -140,11 +140,11 @@ pub(crate) fn map_span_groups(
                 .occurrences
                 .into_iter()
                 .map(|o| JsonDuplicateSpanOccurrence {
-                    repo_id: o.repo_id,
-                    repo_label: o.repo_label.as_ref().to_string(),
-                    path: o.path.as_ref().to_string(),
-                    start_line: o.start_line,
-                    end_line: o.end_line,
+                    repo_id: o.repo_id(),
+                    repo_label: o.repo_label().to_string(),
+                    path: o.path().to_string(),
+                    start_line: o.start_line(),
+                    end_line: o.end_line(),
                 })
                 .collect(),
         })
@@ -164,18 +164,18 @@ pub(crate) fn map_report(report: dup_code_check_core::DuplicationReport) -> Json
             .into_iter()
             .map(|p| JsonSimilarityPair {
                 a: JsonDuplicateSpanOccurrence {
-                    repo_id: p.a.repo_id,
-                    repo_label: p.a.repo_label.as_ref().to_string(),
-                    path: p.a.path.as_ref().to_string(),
-                    start_line: p.a.start_line,
-                    end_line: p.a.end_line,
+                    repo_id: p.a.repo_id(),
+                    repo_label: p.a.repo_label().to_string(),
+                    path: p.a.path().to_string(),
+                    start_line: p.a.start_line(),
+                    end_line: p.a.end_line(),
                 },
                 b: JsonDuplicateSpanOccurrence {
-                    repo_id: p.b.repo_id,
-                    repo_label: p.b.repo_label.as_ref().to_string(),
-                    path: p.b.path.as_ref().to_string(),
-                    start_line: p.b.start_line,
-                    end_line: p.b.end_line,
+                    repo_id: p.b.repo_id(),
+                    repo_label: p.b.repo_label().to_string(),
+                    path: p.b.path().to_string(),
+                    start_line: p.b.start_line(),
+                    end_line: p.b.end_line(),
                 },
                 score: p.score,
                 distance: p.distance,
@@ -186,18 +186,18 @@ pub(crate) fn map_report(report: dup_code_check_core::DuplicationReport) -> Json
             .into_iter()
             .map(|p| JsonSimilarityPair {
                 a: JsonDuplicateSpanOccurrence {
-                    repo_id: p.a.repo_id,
-                    repo_label: p.a.repo_label.as_ref().to_string(),
-                    path: p.a.path.as_ref().to_string(),
-                    start_line: p.a.start_line,
-                    end_line: p.a.end_line,
+                    repo_id: p.a.repo_id(),
+                    repo_label: p.a.repo_label().to_string(),
+                    path: p.a.path().to_string(),
+                    start_line: p.a.start_line(),
+                    end_line: p.a.end_line(),
                 },
                 b: JsonDuplicateSpanOccurrence {
-                    repo_id: p.b.repo_id,
-                    repo_label: p.b.repo_label.as_ref().to_string(),
-                    path: p.b.path.as_ref().to_string(),
-                    start_line: p.b.start_line,
-                    end_line: p.b.end_line,
+                    repo_id: p.b.repo_id(),
+                    repo_label: p.b.repo_label().to_string(),
+                    path: p.b.path().to_string(),
+                    start_line: p.b.start_line(),
+                    end_line: p.b.end_line(),
                 },
                 score: p.score,
                 distance: p.distance,

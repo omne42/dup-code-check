@@ -83,9 +83,23 @@ pub fn default_ignore_dirs() -> HashSet<String> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DuplicateFile {
-    pub repo_id: usize,
-    pub repo_label: Arc<str>,
-    pub path: Arc<str>,
+    pub(crate) repo_id: usize,
+    pub(crate) repo_label: Arc<str>,
+    pub(crate) path: Arc<str>,
+}
+
+impl DuplicateFile {
+    pub fn repo_id(&self) -> usize {
+        self.repo_id
+    }
+
+    pub fn repo_label(&self) -> &str {
+        self.repo_label.as_ref()
+    }
+
+    pub fn path(&self) -> &str {
+        self.path.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,11 +111,33 @@ pub struct DuplicateGroup {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DuplicateSpanOccurrence {
-    pub repo_id: usize,
-    pub repo_label: Arc<str>,
-    pub path: Arc<str>,
-    pub start_line: u32,
-    pub end_line: u32,
+    pub(crate) repo_id: usize,
+    pub(crate) repo_label: Arc<str>,
+    pub(crate) path: Arc<str>,
+    pub(crate) start_line: u32,
+    pub(crate) end_line: u32,
+}
+
+impl DuplicateSpanOccurrence {
+    pub fn repo_id(&self) -> usize {
+        self.repo_id
+    }
+
+    pub fn repo_label(&self) -> &str {
+        self.repo_label.as_ref()
+    }
+
+    pub fn path(&self) -> &str {
+        self.path.as_ref()
+    }
+
+    pub fn start_line(&self) -> u32 {
+        self.start_line
+    }
+
+    pub fn end_line(&self) -> u32 {
+        self.end_line
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

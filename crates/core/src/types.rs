@@ -49,6 +49,7 @@ pub struct ScanStats {
     pub skipped_too_large: u64,
     pub skipped_binary: u64,
     pub skipped_outside_root: u64,
+    pub skipped_relativize_failed: u64,
     pub skipped_walk_errors: u64,
     pub skipped_budget_max_files: u64,
     pub skipped_budget_max_total_bytes: u64,

@@ -75,7 +75,8 @@ pub(super) fn scan_text_files_for_report(
                 let rel_path_for_verification = match repo_file.abs_path.strip_prefix(&repo.root) {
                     Ok(rel) => rel.to_path_buf(),
                     Err(_) => {
-                        stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
+                        stats.skipped_relativize_failed =
+                            stats.skipped_relativize_failed.saturating_add(1);
                         return Ok(std::ops::ControlFlow::Continue(()));
                     }
                 };

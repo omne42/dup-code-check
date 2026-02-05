@@ -8,6 +8,7 @@ use crate::json::{
 pub(crate) fn has_fatal_skips(stats: &ScanStats) -> bool {
     stats.skipped_permission_denied > 0
         || stats.skipped_outside_root > 0
+        || stats.skipped_relativize_failed > 0
         || stats.skipped_walk_errors > 0
         || stats.skipped_bucket_truncated > 0
         || stats.skipped_budget_max_files > 0
@@ -58,8 +59,16 @@ pub(crate) fn format_fatal_skip_warning(
         "skippedOutsideRoot",
         "outside_root",
         stats.skipped_outside_root,
-        "some paths were skipped because they resolved outside roots (e.g. --follow-symlinks) or could not be made relative to a root; consider disabling --follow-symlinks or fixing the path/root setup.",
-        "部分路径被跳过：解析后位于 root 之外（例如启用 --follow-symlinks），或无法相对化到某个 root；可考虑关闭 --follow-symlinks 或修复路径/root 配置。",
+        "some symlink targets resolved outside roots; consider disabling --follow-symlinks or fixing symlinks.",
+        "部分符号链接解析后位于 root 之外；可考虑关闭 --follow-symlinks 或修复符号链接。",
+    );
+    push_item(
+        &mut out,
+        "skippedRelativizeFailed",
+        "relativize_failed",
+        stats.skipped_relativize_failed,
+        "some paths could not be made relative to the provided roots (unexpected); re-run with --stats and report a bug if this persists.",
+        "部分路径无法相对化到提供的 root（不符合预期）；请使用 --stats 重新运行，若持续出现请提交 issue。",
     );
     push_item(
         &mut out,
@@ -125,6 +134,7 @@ pub(crate) fn format_scan_stats(localization: Localization, stats: &ScanStats) -
         ("too_large", stats.skipped_too_large),
         ("binary", stats.skipped_binary),
         ("outside_root", stats.skipped_outside_root),
+        ("relativize_failed", stats.skipped_relativize_failed),
         ("walk_errors", stats.skipped_walk_errors),
         ("bucket_truncated", stats.skipped_bucket_truncated),
         ("budget_max_files", stats.skipped_budget_max_files),
@@ -319,6 +329,15 @@ mod tests {
     fn bucket_truncated_is_fatal_skip() {
         let stats = ScanStats {
             skipped_bucket_truncated: 1,
+            ..ScanStats::default()
+        };
+        assert!(has_fatal_skips(&stats));
+    }
+
+    #[test]
+    fn relativize_failed_is_fatal_skip() {
+        let stats = ScanStats {
+            skipped_relativize_failed: 1,
             ..ScanStats::default()
         };
         assert!(has_fatal_skips(&stats));

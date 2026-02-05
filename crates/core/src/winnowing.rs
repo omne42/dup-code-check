@@ -230,13 +230,20 @@ pub(crate) fn finalize_span_groups(
             }
 
             builder.occurrences.sort_by(|a, b| {
-                (a.repo_id, &a.repo_label, &a.path, a.start_line, a.end_line).cmp(&(
-                    b.repo_id,
-                    &b.repo_label,
-                    &b.path,
-                    b.start_line,
-                    b.end_line,
-                ))
+                (
+                    a.repo_id,
+                    a.repo_label.as_ref(),
+                    a.path.as_ref(),
+                    a.start_line,
+                    a.end_line,
+                )
+                    .cmp(&(
+                        b.repo_id,
+                        b.repo_label.as_ref(),
+                        b.path.as_ref(),
+                        b.start_line,
+                        b.end_line,
+                    ))
             });
 
             out.push(DuplicateSpanGroup {

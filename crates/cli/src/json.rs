@@ -117,8 +117,8 @@ pub(crate) fn map_duplicate_groups(
                 .into_iter()
                 .map(|f| JsonDuplicateFile {
                     repo_id: f.repo_id,
-                    repo_label: f.repo_label,
-                    path: f.path,
+                    repo_label: f.repo_label.as_ref().to_string(),
+                    path: f.path.as_ref().to_string(),
                 })
                 .collect(),
         })
@@ -139,8 +139,8 @@ pub(crate) fn map_span_groups(
                 .into_iter()
                 .map(|o| JsonDuplicateSpanOccurrence {
                     repo_id: o.repo_id,
-                    repo_label: o.repo_label,
-                    path: o.path,
+                    repo_label: o.repo_label.as_ref().to_string(),
+                    path: o.path.as_ref().to_string(),
                     start_line: o.start_line,
                     end_line: o.end_line,
                 })
@@ -163,15 +163,15 @@ pub(crate) fn map_report(report: dup_code_check_core::DuplicationReport) -> Json
             .map(|p| JsonSimilarityPair {
                 a: JsonDuplicateSpanOccurrence {
                     repo_id: p.a.repo_id,
-                    repo_label: p.a.repo_label,
-                    path: p.a.path,
+                    repo_label: p.a.repo_label.as_ref().to_string(),
+                    path: p.a.path.as_ref().to_string(),
                     start_line: p.a.start_line,
                     end_line: p.a.end_line,
                 },
                 b: JsonDuplicateSpanOccurrence {
                     repo_id: p.b.repo_id,
-                    repo_label: p.b.repo_label,
-                    path: p.b.path,
+                    repo_label: p.b.repo_label.as_ref().to_string(),
+                    path: p.b.path.as_ref().to_string(),
                     start_line: p.b.start_line,
                     end_line: p.b.end_line,
                 },
@@ -185,15 +185,15 @@ pub(crate) fn map_report(report: dup_code_check_core::DuplicationReport) -> Json
             .map(|p| JsonSimilarityPair {
                 a: JsonDuplicateSpanOccurrence {
                     repo_id: p.a.repo_id,
-                    repo_label: p.a.repo_label,
-                    path: p.a.path,
+                    repo_label: p.a.repo_label.as_ref().to_string(),
+                    path: p.a.path.as_ref().to_string(),
                     start_line: p.a.start_line,
                     end_line: p.a.end_line,
                 },
                 b: JsonDuplicateSpanOccurrence {
                     repo_id: p.b.repo_id,
-                    repo_label: p.b.repo_label,
-                    path: p.b.path,
+                    repo_label: p.b.repo_label.as_ref().to_string(),
+                    path: p.b.path.as_ref().to_string(),
                     start_line: p.b.start_line,
                     end_line: p.b.end_line,
                 },

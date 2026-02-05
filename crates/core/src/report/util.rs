@@ -89,7 +89,7 @@ pub(super) fn fill_missing_previews_from_files(
 
     let mut by_path: HashMap<(usize, &str), &Path> = HashMap::new();
     for file in files {
-        by_path.insert((file.repo_id, file.path.as_str()), file.abs_path.as_path());
+        by_path.insert((file.repo_id, file.path.as_ref()), file.abs_path.as_path());
     }
 
     for group in groups {
@@ -99,7 +99,7 @@ pub(super) fn fill_missing_previews_from_files(
         let Some(occ) = group.occurrences.first() else {
             continue;
         };
-        let Some(path) = by_path.get(&(occ.repo_id, occ.path.as_str())) else {
+        let Some(path) = by_path.get(&(occ.repo_id, occ.path.as_ref())) else {
             continue;
         };
 

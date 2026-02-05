@@ -283,12 +283,12 @@ pub(crate) fn read_repo_file_bytes_with_path(
 
 pub(crate) fn read_repo_file_bytes_for_verification(
     repo_root: &Path,
-    rel_path: &str,
+    rel_path: &Path,
     canonical_root: Option<&Path>,
     follow_symlinks: bool,
     max_file_size: Option<u64>,
 ) -> io::Result<Option<Vec<u8>>> {
-    if !super::is_safe_relative_path(rel_path) {
+    if !super::is_safe_relative_path_buf(rel_path) {
         return Ok(None);
     }
 

@@ -1,5 +1,6 @@
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::dedupe::FileDuplicateGrouper;
 use crate::scan::{
@@ -15,11 +16,13 @@ use super::util::sort_duplicate_groups_for_report;
 
 const DEFAULT_REPORT_MAX_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
 
+type ReportScanOutput = (Vec<Arc<str>>, Vec<ScannedTextFile>, Vec<DuplicateGroup>);
+
 pub(super) fn scan_text_files_for_report(
     roots: &[PathBuf],
     options: &ScanOptions,
     stats: &mut ScanStats,
-) -> io::Result<(Vec<String>, Vec<ScannedTextFile>, Vec<DuplicateGroup>)> {
+) -> io::Result<ReportScanOutput> {
     let mut scan_options = options.clone();
     scan_options.max_total_bytes = Some(
         scan_options
@@ -33,10 +36,10 @@ pub(super) fn scan_text_files_for_report(
         .map(|(id, root)| Repo {
             id,
             root: root.clone(),
-            label: repo_label(root, id),
+            label: Arc::from(repo_label(root, id)),
         })
         .collect();
-    let repo_labels: Vec<String> = repos.iter().map(|repo| repo.label.clone()).collect();
+    let repo_labels: Vec<Arc<str>> = repos.iter().map(|repo| Arc::clone(&repo.label)).collect();
 
     let canonical_roots = if options.follow_symlinks {
         Some(
@@ -72,7 +75,17 @@ pub(super) fn scan_text_files_for_report(
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
 
                 // 1) File duplicates (whitespace-insensitive)
-                file_groups.push_bytes(&bytes, repo.id, rel_path.clone());
+                let rel_path_for_verification = repo_file
+                    .abs_path
+                    .strip_prefix(&repo.root)
+                    .ok()
+                    .map(std::path::Path::to_path_buf);
+                file_groups.push_bytes(
+                    &bytes,
+                    repo.id,
+                    rel_path_for_verification,
+                    Arc::from(rel_path.clone()),
+                );
 
                 // 2) Text-based detectors
                 let text = String::from_utf8_lossy(&bytes);
@@ -83,7 +96,7 @@ pub(super) fn scan_text_files_for_report(
 
                 files.push(ScannedTextFile {
                     repo_id: repo.id,
-                    path: rel_path,
+                    path: Arc::from(rel_path),
                     abs_path: read_path,
                     code_chars: code_norm.chars,
                     code_char_lines: code_norm.line_map,
@@ -113,13 +126,13 @@ pub(super) fn scan_text_files_for_report(
 
             read_repo_file_bytes_for_verification(
                 &repo.root,
-                path,
+                path.as_path(),
                 canonical_root,
                 follow_symlinks,
                 max_file_size,
             )
         },
-        |repo_id| repos[repo_id].label.clone(),
+        |repo_id| Arc::clone(&repos[repo_id].label),
     )?;
 
     sort_duplicate_groups_for_report(&mut file_duplicates);

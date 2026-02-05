@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct ScanOptions {
@@ -82,8 +83,8 @@ pub fn default_ignore_dirs() -> HashSet<String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DuplicateFile {
     pub repo_id: usize,
-    pub repo_label: String,
-    pub path: String,
+    pub repo_label: Arc<str>,
+    pub path: Arc<str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,8 +97,8 @@ pub struct DuplicateGroup {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DuplicateSpanOccurrence {
     pub repo_id: usize,
-    pub repo_label: String,
-    pub path: String,
+    pub repo_label: Arc<str>,
+    pub path: Arc<str>,
     pub start_line: u32,
     pub end_line: u32,
 }

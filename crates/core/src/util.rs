@@ -1,20 +1,22 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use crate::types::DuplicateSpanOccurrence;
 
 #[derive(Debug)]
 pub(crate) struct NormalizedFile {
     pub(crate) repo_id: usize,
-    pub(crate) rel_path: String,
+    pub(crate) repo_label: Arc<str>,
+    pub(crate) rel_path: Arc<str>,
     pub(crate) normalized: Vec<u32>,
     pub(crate) line_map: Vec<u32>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) struct NormalizedFileView<'a> {
     pub(crate) repo_id: usize,
-    pub(crate) repo_label: &'a str,
-    pub(crate) rel_path: &'a str,
+    pub(crate) repo_label: Arc<str>,
+    pub(crate) rel_path: Arc<str>,
     pub(crate) normalized: &'a [u32],
     pub(crate) line_map: &'a [u32],
 }
@@ -302,8 +304,8 @@ pub(crate) fn add_occurrence_view(
     builder.repo_ids.insert(file.repo_id);
     builder.occurrences.push(DuplicateSpanOccurrence {
         repo_id: file.repo_id,
-        repo_label: file.repo_label.to_string(),
-        path: file.rel_path.to_string(),
+        repo_label: Arc::clone(&file.repo_label),
+        path: Arc::clone(&file.rel_path),
         start_line,
         end_line,
     });

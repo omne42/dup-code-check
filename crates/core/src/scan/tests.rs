@@ -227,7 +227,7 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Res
         let repo = Repo {
             id: 0,
             root: root.clone(),
-            label: "test".to_string(),
+            label: "test".into(),
         };
         let options = ScanOptions {
             max_files: Some(10),
@@ -282,7 +282,7 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_after_scanning_started() -> 
         let repo = Repo {
             id: 0,
             root: root.clone(),
-            label: "test".to_string(),
+            label: "test".into(),
         };
         let options = ScanOptions {
             max_files: Some(FILES + 10),

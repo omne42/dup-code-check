@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::types::{DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanStats};
 use crate::util::{NormalizedFileView, fnv1a64, make_preview, whitespace_insensitive_fingerprint};
@@ -7,10 +9,16 @@ use crate::winnowing::{WinnowingParams, detect_duplicate_span_groups_winnowing};
 
 type FileDuplicateKey = (u64, usize, u64, [u8; 16], [u8; 16]);
 
+#[derive(Debug, Clone)]
+enum FileCandidatePath {
+    Rel(PathBuf),
+    External(Arc<str>),
+}
+
 #[derive(Debug)]
 struct FileCandidate {
     repo_id: usize,
-    path: String,
+    path: FileCandidatePath,
 }
 
 #[derive(Debug)]
@@ -25,7 +33,13 @@ pub(crate) struct FileDuplicateGrouper {
 }
 
 impl FileDuplicateGrouper {
-    pub(crate) fn push_bytes(&mut self, bytes: &[u8], repo_id: usize, path: String) {
+    pub(crate) fn push_bytes(
+        &mut self,
+        bytes: &[u8],
+        repo_id: usize,
+        rel_path_for_verification: Option<PathBuf>,
+        path_display: Arc<str>,
+    ) {
         let fp = whitespace_insensitive_fingerprint(bytes);
         let key = (
             fp.content_hash,
@@ -34,6 +48,11 @@ impl FileDuplicateGrouper {
             fp.prefix,
             fp.suffix,
         );
+
+        let path = match rel_path_for_verification {
+            Some(rel) => FileCandidatePath::Rel(rel),
+            None => FileCandidatePath::External(path_display),
+        };
 
         match self.groups.get_mut(&key) {
             Some(existing) => {
@@ -61,8 +80,8 @@ impl FileDuplicateGrouper {
         mut repo_label_for: L,
     ) -> io::Result<Vec<DuplicateGroup>>
     where
-        R: FnMut(usize, &str) -> io::Result<Option<Vec<u8>>>,
-        L: FnMut(usize) -> String,
+        R: FnMut(usize, &PathBuf) -> io::Result<Option<Vec<u8>>>,
+        L: FnMut(usize) -> Arc<str>,
     {
         fn normalize_ascii_whitespace(bytes: &[u8]) -> Vec<u8> {
             let mut out = Vec::with_capacity(bytes.len());
@@ -85,7 +104,11 @@ impl FileDuplicateGrouper {
 
             let mut verified: Vec<(Vec<u8>, Vec<FileCandidate>, HashSet<usize>)> = Vec::new();
             for file in builder.files {
-                let Some(bytes) = read_bytes(file.repo_id, &file.path)? else {
+                let path = match &file.path {
+                    FileCandidatePath::Rel(rel) => rel,
+                    FileCandidatePath::External(_) => continue,
+                };
+                let Some(bytes) = read_bytes(file.repo_id, path)? else {
                     continue;
                 };
                 if bytes.contains(&0) {
@@ -117,13 +140,35 @@ impl FileDuplicateGrouper {
                 let content_hash = fnv1a64(&normalized);
                 let normalized_len = normalized.len();
 
-                files.sort_by(|a, b| (a.repo_id, &a.path).cmp(&(b.repo_id, &b.path)));
+                files.sort_by(|a, b| {
+                    let a_key = (
+                        a.repo_id,
+                        match &a.path {
+                            FileCandidatePath::Rel(p) => p.as_path(),
+                            FileCandidatePath::External(s) => std::path::Path::new(s.as_ref()),
+                        },
+                    );
+                    let b_key = (
+                        b.repo_id,
+                        match &b.path {
+                            FileCandidatePath::Rel(p) => p.as_path(),
+                            FileCandidatePath::External(s) => std::path::Path::new(s.as_ref()),
+                        },
+                    );
+                    a_key.cmp(&b_key)
+                });
                 let files = files
                     .into_iter()
                     .map(|file| DuplicateFile {
                         repo_id: file.repo_id,
                         repo_label: repo_label_for(file.repo_id),
-                        path: file.path,
+                        path: match file.path {
+                            FileCandidatePath::Rel(rel) => {
+                                let display = rel.to_string_lossy().replace('\\', "/");
+                                Arc::from(display)
+                            }
+                            FileCandidatePath::External(display) => display,
+                        },
                     })
                     .collect();
                 out.push(DuplicateGroup {
@@ -166,25 +211,27 @@ pub(crate) fn detect_duplicate_code_spans_winnowing<'a>(
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::Arc;
 
     use super::*;
 
     #[test]
     fn file_duplicates_are_verified_against_bytes() {
         let mut groups = FileDuplicateGrouper::default();
-        groups.push_bytes(b"abc", 0, "a.txt".to_string());
-        groups.push_bytes(b"abc", 0, "b.txt".to_string());
+        groups.push_bytes(b"abc", 0, Some(PathBuf::from("a.txt")), Arc::from("a.txt"));
+        groups.push_bytes(b"abc", 0, Some(PathBuf::from("b.txt")), Arc::from("b.txt"));
 
-        let mut content = HashMap::new();
-        content.insert("a.txt".to_string(), b"abc".to_vec());
+        let mut content: HashMap<PathBuf, Vec<u8>> = HashMap::new();
+        content.insert(PathBuf::from("a.txt"), b"abc".to_vec());
         // Simulate a file changing between scan and verification.
-        content.insert("b.txt".to_string(), b"xyz".to_vec());
+        content.insert(PathBuf::from("b.txt"), b"xyz".to_vec());
 
         let verified = groups
             .into_groups_verified(
                 false,
                 |_repo_id, path| Ok(content.get(path).cloned()),
-                |_repo_id| "repo0".to_string(),
+                |_repo_id| Arc::from("repo0"),
             )
             .expect("verification should not fail");
 

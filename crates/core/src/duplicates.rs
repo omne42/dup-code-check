@@ -1,5 +1,6 @@
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::dedupe::{FileDuplicateGrouper, detect_duplicate_code_spans_winnowing};
 use crate::scan::{
@@ -35,7 +36,7 @@ pub fn find_duplicate_files_with_stats(
         .map(|(id, root)| Repo {
             id,
             root: root.clone(),
-            label: repo_label(root, id),
+            label: Arc::from(repo_label(root, id)),
         })
         .collect();
 
@@ -66,7 +67,17 @@ pub fn find_duplicate_files_with_stats(
                 };
 
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
-                groups.push_bytes(&bytes, repo.id, rel_path);
+                let rel_path_for_verification = repo_file
+                    .abs_path
+                    .strip_prefix(&repo.root)
+                    .ok()
+                    .map(std::path::Path::to_path_buf);
+                groups.push_bytes(
+                    &bytes,
+                    repo.id,
+                    rel_path_for_verification,
+                    Arc::from(rel_path),
+                );
 
                 Ok(std::ops::ControlFlow::Continue(()))
             })?
@@ -85,13 +96,13 @@ pub fn find_duplicate_files_with_stats(
 
             read_repo_file_bytes_for_verification(
                 &repo.root,
-                path,
+                path.as_path(),
                 canonical_root,
                 options.follow_symlinks,
                 options.max_file_size,
             )
         },
-        |repo_id| repos[repo_id].label.clone(),
+        |repo_id| Arc::clone(&repos[repo_id].label),
     )?;
 
     out.sort_by(|a, b| {
@@ -132,7 +143,7 @@ pub fn find_duplicate_code_spans_with_stats(
         .map(|(id, root)| Repo {
             id,
             root: root.clone(),
-            label: repo_label(root, id),
+            label: Arc::from(repo_label(root, id)),
         })
         .collect();
 
@@ -170,7 +181,8 @@ pub fn find_duplicate_code_spans_with_stats(
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
                 files.push(NormalizedFile {
                     repo_id: repo.id,
-                    rel_path,
+                    repo_label: Arc::clone(&repo.label),
+                    rel_path: Arc::from(rel_path),
                     normalized: normalized.chars,
                     line_map: normalized.line_map,
                 });
@@ -191,8 +203,8 @@ pub fn find_duplicate_code_spans_with_stats(
             );
             NormalizedFileView {
                 repo_id: file.repo_id,
-                repo_label: repos[file.repo_id].label.as_str(),
-                rel_path: &file.rel_path,
+                repo_label: Arc::clone(&file.repo_label),
+                rel_path: Arc::clone(&file.rel_path),
                 normalized: &file.normalized,
                 line_map: &file.line_map,
             }

@@ -25,7 +25,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.92.0
-          components: rustfmt
+          components: rustfmt, clippy
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -46,6 +46,10 @@ jobs:
       - name: Rust tests
         if: matrix.os == 'ubuntu-latest'
         run: cargo test --workspace
+
+      - name: Rust clippy (deny warnings)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Node smoke tests
         run: npm test

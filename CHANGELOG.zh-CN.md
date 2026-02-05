@@ -131,3 +131,6 @@
 - 扫描预算：在读取过程中也会强制 `maxTotalBytes` / `maxFileSize`，避免扫描期间文件增长导致预算超出。
 - Report：截断包含非 ASCII 字符的 preview 时不再 panic。
 - 测试：当运行环境下 `chmod 000` 无法触发 `PermissionDenied`（例如 root）时，`PermissionDenied` 扫描测试会跳过，避免误报失败。
+- Core：通过 `Arc<str>` 共享输出中的 `repoLabel` / `path` 字符串，减少分配与拷贝成本（clone 变便宜）。
+- Core：重复文件校验改为使用相对 `PathBuf`（支持非 UTF-8 路径），避免依赖 lossy UTF-8 字符串导致无法复核。
+- CI：在 Linux 上新增 `cargo clippy --workspace --all-targets -- -D warnings` 硬门。

@@ -7,6 +7,7 @@ mod tests;
 
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::scan::validate_roots;
 use crate::tokenize::BlockNode;
@@ -15,7 +16,7 @@ use crate::types::{DuplicationReport, ScanOptions, ScanOutcome, ScanStats};
 #[derive(Debug)]
 struct ScannedTextFile {
     repo_id: usize,
-    path: String,
+    path: Arc<str>,
     abs_path: PathBuf,
     code_chars: Vec<u32>,
     code_char_lines: Vec<u32>,

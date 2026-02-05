@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 use crate::types::{ScanOptions, ScanStats};
 
@@ -47,7 +48,7 @@ pub(crate) fn validate_roots(roots: &[PathBuf]) -> io::Result<()> {
 pub(crate) struct Repo {
     pub(crate) id: usize,
     pub(crate) root: PathBuf,
-    pub(crate) label: String,
+    pub(crate) label: Arc<str>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +83,27 @@ fn is_safe_relative_path(raw: &str) -> bool {
         return false;
     }
     let path = Path::new(raw);
+    if path.is_absolute() {
+        return false;
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => {}
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn is_safe_relative_path_buf(path: &Path) -> bool {
+    if path.as_os_str().is_empty() {
+        return false;
+    }
     if path.is_absolute() {
         return false;
     }

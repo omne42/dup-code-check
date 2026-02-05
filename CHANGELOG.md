@@ -104,6 +104,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: avoid cloning scan stats when emitting JSON (`--json --stats`).
 - File duplicates: speed up verification grouping for large candidate sets (avoid quadratic behavior).
 - Scan: de-duplicate safe-relative-path validation helpers.
+- Scan: avoid per-file `ScanOptions::default()` allocations during verification reads.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

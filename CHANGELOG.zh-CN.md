@@ -104,6 +104,7 @@
 - CLI：JSON 输出 scanStats 时避免 clone（`--json --stats`）。
 - 重复文件：加速大候选集的校验分组（避免 O(n^2)）。
 - 扫描：安全相对路径校验 helper 去重。
+- 扫描：校验读取阶段避免为每个文件构造 `ScanOptions::default()`（减少分配）。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。

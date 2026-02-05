@@ -147,7 +147,8 @@ fn finalize_scan(
         eprint!("{}", format_scan_stats(parsed.localization, scan_stats));
     }
 
-    if scan_stats.has_fatal_skips() {
+    let has_fatal_skips = scan_stats.has_fatal_skips();
+    if has_fatal_skips {
         eprint!(
             "{}",
             format_fatal_skip_warning(
@@ -158,7 +159,7 @@ fn finalize_scan(
         );
     }
 
-    if parsed.strict && scan_stats.has_fatal_skips() {
+    if parsed.strict && has_fatal_skips {
         if !parsed.stats {
             eprint!("{}", format_scan_stats(parsed.localization, scan_stats));
         }

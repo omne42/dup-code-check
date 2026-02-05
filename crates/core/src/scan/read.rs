@@ -302,11 +302,20 @@ pub(crate) fn read_repo_file_bytes_for_verification(
         abs_path: repo_root.join(rel_path),
     };
     let options = ScanOptions {
+        ignore_dirs: std::collections::HashSet::new(),
         follow_symlinks,
         max_file_size,
         max_files: None,
         max_total_bytes: None,
-        ..ScanOptions::default()
+        max_normalized_chars: None,
+        max_tokens: None,
+        min_match_len: 1,
+        min_token_len: 1,
+        similarity_threshold: 0.0,
+        simhash_max_distance: 0,
+        max_report_items: 0,
+        respect_gitignore: true,
+        cross_repo_only: false,
     };
     let mut stats = ScanStats::default();
     read_repo_file_bytes(&repo_file, canonical_root, &options, &mut stats)

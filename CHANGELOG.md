@@ -133,4 +133,5 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Report: avoid panics when truncating previews containing non-ASCII characters.
 - Core: reduce output allocations by sharing `repoLabel` / `path` strings via `Arc<str>` (cheap clones).
 - Core: file-duplicate verification now uses relative `PathBuf` (non-UTF-8 safe) instead of lossy UTF-8 strings.
+- Core: treat unexpected path prefix stripping failures as `skippedOutsideRoot` (fatal skip) instead of silently dropping candidates.
 - CI: add a `cargo clippy --workspace --all-targets -- -D warnings` gate on Linux.

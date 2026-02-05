@@ -133,4 +133,5 @@
 - 测试：当运行环境下 `chmod 000` 无法触发 `PermissionDenied`（例如 root）时，`PermissionDenied` 扫描测试会跳过，避免误报失败。
 - Core：通过 `Arc<str>` 共享输出中的 `repoLabel` / `path` 字符串，减少分配与拷贝成本（clone 变便宜）。
 - Core：重复文件校验改为使用相对 `PathBuf`（支持非 UTF-8 路径），避免依赖 lossy UTF-8 字符串导致无法复核。
+- Core：当前缀剥离失败（`strip_prefix`）这种异常情况发生时，将其计为 `skippedOutsideRoot`（致命跳过），不再静默丢弃候选项。
 - CI：在 Linux 上新增 `cargo clippy --workspace --all-targets -- -D warnings` 硬门。

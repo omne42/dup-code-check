@@ -72,14 +72,17 @@ pub(super) fn scan_text_files_for_report(
                     return Ok(std::ops::ControlFlow::Continue(()));
                 };
 
+                let rel_path_for_verification = match repo_file.abs_path.strip_prefix(&repo.root) {
+                    Ok(rel) => rel.to_path_buf(),
+                    Err(_) => {
+                        stats.skipped_outside_root = stats.skipped_outside_root.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Continue(()));
+                    }
+                };
+
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
 
                 // 1) File duplicates (whitespace-insensitive)
-                let rel_path_for_verification = repo_file
-                    .abs_path
-                    .strip_prefix(&repo.root)
-                    .ok()
-                    .map(std::path::Path::to_path_buf);
                 file_groups.push_bytes(
                     &bytes,
                     repo.id,

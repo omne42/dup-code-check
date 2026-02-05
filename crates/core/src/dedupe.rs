@@ -9,16 +9,11 @@ use crate::winnowing::{WinnowingParams, detect_duplicate_span_groups_winnowing};
 
 type FileDuplicateKey = (u64, usize, u64, [u8; 16], [u8; 16]);
 
-#[derive(Debug, Clone)]
-enum FileCandidatePath {
-    Rel(PathBuf),
-    External(Arc<str>),
-}
-
 #[derive(Debug)]
 struct FileCandidate {
     repo_id: usize,
-    path: FileCandidatePath,
+    rel_path: PathBuf,
+    path_display: Arc<str>,
 }
 
 #[derive(Debug)]
@@ -37,7 +32,7 @@ impl FileDuplicateGrouper {
         &mut self,
         bytes: &[u8],
         repo_id: usize,
-        rel_path_for_verification: Option<PathBuf>,
+        rel_path_for_verification: PathBuf,
         path_display: Arc<str>,
     ) {
         let fp = whitespace_insensitive_fingerprint(bytes);
@@ -49,15 +44,14 @@ impl FileDuplicateGrouper {
             fp.suffix,
         );
 
-        let path = match rel_path_for_verification {
-            Some(rel) => FileCandidatePath::Rel(rel),
-            None => FileCandidatePath::External(path_display),
-        };
-
         match self.groups.get_mut(&key) {
             Some(existing) => {
                 existing.repo_ids.insert(repo_id);
-                existing.files.push(FileCandidate { repo_id, path });
+                existing.files.push(FileCandidate {
+                    repo_id,
+                    rel_path: rel_path_for_verification,
+                    path_display,
+                });
             }
             None => {
                 let mut repo_ids = HashSet::new();
@@ -65,7 +59,11 @@ impl FileDuplicateGrouper {
                 self.groups.insert(
                     key,
                     FileGroupBuilder {
-                        files: vec![FileCandidate { repo_id, path }],
+                        files: vec![FileCandidate {
+                            repo_id,
+                            rel_path: rel_path_for_verification,
+                            path_display,
+                        }],
                         repo_ids,
                     },
                 );
@@ -104,11 +102,7 @@ impl FileDuplicateGrouper {
 
             let mut verified: Vec<(Vec<u8>, Vec<FileCandidate>, HashSet<usize>)> = Vec::new();
             for file in builder.files {
-                let path = match &file.path {
-                    FileCandidatePath::Rel(rel) => rel,
-                    FileCandidatePath::External(_) => continue,
-                };
-                let Some(bytes) = read_bytes(file.repo_id, path)? else {
+                let Some(bytes) = read_bytes(file.repo_id, &file.rel_path)? else {
                     continue;
                 };
                 if bytes.contains(&0) {
@@ -141,34 +135,14 @@ impl FileDuplicateGrouper {
                 let normalized_len = normalized.len();
 
                 files.sort_by(|a, b| {
-                    let a_key = (
-                        a.repo_id,
-                        match &a.path {
-                            FileCandidatePath::Rel(p) => p.as_path(),
-                            FileCandidatePath::External(s) => std::path::Path::new(s.as_ref()),
-                        },
-                    );
-                    let b_key = (
-                        b.repo_id,
-                        match &b.path {
-                            FileCandidatePath::Rel(p) => p.as_path(),
-                            FileCandidatePath::External(s) => std::path::Path::new(s.as_ref()),
-                        },
-                    );
-                    a_key.cmp(&b_key)
+                    (a.repo_id, a.path_display.as_ref()).cmp(&(b.repo_id, b.path_display.as_ref()))
                 });
                 let files = files
                     .into_iter()
                     .map(|file| DuplicateFile {
                         repo_id: file.repo_id,
                         repo_label: repo_label_for(file.repo_id),
-                        path: match file.path {
-                            FileCandidatePath::Rel(rel) => {
-                                let display = rel.to_string_lossy().replace('\\', "/");
-                                Arc::from(display)
-                            }
-                            FileCandidatePath::External(display) => display,
-                        },
+                        path: file.path_display,
                     })
                     .collect();
                 out.push(DuplicateGroup {
@@ -219,8 +193,8 @@ mod tests {
     #[test]
     fn file_duplicates_are_verified_against_bytes() {
         let mut groups = FileDuplicateGrouper::default();
-        groups.push_bytes(b"abc", 0, Some(PathBuf::from("a.txt")), Arc::from("a.txt"));
-        groups.push_bytes(b"abc", 0, Some(PathBuf::from("b.txt")), Arc::from("b.txt"));
+        groups.push_bytes(b"abc", 0, PathBuf::from("a.txt"), Arc::from("a.txt"));
+        groups.push_bytes(b"abc", 0, PathBuf::from("b.txt"), Arc::from("b.txt"));
 
         let mut content: HashMap<PathBuf, Vec<u8>> = HashMap::new();
         content.insert(PathBuf::from("a.txt"), b"abc".to_vec());

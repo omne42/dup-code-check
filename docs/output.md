@@ -86,7 +86,7 @@ dup-code-check --stats . >result.txt 2>stats.txt
 
 `--strict` is intended for CI and answers “was the scan complete?”:
 
-- exits `1` on `PermissionDenied`, `relativize_failed`, traversal errors, or budget abort (`maxFiles` / `maxTotalBytes`)
+- exits `1` on `PermissionDenied`, `outside_root`, `relativize_failed`, traversal errors, or budget abort (`maxFiles` / `maxTotalBytes`)
 - does **not** fail on `NotFound`, `TooLarge`, `Binary`, or `BucketTruncated`
 
 When `--json` is enabled and `--stats` is not, `--strict` still prints stats to stderr on failure (so you can see why).

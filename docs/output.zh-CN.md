@@ -96,7 +96,7 @@ dup-code-check --stats . >result.txt 2>stats.txt
 
 `--strict` 用于在 CI 中判断“扫描是否完整”：
 
-- 若出现 `PermissionDenied` / `relativize_failed` / 遍历错误 / 预算中断（`maxFiles` / `maxTotalBytes`），退出码为 `1`
+- 若出现 `PermissionDenied` / `outside_root` / `relativize_failed` / 遍历错误 / 预算中断（`maxFiles` / `maxTotalBytes`），退出码为 `1`
 - 其他跳过（`NotFound` / `TooLarge` / `Binary` / `BucketTruncated`）不会触发失败
 
 当 `--json` 开启且 `--stats` 未开启时，`--strict` 仍会在失败时把统计打印到 stderr，避免你拿不到原因。

@@ -146,7 +146,13 @@ where
     }
 
     fn kill_and_wait_retriable(child: &mut std::process::Child) {
-        let _ = child.kill();
+        loop {
+            match child.kill() {
+                Ok(()) => break,
+                Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
         let _ = wait_retriable(child);
     }
 

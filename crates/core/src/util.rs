@@ -3,15 +3,6 @@ use std::sync::Arc;
 
 use crate::types::DuplicateSpanOccurrence;
 
-#[derive(Debug)]
-pub(crate) struct NormalizedFile {
-    pub(crate) repo_id: usize,
-    pub(crate) repo_label: Arc<str>,
-    pub(crate) rel_path: Arc<str>,
-    pub(crate) normalized: Vec<u32>,
-    pub(crate) line_map: Vec<u32>,
-}
-
 #[derive(Debug, Clone)]
 pub(crate) struct NormalizedFileView<'a> {
     pub(crate) repo_id: usize,
@@ -19,6 +10,24 @@ pub(crate) struct NormalizedFileView<'a> {
     pub(crate) rel_path: Arc<str>,
     pub(crate) normalized: &'a [u32],
     pub(crate) line_map: &'a [u32],
+}
+
+#[derive(Debug)]
+pub(crate) struct NormalizedCodeFile {
+    pub(crate) repo_id: usize,
+    pub(crate) repo_label: Arc<str>,
+    pub(crate) rel_path: Arc<str>,
+    pub(crate) normalized: Vec<u8>,
+    pub(crate) line_starts: Vec<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct NormalizedCodeFileView<'a> {
+    pub(crate) repo_id: usize,
+    pub(crate) repo_label: Arc<str>,
+    pub(crate) rel_path: Arc<str>,
+    pub(crate) normalized: &'a [u8],
+    pub(crate) line_starts: &'a [u32],
 }
 
 #[derive(Debug)]
@@ -34,8 +43,8 @@ pub(crate) struct SpanGroupBuilder {
 
 #[derive(Debug)]
 pub(crate) struct NormalizedText {
-    pub(crate) chars: Vec<u32>,
-    pub(crate) line_map: Vec<u32>,
+    pub(crate) chars: Vec<u8>,
+    pub(crate) line_starts: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,26 +123,33 @@ pub(crate) fn whitespace_insensitive_fingerprint(bytes: &[u8]) -> WhitespaceInse
 }
 
 pub(crate) fn normalize_for_code_spans(bytes: &[u8]) -> NormalizedText {
-    let mut line: u32 = 1;
     let mut chars = Vec::new();
-    let mut line_map = Vec::new();
+    let mut line_starts: Vec<u32> = vec![0];
 
     for &b in bytes {
         if b == b'\n' {
-            line = line.saturating_add(1);
+            line_starts.push(u32::try_from(chars.len()).unwrap_or(u32::MAX));
             continue;
         }
         if b.is_ascii_alphanumeric() || b == b'_' {
-            chars.push(u32::from(b));
-            line_map.push(line);
+            chars.push(b);
         }
     }
 
-    NormalizedText { chars, line_map }
+    NormalizedText { chars, line_starts }
 }
 
 pub(crate) fn fold_u64_to_u32(value: u64) -> u32 {
     (value as u32) ^ ((value >> 32) as u32)
+}
+
+pub(crate) fn line_for_pos(line_starts: &[u32], pos: usize) -> u32 {
+    if line_starts.is_empty() {
+        return 1;
+    }
+    let pos_u32 = u32::try_from(pos).unwrap_or(u32::MAX);
+    let idx = line_starts.partition_point(|&start| start <= pos_u32);
+    idx.max(1) as u32
 }
 
 pub(crate) fn fnv1a64(bytes: &[u8]) -> u64 {
@@ -162,8 +178,91 @@ pub(crate) fn fnv1a64_u32(codepoints: &[u32]) -> u64 {
     hash
 }
 
+pub(crate) fn fnv1a64_u8_as_u32(codepoints: &[u8]) -> u64 {
+    const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+
+    let mut hash = FNV_OFFSET_BASIS;
+    for &cp in codepoints {
+        for b in u32::from(cp).to_le_bytes() {
+            hash ^= u64::from(b);
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+    }
+    hash
+}
+
 pub(crate) fn winnowed_fingerprints(
     chars: &[u32],
+    k: usize,
+    window_size: usize,
+) -> Vec<(u64, usize)> {
+    use std::collections::VecDeque;
+
+    if k == 0 || window_size == 0 || chars.len() < k {
+        return Vec::new();
+    }
+
+    const BASE: u64 = 911382323;
+
+    let mut pow = 1u64;
+    for _ in 1..k {
+        pow = pow.wrapping_mul(BASE);
+    }
+
+    let mut hash = 0u64;
+    for &cp in &chars[..k] {
+        hash = hash
+            .wrapping_mul(BASE)
+            .wrapping_add(u64::from(cp).wrapping_add(1));
+    }
+
+    let mut out = Vec::new();
+    let mut deque: VecDeque<(usize, u64)> = VecDeque::new();
+    let last_start = chars.len() - k;
+
+    for i in 0..=last_start {
+        if i != 0 {
+            let out_cp = u64::from(chars[i - 1]).wrapping_add(1);
+            let in_cp = u64::from(chars[i + k - 1]).wrapping_add(1);
+            hash = hash
+                .wrapping_sub(out_cp.wrapping_mul(pow))
+                .wrapping_mul(BASE)
+                .wrapping_add(in_cp);
+        }
+
+        while let Some(&(idx, _)) = deque.front() {
+            if idx + window_size <= i {
+                deque.pop_front();
+            } else {
+                break;
+            }
+        }
+        while let Some(&(_, h)) = deque.back() {
+            if hash <= h {
+                deque.pop_back();
+            } else {
+                break;
+            }
+        }
+        deque.push_back((i, hash));
+
+        if i + 1 >= window_size {
+            let Some(&(min_idx, min_hash)) = deque.front() else {
+                debug_assert!(false, "window has items");
+                continue;
+            };
+            if out.last().map(|&(_, idx)| idx) != Some(min_idx) {
+                out.push((min_hash, min_idx));
+            }
+        }
+    }
+
+    out
+}
+
+pub(crate) fn winnowed_fingerprints_u8(
+    chars: &[u8],
     k: usize,
     window_size: usize,
 ) -> Vec<(u64, usize)> {
@@ -262,6 +361,37 @@ pub(crate) fn maximal_match(
     Some((start_a, start_b, end_a - start_a))
 }
 
+pub(crate) fn maximal_match_u8(
+    a: &[u8],
+    a_pos: usize,
+    b: &[u8],
+    b_pos: usize,
+    k: usize,
+) -> Option<(usize, usize, usize)> {
+    if k == 0 || a_pos.checked_add(k)? > a.len() || b_pos.checked_add(k)? > b.len() {
+        return None;
+    }
+    if a[a_pos..a_pos + k] != b[b_pos..b_pos + k] {
+        return None;
+    }
+
+    let mut start_a = a_pos;
+    let mut start_b = b_pos;
+    while start_a > 0 && start_b > 0 && a[start_a - 1] == b[start_b - 1] {
+        start_a -= 1;
+        start_b -= 1;
+    }
+
+    let mut end_a = a_pos + k;
+    let mut end_b = b_pos + k;
+    while end_a < a.len() && end_b < b.len() && a[end_a] == b[end_b] {
+        end_a += 1;
+        end_b += 1;
+    }
+
+    Some((start_a, start_b, end_a - start_a))
+}
+
 pub(crate) fn canonicalize_match(
     file_a: usize,
     file_b: usize,
@@ -273,6 +403,14 @@ pub(crate) fn canonicalize_match(
     } else {
         (file_b, file_a, start_b, start_a)
     }
+}
+
+pub(crate) fn make_preview_ascii(codepoints: &[u8], max_len: usize) -> String {
+    codepoints
+        .iter()
+        .take(max_len)
+        .map(|&cp| char::from(cp))
+        .collect()
 }
 
 pub(crate) fn add_occurrence_view(
@@ -309,14 +447,6 @@ pub(crate) fn add_occurrence_view(
         start_line,
         end_line,
     });
-}
-
-pub(crate) fn make_preview(codepoints: &[u32], max_len: usize) -> String {
-    codepoints
-        .iter()
-        .take(max_len)
-        .filter_map(|&cp| char::from_u32(cp))
-        .collect()
 }
 
 #[cfg(test)]

@@ -14,6 +14,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI i18n: `--localization <en|zh>` (default: `en`).
 - CLI: `--version` / `-V`.
 - Scan budgets: `maxFiles` / `maxTotalBytes` (CLI: `--max-files` / `--max-total-bytes`).
+- Scan budgets: `maxNormalizedChars` / `maxTokens` (CLI: `--max-normalized-chars` / `--max-tokens`).
 - Scan stats + strict mode in CLI (`--stats`, `--strict`).
 - CLI: `--gitignore` to explicitly enable `.gitignore` filtering (default on; mainly useful in scripts).
 - npm: `bin/dup-code-check.mjs` launcher script (enables cross-platform `dup-code-check` via npm).
@@ -53,6 +54,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Repo links: update GitHub owner / Pages URLs (`omne42`).
 - Metadata: use MIT-only license identifier.
 - Scan budgets: `maxFiles` now stops scanning once the file-count budget is hit (`skippedBudgetMaxFiles` becomes non-zero).
+- Scan budgets: `maxNormalizedChars` / `maxTokens` now stop scanning once normalization/token budgets are hit (`skippedBudgetMaxNormalizedChars` / `skippedBudgetMaxTokens` become non-zero).
 - Node installer: `postinstall` builds the Rust binary for global installs; project installs build on first run (or set `DUP_CODE_CHECK_BUILD_ON_INSTALL=1`).
 - Scan pipeline: stream `git ls-files` enumeration in the Git fast path (avoid collecting full lists; stop early under `maxFiles`).
 - CLI: clarify `--strict` semantics (fatal skips only: permission/traversal/budget/bucket) and add smoke coverage.
@@ -78,6 +80,7 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan: when Git streaming enumeration fails, fall back to the walker (avoid early aborts / double-scans).
 - CLI: resolve roots by directly `canonicalize()`-ing user paths (preserve symlink semantics).
 - Report: reduce memory usage by avoiding storing full file text for previews (generate previews from files on demand).
+- Report/code spans: reduce memory usage by storing code-span normalization as compact bytes with per-line start indexes.
 - Rust: refactor the winnowing detector API to pass params as a struct (no behavior change).
 - Normalization: code-span and line-span detectors now keep only ASCII word chars (`[A-Za-z0-9_]`) to match the docs.
 - Report: avoid extra `String` allocations when scanning/tokenizing files for `--report`.
@@ -88,6 +91,8 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan stats: add `gitFastPathFallbacks` to record when the Git fast path falls back to the walker.
 - Report: de-duplicate the `splitmix64` helper for similar-block detectors (no behavior change).
 - CLI: avoid cloning scan stats when emitting JSON (`--json --stats`).
+- File duplicates: speed up verification grouping for large candidate sets (avoid quadratic behavior).
+- Scan: de-duplicate safe-relative-path validation helpers.
 
 ### Fixed
 - Tolerate `NotFound` during scanning (files deleted mid-scan).

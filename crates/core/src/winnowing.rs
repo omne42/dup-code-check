@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
-use crate::types::{DuplicateSpanGroup, ScanStats};
+use crate::types::{DuplicateSpanGroup, DuplicateSpanOccurrence, ScanStats};
 use crate::util::{
-    NormalizedFileView, SpanGroupBuilder, add_occurrence_view, canonicalize_match, fnv1a64_u32,
-    maximal_match, winnowed_fingerprints,
+    NormalizedCodeFileView, NormalizedFileView, SpanGroupBuilder, add_occurrence_view,
+    canonicalize_match, fnv1a64_u8_as_u32, fnv1a64_u32, line_for_pos, maximal_match,
+    maximal_match_u8, winnowed_fingerprints, winnowed_fingerprints_u8,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -31,20 +33,20 @@ pub(crate) struct WinnowingParams {
     pub(crate) cross_repo_only: bool,
 }
 
-fn truncate_bucket_by_repo<'a>(
+fn truncate_bucket_by_repo(
     mut occs: Vec<FingerprintOcc>,
-    files: &[NormalizedFileView<'a>],
+    mut repo_id_for_file: impl FnMut(usize) -> usize,
     max_bucket: usize,
 ) -> Vec<FingerprintOcc> {
     if occs.len() <= max_bucket {
         return occs;
     }
 
-    occs.sort_by_key(|o| (files[o.file_id].repo_id, o.file_id, o.pos));
+    occs.sort_by_key(|o| (repo_id_for_file(o.file_id), o.file_id, o.pos));
 
     let mut by_repo: Vec<(usize, Vec<FingerprintOcc>)> = Vec::new();
     for occ in occs {
-        let repo_id = files[occ.file_id].repo_id;
+        let repo_id = repo_id_for_file(occ.file_id);
         if let Some((last_repo, bucket)) = by_repo.last_mut()
             && *last_repo == repo_id
         {
@@ -74,6 +76,228 @@ fn truncate_bucket_by_repo<'a>(
     }
 
     out
+}
+
+#[derive(Debug)]
+struct AsciiSpanGroupBuilder {
+    content_hash: u64,
+    normalized_len: usize,
+    sample: Vec<u8>,
+    preview: String,
+    occurrences: Vec<DuplicateSpanOccurrence>,
+    occurrence_keys: HashSet<(usize, usize)>,
+    repo_ids: HashSet<usize>,
+}
+
+fn add_occurrence_ascii_view(
+    builder: &mut AsciiSpanGroupBuilder,
+    file: &NormalizedCodeFileView<'_>,
+    file_id: usize,
+    start: usize,
+    len: usize,
+) {
+    if len == 0 {
+        return;
+    }
+    if !builder.occurrence_keys.insert((file_id, start)) {
+        return;
+    }
+
+    let start_line = line_for_pos(file.line_starts, start);
+    let end_line = line_for_pos(file.line_starts, start.saturating_add(len - 1));
+
+    builder.repo_ids.insert(file.repo_id);
+    builder.occurrences.push(DuplicateSpanOccurrence {
+        repo_id: file.repo_id,
+        repo_label: Arc::clone(&file.repo_label),
+        path: Arc::clone(&file.rel_path),
+        start_line,
+        end_line,
+    });
+}
+
+fn finalize_span_groups_ascii(
+    groups: HashMap<(u64, usize), Vec<AsciiSpanGroupBuilder>>,
+    cross_repo_only: bool,
+) -> Vec<DuplicateSpanGroup> {
+    let mut out = Vec::new();
+    for builders in groups.into_values() {
+        for mut builder in builders {
+            if builder.occurrences.len() <= 1 {
+                continue;
+            }
+            if cross_repo_only && builder.repo_ids.len() < 2 {
+                continue;
+            }
+
+            builder.occurrences.sort_by(|a, b| {
+                (
+                    a.repo_id,
+                    a.repo_label.as_ref(),
+                    a.path.as_ref(),
+                    a.start_line,
+                    a.end_line,
+                )
+                    .cmp(&(
+                        b.repo_id,
+                        b.repo_label.as_ref(),
+                        b.path.as_ref(),
+                        b.start_line,
+                        b.end_line,
+                    ))
+            });
+
+            out.push(DuplicateSpanGroup {
+                content_hash: builder.content_hash,
+                normalized_len: builder.normalized_len,
+                preview: builder.preview,
+                occurrences: builder.occurrences,
+            });
+        }
+    }
+
+    out.sort_by(|a, b| {
+        (a.content_hash, a.normalized_len, a.occurrences.len()).cmp(&(
+            b.content_hash,
+            b.normalized_len,
+            b.occurrences.len(),
+        ))
+    });
+    out
+}
+
+pub(crate) fn detect_duplicate_span_groups_winnowing_ascii<'a>(
+    files: &[NormalizedCodeFileView<'a>],
+    params: WinnowingParams,
+    accept_match: impl Fn(usize, usize, usize) -> bool,
+    preview_from_occurrence: impl Fn(usize, u32, u32, &[u8]) -> String,
+    stats: &mut ScanStats,
+) -> Vec<DuplicateSpanGroup> {
+    if files.is_empty()
+        || params.min_len == 0
+        || params.fingerprint_len == 0
+        || params.window_size == 0
+    {
+        return Vec::new();
+    }
+
+    let mut fingerprints: HashMap<u64, Vec<FingerprintOcc>> = HashMap::new();
+    for (file_id, file) in files.iter().enumerate() {
+        if file.normalized.len() < params.min_len {
+            continue;
+        }
+        for (hash, pos) in
+            winnowed_fingerprints_u8(file.normalized, params.fingerprint_len, params.window_size)
+        {
+            fingerprints
+                .entry(hash)
+                .or_default()
+                .push(FingerprintOcc { file_id, pos });
+        }
+    }
+
+    let mut seen_matches: HashSet<MatchKey> = HashSet::new();
+    let mut groups: HashMap<(u64, usize), Vec<AsciiSpanGroupBuilder>> = HashMap::new();
+
+    for mut occs in fingerprints.into_values() {
+        if occs.len() <= 1 {
+            continue;
+        }
+        let original_len = occs.len();
+        if original_len > MAX_BUCKET {
+            occs = truncate_bucket_by_repo(occs, |file_id| files[file_id].repo_id, MAX_BUCKET);
+            stats.skipped_bucket_truncated = stats
+                .skipped_bucket_truncated
+                .saturating_add((original_len - occs.len()) as u64);
+        }
+
+        for i in 0..occs.len() {
+            for j in (i + 1)..occs.len() {
+                let a = occs[i];
+                let b = occs[j];
+                if a.file_id == b.file_id && a.pos == b.pos {
+                    continue;
+                }
+                if params.cross_repo_only && files[a.file_id].repo_id == files[b.file_id].repo_id {
+                    continue;
+                }
+
+                let (start_a, start_b, len) = match maximal_match_u8(
+                    files[a.file_id].normalized,
+                    a.pos,
+                    files[b.file_id].normalized,
+                    b.pos,
+                    params.fingerprint_len,
+                ) {
+                    Some(v) => v,
+                    None => continue,
+                };
+
+                if len < params.min_len {
+                    continue;
+                }
+                if !accept_match(a.file_id, start_a, len) || !accept_match(b.file_id, start_b, len)
+                {
+                    continue;
+                }
+
+                if a.file_id == b.file_id {
+                    let a_end = start_a + len;
+                    let b_end = start_b + len;
+                    if start_a < b_end && start_b < a_end {
+                        continue;
+                    }
+                }
+
+                let (file_a, file_b, start_a, start_b) =
+                    canonicalize_match(a.file_id, b.file_id, start_a, start_b);
+                let key = MatchKey {
+                    file_a,
+                    start_a,
+                    file_b,
+                    start_b,
+                    len,
+                };
+                if !seen_matches.insert(key) {
+                    continue;
+                }
+
+                let sample_slice = &files[file_a].normalized[start_a..start_a + len];
+                let content_hash = fnv1a64_u8_as_u32(sample_slice);
+
+                let bucket = groups.entry((content_hash, len)).or_default();
+                let builder = match bucket
+                    .iter_mut()
+                    .find(|g| g.sample.as_slice() == sample_slice)
+                {
+                    Some(existing) => existing,
+                    None => {
+                        let start_line = line_for_pos(files[file_a].line_starts, start_a);
+                        let end_line = line_for_pos(files[file_a].line_starts, start_a + len - 1);
+                        let preview =
+                            preview_from_occurrence(file_a, start_line, end_line, sample_slice);
+
+                        bucket.push(AsciiSpanGroupBuilder {
+                            content_hash,
+                            normalized_len: len,
+                            sample: sample_slice.to_vec(),
+                            preview,
+                            occurrences: Vec::new(),
+                            occurrence_keys: HashSet::new(),
+                            repo_ids: HashSet::new(),
+                        });
+                        let idx = bucket.len() - 1;
+                        &mut bucket[idx]
+                    }
+                };
+
+                add_occurrence_ascii_view(builder, &files[file_a], file_a, start_a, len);
+                add_occurrence_ascii_view(builder, &files[file_b], file_b, start_b, len);
+            }
+        }
+    }
+
+    finalize_span_groups_ascii(groups, params.cross_repo_only)
 }
 
 pub(crate) fn detect_duplicate_span_groups_winnowing<'a>(
@@ -115,7 +339,7 @@ pub(crate) fn detect_duplicate_span_groups_winnowing<'a>(
         }
         let original_len = occs.len();
         if original_len > MAX_BUCKET {
-            occs = truncate_bucket_by_repo(occs, files, MAX_BUCKET);
+            occs = truncate_bucket_by_repo(occs, |file_id| files[file_id].repo_id, MAX_BUCKET);
             stats.skipped_bucket_truncated = stats
                 .skipped_bucket_truncated
                 .saturating_add((original_len - occs.len()) as u64);

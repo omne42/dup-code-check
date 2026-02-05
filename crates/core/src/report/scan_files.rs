@@ -15,6 +15,8 @@ use super::ScannedTextFile;
 use super::util::sort_duplicate_groups_for_report;
 
 const DEFAULT_REPORT_MAX_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
+const DEFAULT_REPORT_MAX_NORMALIZED_CHARS_DIVISOR: u64 = 1;
+const DEFAULT_REPORT_MAX_TOKENS_DIVISOR: u64 = 4;
 
 type ReportScanOutput = (Vec<Arc<str>>, Vec<ScannedTextFile>, Vec<DuplicateGroup>);
 
@@ -24,11 +26,23 @@ pub(super) fn scan_text_files_for_report(
     stats: &mut ScanStats,
 ) -> io::Result<ReportScanOutput> {
     let mut scan_options = options.clone();
-    scan_options.max_total_bytes = Some(
-        scan_options
-            .max_total_bytes
-            .unwrap_or(DEFAULT_REPORT_MAX_TOTAL_BYTES),
-    );
+    let max_total_bytes = scan_options
+        .max_total_bytes
+        .unwrap_or(DEFAULT_REPORT_MAX_TOTAL_BYTES);
+    scan_options.max_total_bytes = Some(max_total_bytes);
+
+    if scan_options.max_normalized_chars.is_none() {
+        scan_options.max_normalized_chars = Some(
+            usize::try_from(max_total_bytes / DEFAULT_REPORT_MAX_NORMALIZED_CHARS_DIVISOR)
+                .unwrap_or(usize::MAX),
+        );
+    }
+    if scan_options.max_tokens.is_none() {
+        scan_options.max_tokens = Some(
+            usize::try_from(max_total_bytes / DEFAULT_REPORT_MAX_TOKENS_DIVISOR)
+                .unwrap_or(usize::MAX),
+        );
+    }
 
     let repos: Vec<Repo> = roots
         .iter()
@@ -54,6 +68,10 @@ pub(super) fn scan_text_files_for_report(
 
     let mut file_groups = FileDuplicateGrouper::default();
     let mut files = Vec::new();
+    let mut total_normalized_chars: usize = 0;
+    let mut total_tokens: usize = 0;
+    let max_normalized_chars = scan_options.max_normalized_chars;
+    let max_tokens = scan_options.max_tokens;
 
     for repo in &repos {
         let canonical_root = canonical_roots
@@ -83,7 +101,33 @@ pub(super) fn scan_text_files_for_report(
 
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
 
-                // 1) File duplicates (whitespace-insensitive)
+                // Text-based detectors
+                let text = String::from_utf8_lossy(&bytes);
+                let code_norm = normalize_for_code_spans(&bytes);
+                let line_norm = normalize_lines_for_dup_detection(&bytes);
+                let tokenized = tokenize_for_dup_detection(&text);
+                let blocks = parse_brace_blocks(&tokenized.tokens, &tokenized.token_lines);
+
+                if let Some(max_normalized_chars) = max_normalized_chars {
+                    let next_total = total_normalized_chars.saturating_add(code_norm.chars.len());
+                    if next_total > max_normalized_chars {
+                        stats.skipped_budget_max_normalized_chars =
+                            stats.skipped_budget_max_normalized_chars.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Break(()));
+                    }
+                    total_normalized_chars = next_total;
+                }
+                if let Some(max_tokens) = max_tokens {
+                    let next_total = total_tokens.saturating_add(tokenized.tokens.len());
+                    if next_total > max_tokens {
+                        stats.skipped_budget_max_tokens =
+                            stats.skipped_budget_max_tokens.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Break(()));
+                    }
+                    total_tokens = next_total;
+                }
+
+                // File duplicates (whitespace-insensitive)
                 file_groups.push_bytes(
                     &bytes,
                     repo.id,
@@ -91,19 +135,12 @@ pub(super) fn scan_text_files_for_report(
                     Arc::from(rel_path.clone()),
                 );
 
-                // 2) Text-based detectors
-                let text = String::from_utf8_lossy(&bytes);
-                let code_norm = normalize_for_code_spans(&bytes);
-                let line_norm = normalize_lines_for_dup_detection(&bytes);
-                let tokenized = tokenize_for_dup_detection(&text);
-                let blocks = parse_brace_blocks(&tokenized.tokens, &tokenized.token_lines);
-
                 files.push(ScannedTextFile {
                     repo_id: repo.id,
                     path: Arc::from(rel_path),
                     abs_path: read_path,
                     code_chars: code_norm.chars,
-                    code_char_lines: code_norm.line_map,
+                    code_line_starts: code_norm.line_starts,
                     line_tokens: line_norm.line_tokens,
                     line_token_lines: line_norm.line_lines,
                     line_token_char_lens: line_norm.line_lens,

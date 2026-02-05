@@ -82,25 +82,14 @@ fn is_safe_relative_path(raw: &str) -> bool {
     if raw.is_empty() {
         return false;
     }
-    let path = Path::new(raw);
-    if path.is_absolute() {
-        return false;
-    }
-    for component in path.components() {
-        match component {
-            Component::Normal(_) => {}
-            Component::CurDir
-            | Component::ParentDir
-            | Component::RootDir
-            | Component::Prefix(_) => {
-                return false;
-            }
-        }
-    }
-    true
+    is_safe_relative_path_impl(Path::new(raw))
 }
 
 fn is_safe_relative_path_buf(path: &Path) -> bool {
+    is_safe_relative_path_impl(path)
+}
+
+fn is_safe_relative_path_impl(path: &Path) -> bool {
     if path.as_os_str().is_empty() {
         return false;
     }

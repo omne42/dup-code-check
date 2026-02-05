@@ -5,7 +5,9 @@ use crate::dedupe::detect_duplicate_code_spans_winnowing;
 use crate::types::{
     DuplicateSpanGroup, DuplicateSpanOccurrence, ScanOptions, ScanStats, SimilarityPair,
 };
-use crate::util::{NormalizedFileView, SpanGroupBuilder, fnv1a64_u32, fold_u64_to_u32};
+use crate::util::{
+    NormalizedCodeFileView, NormalizedFileView, SpanGroupBuilder, fnv1a64_u32, fold_u64_to_u32,
+};
 use crate::winnowing::{
     WinnowingParams, detect_duplicate_span_groups_winnowing, finalize_span_groups,
 };
@@ -38,12 +40,12 @@ pub(super) fn detect_duplicate_code_spans(
         if file.code_chars.len() < min_match_len {
             continue;
         }
-        normalized.push(NormalizedFileView {
+        normalized.push(NormalizedCodeFileView {
             repo_id: file.repo_id,
             repo_label: repo_label_arc(repo_labels, file.repo_id),
             rel_path: Arc::clone(&file.path),
             normalized: &file.code_chars,
-            line_map: &file.code_char_lines,
+            line_starts: &file.code_line_starts,
         });
     }
 

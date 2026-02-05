@@ -8,7 +8,7 @@ use crate::scan::{
     validate_roots, visit_repo_files,
 };
 use crate::types::{DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanOutcome, ScanStats};
-use crate::util::{NormalizedFile, NormalizedFileView, normalize_for_code_spans};
+use crate::util::{NormalizedCodeFile, NormalizedCodeFileView, normalize_for_code_spans};
 
 pub fn find_duplicate_files(
     roots: &[PathBuf],
@@ -163,6 +163,7 @@ pub fn find_duplicate_code_spans_with_stats(
 
     let mut stats = ScanStats::default();
     let mut files = Vec::new();
+    let mut total_normalized_chars: usize = 0;
 
     for repo in &repos {
         let canonical_root = canonical_roots
@@ -180,14 +181,23 @@ pub fn find_duplicate_code_spans_with_stats(
                 if normalized.chars.len() < min_match_len {
                     return Ok(std::ops::ControlFlow::Continue(()));
                 }
+                if let Some(max_normalized_chars) = options.max_normalized_chars {
+                    let next_total = total_normalized_chars.saturating_add(normalized.chars.len());
+                    if next_total > max_normalized_chars {
+                        stats.skipped_budget_max_normalized_chars =
+                            stats.skipped_budget_max_normalized_chars.saturating_add(1);
+                        return Ok(std::ops::ControlFlow::Break(()));
+                    }
+                    total_normalized_chars = next_total;
+                }
 
                 let rel_path = make_rel_path(&repo.root, &repo_file.abs_path);
-                files.push(NormalizedFile {
+                files.push(NormalizedCodeFile {
                     repo_id: repo.id,
                     repo_label: Arc::clone(&repo.label),
                     rel_path: Arc::from(rel_path),
                     normalized: normalized.chars,
-                    line_map: normalized.line_map,
+                    line_starts: normalized.line_starts,
                 });
 
                 Ok(std::ops::ControlFlow::Continue(()))
@@ -197,19 +207,19 @@ pub fn find_duplicate_code_spans_with_stats(
         }
     }
 
-    let views: Vec<NormalizedFileView<'_>> = files
+    let views: Vec<NormalizedCodeFileView<'_>> = files
         .iter()
         .map(|file| {
             debug_assert!(
                 file.repo_id < repos.len(),
                 "repo_id must be valid for all scanned files"
             );
-            NormalizedFileView {
+            NormalizedCodeFileView {
                 repo_id: file.repo_id,
                 repo_label: Arc::clone(&file.repo_label),
                 rel_path: Arc::clone(&file.rel_path),
                 normalized: &file.normalized,
-                line_map: &file.line_map,
+                line_starts: &file.line_starts,
             }
         })
         .collect();

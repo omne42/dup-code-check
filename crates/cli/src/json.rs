@@ -19,6 +19,8 @@ pub(crate) struct JsonScanStats {
     pub(crate) skipped_walk_errors: u64,
     pub(crate) skipped_budget_max_files: u64,
     pub(crate) skipped_budget_max_total_bytes: u64,
+    pub(crate) skipped_budget_max_normalized_chars: u64,
+    pub(crate) skipped_budget_max_tokens: u64,
     pub(crate) skipped_bucket_truncated: u64,
 }
 
@@ -38,6 +40,8 @@ impl From<&ScanStats> for JsonScanStats {
             skipped_walk_errors: stats.skipped_walk_errors,
             skipped_budget_max_files: stats.skipped_budget_max_files,
             skipped_budget_max_total_bytes: stats.skipped_budget_max_total_bytes,
+            skipped_budget_max_normalized_chars: stats.skipped_budget_max_normalized_chars,
+            skipped_budget_max_tokens: stats.skipped_budget_max_tokens,
             skipped_bucket_truncated: stats.skipped_bucket_truncated,
         }
     }

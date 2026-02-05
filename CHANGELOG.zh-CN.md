@@ -14,6 +14,7 @@
 - CLI 国际化：`--localization <en|zh>`（默认：`en`）。
 - CLI：`--version` / `-V`。
 - 扫描预算：`maxFiles` / `maxTotalBytes`（CLI：`--max-files` / `--max-total-bytes`）。
+- 扫描预算：`maxNormalizedChars` / `maxTokens`（CLI：`--max-normalized-chars` / `--max-tokens`）。
 - 扫描统计 + 严格模式（`--stats`, `--strict`）。
 - CLI：`--gitignore` 显式启用 `.gitignore` 过滤（默认开启；主要用于脚本）。
 - npm：`bin/dup-code-check.mjs` 启动脚本（通过 npm 跨平台运行 `dup-code-check`）。
@@ -53,6 +54,7 @@
 - 仓库链接：更新 GitHub owner / Pages 地址（`omne42`）。
 - 元数据：license 仅使用 MIT（不再是双协议）。
 - 扫描预算：`maxFiles` 达到上限后会停止扫描（`skippedBudgetMaxFiles` 会变为非 0）。
+- 扫描预算：`maxNormalizedChars` / `maxTokens` 达到上限后会停止扫描（`skippedBudgetMaxNormalizedChars` / `skippedBudgetMaxTokens` 会变为非 0）。
 - Node 安装：全局安装时 `postinstall` 会构建 Rust 二进制；作为工程依赖安装时默认在首次运行时构建（或设置 `DUP_CODE_CHECK_BUILD_ON_INSTALL=1`）。
 - 扫描流程：Git 快路径对 `git ls-files` 做流式遍历（避免收集完整列表；`maxFiles` 可提前停止）。
 - CLI：澄清 `--strict` 语义（仅在“致命跳过”：权限/遍历错误/预算中断/bucket 截断时返回非 0），并增加 smoke 覆盖。
@@ -78,6 +80,7 @@
 - 扫描：Git 流式枚举失败时回退到 walker（避免提前中止/重复扫描）。
 - CLI：root 路径直接使用 `canonicalize()` 解析（保留 symlink 语义）。
 - Report：不再为 preview 保存全量文本，按需从文件生成 preview，降低内存占用。
+- Report/code spans：code-span 归一化改用更紧凑的 bytes + 每行起始索引，降低内存占用。
 - Rust：重构 winnowing 检测器 API，把参数收敛为一个 struct（无行为变化）。
 - 归一化：code-span 与 line-span 检测器现在仅保留 ASCII 的“词字符”（`[A-Za-z0-9_]`），与文档一致。
 - Report：在 `--report` 扫描/分词过程中避免额外的 `String` 分配，降低内存与拷贝开销。
@@ -88,6 +91,8 @@
 - 扫描统计：新增 `gitFastPathFallbacks`，用于标记 Git 快路径回退到 walker 的次数。
 - Report：相似块检测器的 `splitmix64` helper 去重（无行为变化）。
 - CLI：JSON 输出 scanStats 时避免 clone（`--json --stats`）。
+- 重复文件：加速大候选集的校验分组（避免 O(n^2)）。
+- 扫描：安全相对路径校验 helper 去重。
 
 ### Fixed
 - 扫描时容忍 `NotFound`（例如扫描过程中文件被删除）。

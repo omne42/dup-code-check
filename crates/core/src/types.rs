@@ -7,6 +7,8 @@ pub struct ScanOptions {
     pub max_file_size: Option<u64>,
     pub max_files: Option<usize>,
     pub max_total_bytes: Option<u64>,
+    pub max_normalized_chars: Option<usize>,
+    pub max_tokens: Option<usize>,
     pub min_match_len: usize,
     pub min_token_len: usize,
     pub similarity_threshold: f64,
@@ -26,6 +28,8 @@ impl Default for ScanOptions {
             max_file_size: Some(DEFAULT_MAX_FILE_SIZE_BYTES),
             max_files: None,
             max_total_bytes: None,
+            max_normalized_chars: None,
+            max_tokens: None,
             min_match_len: 50,
             min_token_len: 50,
             similarity_threshold: 0.85,
@@ -53,6 +57,8 @@ pub struct ScanStats {
     pub skipped_walk_errors: u64,
     pub skipped_budget_max_files: u64,
     pub skipped_budget_max_total_bytes: u64,
+    pub skipped_budget_max_normalized_chars: u64,
+    pub skipped_budget_max_tokens: u64,
     pub skipped_bucket_truncated: u64,
 }
 

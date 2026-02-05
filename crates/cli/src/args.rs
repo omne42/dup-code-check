@@ -27,6 +27,8 @@ const HELP_TEXT_EN: &str = concat!(
     "  --max-files <n>         Stop after scanning n files\n",
     "  --max-total-bytes <n>   Skip files that would exceed total scanned bytes\n",
     "  --max-file-size <n>     Skip files larger than n bytes (default: 10485760)\n",
+    "  --max-normalized-chars <n>  Stop after storing n normalized code characters\n",
+    "  --max-tokens <n>        (Report) Stop after storing n tokens\n",
     "  --ignore-dir <name>     Add an ignored directory name (repeatable)\n",
     "  --follow-symlinks       Follow symlinks (within each root; default: off)\n",
     "  -V, --version           Show version\n",
@@ -70,6 +72,8 @@ const HELP_TEXT_ZH: &str = concat!(
     "  --max-files <n>         最多扫描 n 个文件\n",
     "  --max-total-bytes <n>   跳过会导致累计扫描字节数超出预算的文件\n",
     "  --max-file-size <n>     跳过大于 n 字节的文件（默认: 10485760）\n",
+    "  --max-normalized-chars <n>  最多保存 n 个归一化后的 code-span 字符\n",
+    "  --max-tokens <n>        （Report）最多保存 n 个 token\n",
     "  --ignore-dir <name>     忽略目录名（可重复）\n",
     "  --follow-symlinks       跟随符号链接（仅限 root 内；默认: 关闭）\n",
     "  -V, --version           显示版本\n",
@@ -246,6 +250,8 @@ pub(crate) fn parse_args(
     let mut max_file_size: Option<u64> = None;
     let mut max_files: Option<usize> = None;
     let mut max_total_bytes: Option<u64> = None;
+    let mut max_normalized_chars: Option<usize> = None;
+    let mut max_tokens: Option<usize> = None;
     let mut min_match_len: Option<usize> = None;
     let mut min_token_len: Option<usize> = None;
     let mut similarity_threshold: Option<f64> = None;
@@ -352,6 +358,48 @@ pub(crate) fn parse_args(
             })?;
             let value = parse_u64_non_negative_safe(localization, "--max-total-bytes", raw)?;
             max_total_bytes = Some(value);
+            i += 2;
+            continue;
+        }
+        if arg == "--max-normalized-chars" {
+            let raw = argv.get(i + 1).ok_or_else(|| {
+                tr(
+                    localization,
+                    "--max-normalized-chars requires a value",
+                    "--max-normalized-chars 需要一个值",
+                )
+                .to_string()
+            })?;
+            let value = parse_u64_non_negative_safe(localization, "--max-normalized-chars", raw)?;
+            let value = usize::try_from(value).map_err(|_| {
+                format!(
+                    "--max-normalized-chars {} {max}",
+                    tr(localization, "must be <=", "必须 <= "),
+                    max = usize::MAX
+                )
+            })?;
+            max_normalized_chars = Some(value);
+            i += 2;
+            continue;
+        }
+        if arg == "--max-tokens" {
+            let raw = argv.get(i + 1).ok_or_else(|| {
+                tr(
+                    localization,
+                    "--max-tokens requires a value",
+                    "--max-tokens 需要一个值",
+                )
+                .to_string()
+            })?;
+            let value = parse_u64_non_negative_safe(localization, "--max-tokens", raw)?;
+            let value = usize::try_from(value).map_err(|_| {
+                format!(
+                    "--max-tokens {} {max}",
+                    tr(localization, "must be <=", "必须 <= "),
+                    max = usize::MAX
+                )
+            })?;
+            max_tokens = Some(value);
             i += 2;
             continue;
         }
@@ -501,6 +549,12 @@ pub(crate) fn parse_args(
     }
     if let Some(max_total_bytes) = max_total_bytes {
         options.max_total_bytes = Some(max_total_bytes);
+    }
+    if let Some(max_normalized_chars) = max_normalized_chars {
+        options.max_normalized_chars = Some(max_normalized_chars);
+    }
+    if let Some(max_tokens) = max_tokens {
+        options.max_tokens = Some(max_tokens);
     }
     if let Some(min_match_len) = min_match_len {
         options.min_match_len = min_match_len;

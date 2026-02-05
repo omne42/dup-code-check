@@ -13,6 +13,8 @@ pub(crate) fn has_fatal_skips(stats: &ScanStats) -> bool {
         || stats.skipped_bucket_truncated > 0
         || stats.skipped_budget_max_files > 0
         || stats.skipped_budget_max_total_bytes > 0
+        || stats.skipped_budget_max_normalized_chars > 0
+        || stats.skipped_budget_max_tokens > 0
 }
 
 pub(crate) fn format_fatal_skip_warning(
@@ -102,6 +104,22 @@ pub(crate) fn format_fatal_skip_warning(
         "hit --max-total-bytes; increase the budget or remove the limit.",
         "触发 --max-total-bytes 预算；请提高预算或移除限制。",
     );
+    push_item(
+        &mut out,
+        "skippedBudgetMaxNormalizedChars",
+        "budget_max_normalized_chars",
+        stats.skipped_budget_max_normalized_chars,
+        "hit --max-normalized-chars; increase the budget or remove the limit.",
+        "触发 --max-normalized-chars 预算；请提高预算或移除限制。",
+    );
+    push_item(
+        &mut out,
+        "skippedBudgetMaxTokens",
+        "budget_max_tokens",
+        stats.skipped_budget_max_tokens,
+        "hit --max-tokens; increase the budget or remove the limit.",
+        "触发 --max-tokens 预算；请提高预算或移除限制。",
+    );
 
     if !has_stats {
         out.push_str(tr(
@@ -142,6 +160,11 @@ pub(crate) fn format_scan_stats(localization: Localization, stats: &ScanStats) -
             "budget_max_total_bytes",
             stats.skipped_budget_max_total_bytes,
         ),
+        (
+            "budget_max_normalized_chars",
+            stats.skipped_budget_max_normalized_chars,
+        ),
+        ("budget_max_tokens", stats.skipped_budget_max_tokens),
     ];
     skips.retain(|(_, v)| *v > 0);
     if !skips.is_empty() {

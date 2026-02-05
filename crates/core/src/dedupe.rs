@@ -4,8 +4,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::types::{DuplicateFile, DuplicateGroup, DuplicateSpanGroup, ScanOptions, ScanStats};
-use crate::util::{NormalizedFileView, fnv1a64, make_preview, whitespace_insensitive_fingerprint};
-use crate::winnowing::{WinnowingParams, detect_duplicate_span_groups_winnowing};
+use crate::util::{
+    NormalizedCodeFileView, fnv1a64, make_preview_ascii, whitespace_insensitive_fingerprint,
+};
+use crate::winnowing::{WinnowingParams, detect_duplicate_span_groups_winnowing_ascii};
 
 type FileDuplicateKey = (u64, usize, u64, [u8; 16], [u8; 16]);
 
@@ -100,7 +102,13 @@ impl FileDuplicateGrouper {
                 continue;
             }
 
-            let mut verified: Vec<(Vec<u8>, Vec<FileCandidate>, HashSet<usize>)> = Vec::new();
+            #[derive(Debug, Default)]
+            struct VerifiedGroup {
+                files: Vec<FileCandidate>,
+                repo_ids: HashSet<usize>,
+            }
+
+            let mut verified: HashMap<Vec<u8>, VerifiedGroup> = HashMap::new();
             for file in builder.files {
                 let Some(bytes) = read_bytes(file.repo_id, &file.rel_path)? else {
                     continue;
@@ -109,35 +117,27 @@ impl FileDuplicateGrouper {
                     continue;
                 }
                 let normalized = normalize_ascii_whitespace(&bytes);
-
-                let Some((_, files, repo_ids)) =
-                    verified.iter_mut().find(|(n, _, _)| *n == normalized)
-                else {
-                    let mut repo_ids = HashSet::new();
-                    repo_ids.insert(file.repo_id);
-                    verified.push((normalized, vec![file], repo_ids));
-                    continue;
-                };
-
-                repo_ids.insert(file.repo_id);
-                files.push(file);
+                let group = verified.entry(normalized).or_default();
+                group.repo_ids.insert(file.repo_id);
+                group.files.push(file);
             }
 
-            for (normalized, mut files, repo_ids) in verified {
-                if files.len() <= 1 {
+            for (normalized, mut group) in verified {
+                if group.files.len() <= 1 {
                     continue;
                 }
-                if cross_repo_only && repo_ids.len() < 2 {
+                if cross_repo_only && group.repo_ids.len() < 2 {
                     continue;
                 }
 
                 let content_hash = fnv1a64(&normalized);
                 let normalized_len = normalized.len();
 
-                files.sort_by(|a, b| {
+                group.files.sort_by(|a, b| {
                     (a.repo_id, a.path_display.as_ref()).cmp(&(b.repo_id, b.path_display.as_ref()))
                 });
-                let files = files
+                let files = group
+                    .files
                     .into_iter()
                     .map(|file| DuplicateFile {
                         repo_id: file.repo_id,
@@ -158,7 +158,7 @@ impl FileDuplicateGrouper {
 }
 
 pub(crate) fn detect_duplicate_code_spans_winnowing<'a>(
-    files: &[NormalizedFileView<'a>],
+    files: &[NormalizedCodeFileView<'a>],
     options: &ScanOptions,
     stats: &mut ScanStats,
 ) -> Vec<DuplicateSpanGroup> {
@@ -168,7 +168,7 @@ pub(crate) fn detect_duplicate_code_spans_winnowing<'a>(
         .saturating_sub(fingerprint_len)
         .saturating_add(1);
 
-    detect_duplicate_span_groups_winnowing(
+    detect_duplicate_span_groups_winnowing_ascii(
         files,
         WinnowingParams {
             min_len: min_match_len,
@@ -177,7 +177,7 @@ pub(crate) fn detect_duplicate_code_spans_winnowing<'a>(
             cross_repo_only: options.cross_repo_only,
         },
         |_file_id, _start, _len| true,
-        |_file_id, _start_line, _end_line, sample| make_preview(sample, 80),
+        |_file_id, _start_line, _end_line, sample| make_preview_ascii(sample, 80),
         stats,
     )
 }

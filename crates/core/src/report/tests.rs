@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::*;
 use crate::tokenize::tokenize_for_dup_detection;
-use crate::util::{normalize_for_code_spans, normalize_whitespace};
+use crate::util::{line_for_pos, normalize_for_code_spans, normalize_whitespace};
 use crate::{
     DEFAULT_MAX_FILE_SIZE_BYTES, find_duplicate_code_spans, find_duplicate_code_spans_with_stats,
     find_duplicate_files,
@@ -70,26 +70,24 @@ fn normalize_for_code_spans_strips_symbols_and_whitespace() {
 _c
 123";
     let normalized = normalize_for_code_spans(input);
-    let as_string: String = normalized
-        .chars
-        .iter()
-        .filter_map(|&cp| char::from_u32(cp))
-        .collect();
+    let as_string: String = normalized.chars.iter().map(|&b| char::from(b)).collect();
     assert_eq!(as_string, "ab_c123");
-    assert_eq!(normalized.line_map, vec![1, 1, 2, 2, 3, 3, 3]);
+    let lines: Vec<u32> = (0..normalized.chars.len())
+        .map(|i| line_for_pos(&normalized.line_starts, i))
+        .collect();
+    assert_eq!(lines, vec![1, 1, 2, 2, 3, 3, 3]);
 }
 
 #[test]
 fn normalize_for_code_spans_keeps_only_ascii_word_chars() {
     let input = "你好a_b1é2\n";
     let normalized = normalize_for_code_spans(input.as_bytes());
-    let as_string: String = normalized
-        .chars
-        .iter()
-        .filter_map(|&cp| char::from_u32(cp))
-        .collect();
+    let as_string: String = normalized.chars.iter().map(|&b| char::from(b)).collect();
     assert_eq!(as_string, "a_b12");
-    assert_eq!(normalized.line_map, vec![1, 1, 1, 1, 1]);
+    let lines: Vec<u32> = (0..normalized.chars.len())
+        .map(|i| line_for_pos(&normalized.line_starts, i))
+        .collect();
+    assert_eq!(lines, vec![1, 1, 1, 1, 1]);
 }
 
 #[test]

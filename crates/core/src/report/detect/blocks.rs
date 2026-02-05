@@ -215,6 +215,10 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
                 continue;
             }
 
+            // NOTE: We use (hash1, len, hash2) as an approximate equivalence key to avoid
+            // materializing the full subtree representation. Collisions are theoretically
+            // possible, but should be vanishingly unlikely with two independent 64-bit hashes
+            // plus length.
             let content_hash = hash1;
             let key = (content_hash, repr_len, hash2);
             let builder = groups.entry(key).or_insert_with(|| ReportSpanGroupBuilder {

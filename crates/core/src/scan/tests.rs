@@ -214,13 +214,13 @@ fn git_bin_override_requires_opt_in() -> io::Result<()> {
 }
 
 #[test]
-fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Result<()> {
+fn git_streaming_handles_non_utf8_paths_on_unix_before_scanning() -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::ffi::OsStringExt;
         use std::os::unix::fs::PermissionsExt;
 
-        let root = temp_dir("git_streaming_non_utf8_fallback");
+        let root = temp_dir("git_streaming_non_utf8_before_scanning");
         fs::create_dir_all(root.join(".git"))?;
 
         fs::write(root.join("a.txt"), "x")?;
@@ -260,6 +260,7 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Res
 
         assert_eq!(flow, ControlFlow::Continue(()));
         assert!(visited.iter().any(|p| p == "a.txt"));
+        assert_eq!(visited.len(), 2);
         assert!(marker_path.exists());
         assert_eq!(stats.git_fast_path_fallbacks, 0);
         assert_eq!(stats.candidate_files, 2);
@@ -270,14 +271,14 @@ fn git_streaming_non_utf8_path_falls_back_to_walker_before_scanning() -> io::Res
 }
 
 #[test]
-fn git_streaming_non_utf8_path_falls_back_to_walker_after_scanning_started() -> io::Result<()> {
+fn git_streaming_handles_non_utf8_paths_on_unix_after_scanning_started() -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
 
         const FILES: usize = 600;
 
-        let root = temp_dir("git_streaming_non_utf8_mid_fallback");
+        let root = temp_dir("git_streaming_non_utf8_mid_streaming");
         let git_dir = root.join(".git");
         fs::create_dir_all(&git_dir)?;
 

@@ -77,7 +77,7 @@ interface DuplicateSpanGroup {
 - `skippedPermissionDenied`：权限不足
 - `skippedTooLarge`：超过 `maxFileSize`
 - `skippedBinary`：包含 `\\0` 字节的二进制文件
-- `skippedOutsideRoot`：跟随符号链接时发现路径解析到 root 之外（为安全起见跳过）
+- `skippedOutsideRoot`：路径位于 root 之外或不安全（例如符号链接目标解析到 root 之外；或 Git 快路径遇到不安全路径；为安全起见跳过）
 - `skippedRelativizeFailed`：路径无法相对化到提供的 root（不符合预期；可视为 bug 线索）
 - `skippedWalkErrors`：遍历错误（walker errors）
 - `skippedBudgetMaxFiles`：因 `maxFiles` 预算导致提前结束扫描（非 0 表示触发）

@@ -59,10 +59,12 @@
 - 扫描流程：Git 快路径对 `git ls-files` 做流式遍历（避免收集完整列表；`maxFiles` 可提前停止）。
 - CLI：澄清 `--strict` 语义（仅在“致命跳过”：权限/遍历错误/预算中断/bucket 截断时返回非 0），并增加 smoke 覆盖。
 - CLI：当出现“致命跳过”时，在 stderr 输出一次警告（即使启用了 `--stats`；仅在需要时提示重新运行 `--stats`）。
+- CLI：`skippedOutsideRoot` 警告提示覆盖“不安全路径”（不只是符号链接场景）。
 - Rust：通过共享内部 helper 去重 code-span（winnowing）与 file-duplicates 分组逻辑，避免漂移。
 - Core：收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（仅允许绝对路径；且要求文件存在）。
-- Core：进一步收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（不允许 symlink；Unix 下必须可执行且不可被其他用户写入）。
+- Core：进一步收紧 `DUP_CODE_CHECK_GIT_BIN` 覆盖校验（不允许 symlink；Unix 下必须可执行且不可被组/其他用户写入）。
 - Core：只有在 `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` 时才会启用 `DUP_CODE_CHECK_GIT_BIN`（显式 opt-in）。
+- Core：将 `ScanOptions` 标记为 `#[non_exhaustive]`（用 `ScanOptions::default()` 构造后再覆盖字段）。
 - Report：默认设置 `maxTotalBytes` 预算（256 MiB）以限制内存占用；可用 `--max-total-bytes` 覆盖。
 - 文档：在 `--help` 与 README 中说明 `--report` 模式默认 `--max-total-bytes` 预算。
 - CLI：root 路径使用 `canonicalize()`（失败则报错），降低符号链接歧义。
@@ -144,5 +146,5 @@
 - CLI：说明 `--strict` 同样包含 `skippedRelativizeFailed`。
 - 文档：在 output/troubleshooting 等页面补充 `skippedRelativizeFailed` / `relativize_failed` 的说明。
 - 文档：在 output 文档中澄清 `--strict` 同样包含 `outside_root`。
-- 文档：修正 output 文档中 `--strict` 语义（bucket 截断 + `maxNormalizedChars` / `maxTokens`），并补充 `skippedBudgetMaxNormalizedChars` / `skippedBudgetMaxTokens` 字段。
+- 文档：修正 `--strict` 与扫描预算相关文档（output/cli/troubleshooting），补充 `skippedBudgetMaxNormalizedChars` / `skippedBudgetMaxTokens` 字段，并澄清 `skippedOutsideRoot` 语义。
 - Core：将输出中的 `Arc<str>` 字段隐藏在 accessor 方法之后（1.0 前的 API 清理）。

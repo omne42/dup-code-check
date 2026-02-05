@@ -292,129 +292,22 @@ pub(crate) fn read_repo_file_bytes_for_verification(
         return Ok(None);
     }
 
-    let candidate = repo_root.join(rel_path);
-    let read_path = if follow_symlinks {
-        let Some(canonical_root) = canonical_root else {
-            return Err(io::Error::other(
-                "read_repo_file_bytes_for_verification requires canonical_root when follow_symlinks=true",
-            ));
-        };
+    if follow_symlinks && canonical_root.is_none() {
+        return Err(io::Error::other(
+            "read_repo_file_bytes_for_verification requires canonical_root when follow_symlinks=true",
+        ));
+    }
 
-        let resolved = match candidate.canonicalize() {
-            Ok(p) => p,
-            Err(err)
-                if matches!(
-                    err.kind(),
-                    io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
-                ) =>
-            {
-                return Ok(None);
-            }
-            Err(_) => return Ok(None),
-        };
-
-        if !resolved.starts_with(canonical_root) {
-            return Ok(None);
-        }
-
-        resolved
-    } else {
-        candidate
+    let repo_file = RepoFile {
+        abs_path: repo_root.join(rel_path),
     };
-
-    let metadata = match fs::symlink_metadata(&read_path) {
-        Ok(m) => {
-            if m.file_type().is_symlink() {
-                return Ok(None);
-            }
-            m
-        }
-        Err(err)
-            if matches!(
-                err.kind(),
-                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
-            ) =>
-        {
-            return Ok(None);
-        }
-        Err(_) => return Ok(None),
+    let options = ScanOptions {
+        follow_symlinks,
+        max_file_size,
+        max_files: None,
+        max_total_bytes: None,
+        ..ScanOptions::default()
     };
-    if !metadata.is_file() {
-        return Ok(None);
-    }
-    if let Some(max_file_size) = max_file_size
-        && metadata.len() > max_file_size
-    {
-        return Ok(None);
-    }
-
-    let mut file = match fs::File::open(&read_path) {
-        Ok(f) => f,
-        Err(err)
-            if matches!(
-                err.kind(),
-                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
-            ) =>
-        {
-            return Ok(None);
-        }
-        Err(_) => return Ok(None),
-    };
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-
-        let opened = match file.metadata() {
-            Ok(m) => m,
-            Err(err)
-                if matches!(
-                    err.kind(),
-                    io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
-                ) =>
-            {
-                return Ok(None);
-            }
-            Err(_) => return Ok(None),
-        };
-        if (metadata.dev(), metadata.ino()) != (opened.dev(), opened.ino()) {
-            return Ok(None);
-        }
-    }
-
-    use std::io::Read;
-
-    let mut bytes: Vec<u8> = Vec::with_capacity(metadata.len().min(1024 * 1024) as usize);
-    let mut total_read: u64 = 0;
-    let mut buf = [0u8; 16 * 1024];
-    loop {
-        let mut limit = buf.len() as u64;
-        if let Some(max_file_size) = max_file_size {
-            let cap = max_file_size.saturating_add(1);
-            let remaining = cap.saturating_sub(total_read);
-            if remaining == 0 {
-                return Ok(None);
-            }
-            limit = limit.min(remaining);
-        }
-
-        let n = match file.read(&mut buf[..limit as usize]) {
-            Ok(n) => n,
-            Err(_) => return Ok(None),
-        };
-        if n == 0 {
-            break;
-        }
-
-        let new_total_read = total_read.saturating_add(n as u64);
-        if let Some(max_file_size) = max_file_size
-            && new_total_read > max_file_size
-        {
-            return Ok(None);
-        }
-
-        bytes.extend_from_slice(&buf[..n]);
-        total_read = new_total_read;
-    }
-    Ok(Some(bytes))
+    let mut stats = ScanStats::default();
+    read_repo_file_bytes(&repo_file, canonical_root, &options, &mut stats)
 }

@@ -1,7 +1,12 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+/// Scan configuration shared by the CLI and the core APIs.
+///
+/// This struct is `#[non_exhaustive]` so new options can be added without breaking callers.
+/// Construct it via `ScanOptions::default()` and then override fields as needed.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ScanOptions {
     pub ignore_dirs: HashSet<String>,
     pub max_file_size: Option<u64>,

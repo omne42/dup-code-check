@@ -69,13 +69,16 @@ cargo build --release -p dup-code-check
 - `outside_root`
 - `relativize_failed`
 - `walk_errors`
+- `bucket_truncated`
 - `budget_max_files` / `budget_max_total_bytes`
+- `budget_max_normalized_chars` / `budget_max_tokens`
 
 处理建议：
 
 - 权限问题：调整扫描 root（避免扫系统目录/受限目录），或在 CI 中提升权限
 - 遍历错误：确认文件系统稳定性（容器挂载、并发写入等）
-- 预算中断：增大 `--max-files` / `--max-total-bytes`，或缩小 root/加 `--ignore-dir`
+- bucket 截断：增大 `--min-match-len` / `--min-token-len`，或用 `--ignore-dir` 跳过生成物/依赖目录
+- 预算限制：增大 `--max-files` / `--max-total-bytes` / `--max-normalized-chars` / `--max-tokens`，或缩小 root/加 `--ignore-dir`
 
 ## 5) `.gitignore` 行为与预期不一致
 

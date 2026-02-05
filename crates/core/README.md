@@ -11,6 +11,9 @@ Core library for `dup-code-check` duplication scanning.
 This crate is currently developed primarily as an internal library for the `dup-code-check` CLI.
 Public types may change between versions.
 
+`ScanOptions` is `#[non_exhaustive]`; construct it via `ScanOptions::default()` and then override
+fields as needed.
+
 In particular, some output structs use `Arc<str>` for `repo_label` / `path` to reduce allocations
 and make cloning cheap when generating large reports.
 

@@ -86,6 +86,8 @@ dup-code-check --report [root ...]
 - `--max-files <n>`：读取 `n` 个文件后停止扫描（`scanStats.skippedBudgetMaxFiles > 0` 表示触发了预算）
 - `--max-total-bytes <n>`：跳过会导致“累计扫描字节数”超过 `n` 的文件
 - `--max-file-size <n>`：跳过大于 `n` 字节的文件（默认 `10485760`，即 10 MiB）
+- `--max-normalized-chars <n>`：当累计保存的归一化 code-span 字符将超过 `n` 时停止扫描（`scanStats.skippedBudgetMaxNormalizedChars > 0`）
+- `--max-tokens <n>`：（报告模式）当累计保存的 token 数将超过 `n` 时停止扫描（`scanStats.skippedBudgetMaxTokens > 0`）
 
 ### 忽略规则
 
@@ -101,5 +103,5 @@ dup-code-check --report [root ...]
 - `0`：正常完成（即使跳过了 “NotFound/TooLarge/Binary”等非致命情况）
 - `1`：
   - 运行期错误（例如 root 不存在/不是目录、扫描过程异常）
-  - 启用 `--strict` 且出现“致命跳过”：`PermissionDenied` / `outside_root` / `relativize_failed` / 遍历错误 / 被预算中断（`maxFiles` / `maxTotalBytes`）
+  - 启用 `--strict` 且出现“致命跳过”：`PermissionDenied` / `outside_root` / `relativize_failed` / 遍历错误 / bucket 截断 / 触发预算限制（`maxFiles` / `maxTotalBytes` / `maxNormalizedChars` / `maxTokens`）
 - `2`：参数解析错误（未知参数、非整数的整数参数等）

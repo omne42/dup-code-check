@@ -535,12 +535,10 @@ pub(crate) fn parse_args(
         .to_string());
     }
 
-    let mut options = ScanOptions {
-        respect_gitignore,
-        cross_repo_only,
-        follow_symlinks,
-        ..ScanOptions::default()
-    };
+    let mut options = ScanOptions::default();
+    options.respect_gitignore = respect_gitignore;
+    options.cross_repo_only = cross_repo_only;
+    options.follow_symlinks = follow_symlinks;
     if let Some(max_file_size) = max_file_size {
         options.max_file_size = Some(max_file_size);
     }
@@ -643,5 +641,24 @@ mod tests {
                 .unwrap_err();
         assert!(err.contains("必须"));
         assert!(err.contains("Number.MAX_SAFE_INTEGER"));
+    }
+
+    #[test]
+    fn cross_repo_only_requires_two_roots_en() {
+        let err = parse_args(&argv(&["--cross-repo-only", "."]), Localization::En).unwrap_err();
+        assert!(err.contains("at least 2 roots"));
+    }
+
+    #[test]
+    fn cross_repo_only_requires_two_roots_zh() {
+        let err = parse_args(&argv(&["--cross-repo-only", "."]), Localization::Zh).unwrap_err();
+        assert!(err.contains("至少 2"));
+    }
+
+    #[test]
+    fn dashdash_terminates_option_parsing() {
+        let parsed = parse_args(&argv(&["--", "--cross-repo-only"]), Localization::En).unwrap();
+        assert_eq!(parsed.roots, vec![PathBuf::from("--cross-repo-only")]);
+        assert!(!parsed.options.cross_repo_only);
     }
 }

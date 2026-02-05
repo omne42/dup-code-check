@@ -70,6 +70,7 @@ With `--json --stats`:
 - `candidateFiles`, `scannedFiles`, `scannedBytes`
 - `gitFastPathFallbacks`: non-zero when the scan attempted the Git fast path and had to fall back to the filesystem walker
 - `skippedNotFound`, `skippedPermissionDenied`, `skippedTooLarge`, `skippedBinary`, `skippedOutsideRoot`, `skippedRelativizeFailed`, `skippedWalkErrors`
+- `skippedOutsideRoot`: paths outside roots or unsafe paths (e.g. symlink targets outside roots, or unsafe paths emitted by the Git fast path)
 - `skippedBudgetMaxFiles`: non-zero when the scan stopped early due to the `maxFiles` budget
 - `skippedBudgetMaxTotalBytes`: skipped due to `maxTotalBytes` (reading would exceed the total bytes budget)
 - `skippedBudgetMaxNormalizedChars`: non-zero when the scan stopped early due to the `maxNormalizedChars` budget

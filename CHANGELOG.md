@@ -59,10 +59,12 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Scan pipeline: stream `git ls-files` enumeration in the Git fast path (avoid collecting full lists; stop early under `maxFiles`).
 - CLI: clarify `--strict` semantics (fatal skips only: permission/traversal/budget/bucket) and add smoke coverage.
 - CLI: always emit fatal-skip warnings to stderr (even with `--stats`; the `--stats` re-run hint is shown only when needed).
+- CLI: make `skippedOutsideRoot` warnings cover unsafe paths (not only symlinks).
 - Rust: de-duplicate code-span (winnowing) and file-duplicate grouping logic via a shared internal helper.
 - Core: tighten `DUP_CODE_CHECK_GIT_BIN` override validation (absolute path required; must exist and be a file).
-- Core: further tighten `DUP_CODE_CHECK_GIT_BIN` override validation (must not be a symlink; must be executable and not world-writable on Unix).
+- Core: further tighten `DUP_CODE_CHECK_GIT_BIN` override validation (must not be a symlink; must be executable and not group/world-writable on Unix).
 - Core: require `DUP_CODE_CHECK_ALLOW_CUSTOM_GIT=1` to honor `DUP_CODE_CHECK_GIT_BIN` (opt-in).
+- Core: mark `ScanOptions` as `#[non_exhaustive]` (construct via `ScanOptions::default()` and override fields).
 - Report: set a default `maxTotalBytes` budget (256 MiB) to bound memory use; override via `--max-total-bytes`.
 - Docs: mention the `--report` default `--max-total-bytes` budget in `--help` and `README`.
 - CLI: resolve roots via `canonicalize()` (fail if it fails) to reduce symlink ambiguity.
@@ -144,5 +146,5 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: clarify that `--strict` also covers `skippedRelativizeFailed`.
 - Docs: document `skippedRelativizeFailed` / `relativize_failed` in output and troubleshooting pages.
 - Docs: clarify `--strict` includes `outside_root` in output docs.
-- Docs: fix `--strict` docs (bucket truncation + `maxNormalizedChars` / `maxTokens`) and document `skippedBudgetMaxNormalizedChars` / `skippedBudgetMaxTokens`.
+- Docs: fix `--strict` and scan-budget docs (output/cli/troubleshooting), document `skippedBudgetMaxNormalizedChars` / `skippedBudgetMaxTokens`, and clarify `skippedOutsideRoot` semantics.
 - Core: hide `Arc<str>` output fields behind accessors (pre-1.0 API cleanup).

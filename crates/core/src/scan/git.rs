@@ -80,8 +80,8 @@ pub(super) fn validate_git_bin_override(raw: OsString) -> Option<OsString> {
         if mode & 0o111 == 0 {
             return None;
         }
-        // Never allow a world-writable executable as an override.
-        if mode & 0o002 != 0 {
+        // Never allow a group/world-writable executable as an override.
+        if mode & 0o022 != 0 {
             return None;
         }
     }

@@ -72,13 +72,16 @@ Symptoms: exit code `1`, and stderr prints scan stats containing:
 - `outside_root`
 - `relativize_failed`
 - `walk_errors`
+- `bucket_truncated`
 - `budget_max_files` / `budget_max_total_bytes`
+- `budget_max_normalized_chars` / `budget_max_tokens`
 
 Fix ideas:
 
 - permission issues: adjust scan roots (avoid restricted dirs), or run CI with appropriate permissions
 - traversal errors: ensure filesystem stability (container mounts, concurrent writes, etc.)
-- budget aborts: increase `--max-files` / `--max-total-bytes`, or reduce roots / add `--ignore-dir`
+- bucket truncation: increase `--min-match-len` / `--min-token-len`, or use `--ignore-dir` to skip generated/vendor dirs
+- budget limits: increase `--max-files` / `--max-total-bytes` / `--max-normalized-chars` / `--max-tokens`, or reduce roots / add `--ignore-dir`
 
 ## 5) `.gitignore` behavior differs from expectations
 

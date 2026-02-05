@@ -61,8 +61,8 @@ pub(crate) fn format_fatal_skip_warning(
         "skippedOutsideRoot",
         "outside_root",
         stats.skipped_outside_root,
-        "some symlink targets resolved outside roots; consider disabling --follow-symlinks or fixing symlinks.",
-        "部分符号链接解析后位于 root 之外；可考虑关闭 --follow-symlinks 或修复符号链接。",
+        "some paths were outside roots (symlink targets or unsafe paths); consider disabling --follow-symlinks or checking for unexpected paths.",
+        "部分路径位于 root 之外（可能是符号链接目标或不安全路径）；可考虑关闭 --follow-symlinks 或检查是否存在异常路径。",
     );
     push_item(
         &mut out,

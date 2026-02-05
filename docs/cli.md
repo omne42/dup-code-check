@@ -86,6 +86,8 @@ See [Output & Report](output.md) for a full field reference.
 - `--max-files <n>`: stop scanning after reading `n` files (`scanStats.skippedBudgetMaxFiles > 0` indicates the budget was hit)
 - `--max-total-bytes <n>`: skip files that would exceed total scanned bytes budget
 - `--max-file-size <n>`: skip files larger than `n` bytes (default `10485760` = 10 MiB)
+- `--max-normalized-chars <n>`: stop scanning once stored normalized code chars would exceed `n` (`scanStats.skippedBudgetMaxNormalizedChars > 0`)
+- `--max-tokens <n>`: (report) stop scanning once stored tokens would exceed `n` (`scanStats.skippedBudgetMaxTokens > 0`)
 
 ### Ignore rules
 
@@ -101,5 +103,5 @@ See [Output & Report](output.md) for a full field reference.
 - `0`: completed successfully (even if some non-fatal skips happened: `NotFound`/`TooLarge`/`Binary`)
 - `1`:
   - runtime error (e.g. root does not exist / is not a directory, scan failures)
-  - with `--strict`: scan was incomplete due to `PermissionDenied`, `outside_root`, `relativize_failed`, walker errors, or budget abort (`maxFiles`/`maxTotalBytes`)
+  - with `--strict`: scan was incomplete due to `PermissionDenied`, `outside_root`, `relativize_failed`, traversal errors, bucket truncation, or budget limits (`maxFiles`/`maxTotalBytes`/`maxNormalizedChars`/`maxTokens`)
 - `2`: argument parsing error (unknown flags, non-integers for integer flags, etc.)

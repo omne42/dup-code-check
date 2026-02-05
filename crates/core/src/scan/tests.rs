@@ -154,6 +154,16 @@ fn git_bin_override_validation_is_restrictive() -> io::Result<()> {
             git::validate_git_bin_override(writable.as_os_str().to_os_string()),
             None
         );
+
+        let group_writable = root.join("git_group_writable");
+        fs::write(&group_writable, "")?;
+        let mut perms = fs::metadata(&group_writable)?.permissions();
+        perms.set_mode(0o775);
+        fs::set_permissions(&group_writable, perms)?;
+        assert_eq!(
+            git::validate_git_bin_override(group_writable.as_os_str().to_os_string()),
+            None
+        );
     }
 
     Ok(())

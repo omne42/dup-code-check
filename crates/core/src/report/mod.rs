@@ -60,13 +60,13 @@ pub fn generate_duplication_report_with_stats(
     }
 
     validate_roots(roots)?;
+    options.validate_for_report()?;
     if options.max_report_items == 0 {
         return Ok(ScanOutcome {
             result: empty_report(),
             stats: ScanStats::default(),
         });
     }
-    options.validate_for_report()?;
 
     let mut stats = ScanStats::default();
     let (repo_labels, files, file_duplicates) =

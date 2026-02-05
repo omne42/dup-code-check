@@ -70,6 +70,8 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - Core/CLI: forbid `unsafe` code via `#![forbid(unsafe_code)]`.
 - Core: add `ScanStats::has_fatal_skips()` and reuse it in the CLI.
 - Core: validate scan options in report/code-spans APIs (fail fast on invalid thresholds).
+- Core: expose `ScanOptions::validate_for_*` helpers for library callers.
+- Report: validate options even when `maxReportItems=0` (align with CLI behavior).
 - Docs: clarify that core APIs validate option ranges.
 - Report: set a default `maxTotalBytes` budget (256 MiB) to bound memory use; override via `--max-total-bytes`.
 - Docs: mention the `--report` default `--max-total-bytes` budget in `--help` and `README`.

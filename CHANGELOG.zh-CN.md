@@ -70,6 +70,8 @@
 - Core/CLI：通过 `#![forbid(unsafe_code)]` 禁止 `unsafe` 代码。
 - Core：新增 `ScanStats::has_fatal_skips()` 并在 CLI 中复用，避免语义漂移。
 - Core：在 report/code-spans API 中校验 scan options（无效阈值会快速失败）。
+- Core：对库调用者暴露 `ScanOptions::validate_for_*` 校验 helper。
+- Report：即使 `maxReportItems=0` 也会先校验 options（与 CLI 行为一致）。
 - 文档：补充说明 Core API 会校验选项的取值范围。
 - Report：默认设置 `maxTotalBytes` 预算（256 MiB）以限制内存占用；可用 `--max-total-bytes` 覆盖。
 - 文档：在 `--help` 与 README 中说明 `--report` 模式默认 `--max-total-bytes` 预算。

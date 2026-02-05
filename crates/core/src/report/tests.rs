@@ -181,6 +181,22 @@ fn report_rejects_invalid_similarity_threshold() -> io::Result<()> {
 }
 
 #[test]
+fn report_rejects_invalid_similarity_threshold_when_max_report_items_zero() -> io::Result<()> {
+    let root = temp_dir("invalid_similarity_threshold_max_report_items_zero");
+    fs::create_dir_all(&root)?;
+
+    let options = ScanOptions {
+        max_report_items: 0,
+        similarity_threshold: 2.0,
+        ..ScanOptions::default()
+    };
+
+    let err = generate_duplication_report_with_stats(&[root], &options).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    Ok(())
+}
+
+#[test]
 fn report_respects_gitignore() -> io::Result<()> {
     let root = temp_dir("gitignore");
     fs::create_dir_all(&root)?;

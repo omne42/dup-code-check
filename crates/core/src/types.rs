@@ -49,18 +49,25 @@ impl Default for ScanOptions {
 }
 
 impl ScanOptions {
-    /// Validate scan options (including report/similarity detectors).
+    /// Validate scan options for all detectors (strictest).
     ///
-    /// This is primarily useful for library callers; the CLI already validates most inputs.
+    /// This is equivalent to [`ScanOptions::validate_for_report`], since report mode exercises all
+    /// threshold-related options.
+    ///
+    /// For narrower use, prefer:
+    /// - [`ScanOptions::validate_for_file_duplicates`]
+    /// - [`ScanOptions::validate_for_code_spans`]
     pub fn validate(&self) -> io::Result<()> {
         self.validate_for_report()
     }
 
-    pub(crate) fn validate_for_file_duplicates(&self) -> io::Result<()> {
+    /// Validate options used by file-duplicate scanning.
+    pub fn validate_for_file_duplicates(&self) -> io::Result<()> {
         Ok(())
     }
 
-    pub(crate) fn validate_for_code_spans(&self) -> io::Result<()> {
+    /// Validate options used by code-span scanning.
+    pub fn validate_for_code_spans(&self) -> io::Result<()> {
         if self.min_match_len == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -70,7 +77,8 @@ impl ScanOptions {
         Ok(())
     }
 
-    pub(crate) fn validate_for_report(&self) -> io::Result<()> {
+    /// Validate options used by report generation.
+    pub fn validate_for_report(&self) -> io::Result<()> {
         self.validate_for_code_spans()?;
 
         if self.min_token_len == 0 {

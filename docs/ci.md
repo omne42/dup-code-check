@@ -47,7 +47,7 @@ dup-code-check --json --stats --report . >dup-code-check.result.json 2>dup-code-
 `dup-code-check` fails mainly in two cases:
 
 1. runtime errors: invalid args, root does not exist / is not a directory, scan failures
-2. `--strict`: scan was incomplete (permission / traversal / budget abort)
+2. `--strict`: scan was incomplete (permission / relativize / traversal / budget abort)
 
 If you also want to fail when duplicates are found, add a separate step to check the JSON output, e.g.:
 

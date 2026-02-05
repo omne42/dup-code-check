@@ -137,4 +137,5 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CI: add a `cargo clippy --workspace --all-targets -- -D warnings` gate on Linux.
 - CLI: add `skippedRelativizeFailed` fatal-skip reporting, and clarify that `skippedOutsideRoot` refers to symlink targets outside roots.
 - CLI: clarify that `--strict` also covers `skippedRelativizeFailed`.
+- Docs: document `skippedRelativizeFailed` / `relativize_failed` in output and troubleshooting pages.
 - Core: hide `Arc<str>` output fields behind accessors (pre-1.0 API cleanup).

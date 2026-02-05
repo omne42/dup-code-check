@@ -47,7 +47,7 @@ dup-code-check --json --stats --report . >dup-code-check.result.json 2>dup-code-
 `dup-code-check` 的失败条件主要有两类：
 
 1. 运行期错误：参数错误、root 不存在/不是目录、扫描异常等
-2. `--strict` 触发：扫描不完整（权限/遍历错误/预算中断）
+2. `--strict` 触发：扫描不完整（权限/相对化失败/遍历错误/预算中断）
 
 如果你还希望在“发现重复”时失败，可以在 CI 的下一步对 JSON 做检查，例如：
 

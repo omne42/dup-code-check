@@ -78,6 +78,7 @@ interface DuplicateSpanGroup {
 - `skippedTooLarge`：超过 `maxFileSize`
 - `skippedBinary`：包含 `\\0` 字节的二进制文件
 - `skippedOutsideRoot`：跟随符号链接时发现路径解析到 root 之外（为安全起见跳过）
+- `skippedRelativizeFailed`：路径无法相对化到提供的 root（不符合预期；可视为 bug 线索）
 - `skippedWalkErrors`：遍历错误（walker errors）
 - `skippedBudgetMaxFiles`：因 `maxFiles` 预算导致提前结束扫描（非 0 表示触发）
 - `skippedBudgetMaxTotalBytes`：因 `maxTotalBytes` 预算跳过的文件数（当某文件会使累计扫描字节数超出预算时被跳过）
@@ -95,7 +96,7 @@ dup-code-check --stats . >result.txt 2>stats.txt
 
 `--strict` 用于在 CI 中判断“扫描是否完整”：
 
-- 若出现 `PermissionDenied` / 遍历错误 / 预算中断（`maxFiles` / `maxTotalBytes`），退出码为 `1`
+- 若出现 `PermissionDenied` / `relativize_failed` / 遍历错误 / 预算中断（`maxFiles` / `maxTotalBytes`），退出码为 `1`
 - 其他跳过（`NotFound` / `TooLarge` / `Binary` / `BucketTruncated`）不会触发失败
 
 当 `--json` 开启且 `--stats` 未开启时，`--strict` 仍会在失败时把统计打印到 stderr，避免你拿不到原因。

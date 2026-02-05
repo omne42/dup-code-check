@@ -101,5 +101,5 @@ See [Output & Report](output.md) for a full field reference.
 - `0`: completed successfully (even if some non-fatal skips happened: `NotFound`/`TooLarge`/`Binary`)
 - `1`:
   - runtime error (e.g. root does not exist / is not a directory, scan failures)
-  - with `--strict`: scan was incomplete due to `PermissionDenied`, `outside_root`, walker errors, or budget abort (`maxFiles`/`maxTotalBytes`)
+  - with `--strict`: scan was incomplete due to `PermissionDenied`, `outside_root`, `relativize_failed`, walker errors, or budget abort (`maxFiles`/`maxTotalBytes`)
 - `2`: argument parsing error (unknown flags, non-integers for integer flags, etc.)

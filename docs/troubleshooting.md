@@ -70,6 +70,7 @@ Symptoms: exit code `1`, and stderr prints scan stats containing:
 
 - `permission_denied`
 - `outside_root`
+- `relativize_failed`
 - `walk_errors`
 - `budget_max_files` / `budget_max_total_bytes`
 

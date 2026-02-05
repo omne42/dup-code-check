@@ -137,4 +137,5 @@
 - CI：在 Linux 上新增 `cargo clippy --workspace --all-targets -- -D warnings` 硬门。
 - CLI：新增 `skippedRelativizeFailed` 致命跳过输出，并澄清 `skippedOutsideRoot` 指的是“符号链接解析后位于 root 之外”。
 - CLI：说明 `--strict` 同样包含 `skippedRelativizeFailed`。
+- 文档：在 output/troubleshooting 等页面补充 `skippedRelativizeFailed` / `relativize_failed` 的说明。
 - Core：将输出中的 `Arc<str>` 字段隐藏在 accessor 方法之后（1.0 前的 API 清理）。

@@ -69,7 +69,7 @@ With `--json --stats`:
 
 - `candidateFiles`, `scannedFiles`, `scannedBytes`
 - `gitFastPathFallbacks`: non-zero when the scan attempted the Git fast path and had to fall back to the filesystem walker
-- `skippedNotFound`, `skippedPermissionDenied`, `skippedTooLarge`, `skippedBinary`, `skippedOutsideRoot`, `skippedWalkErrors`
+- `skippedNotFound`, `skippedPermissionDenied`, `skippedTooLarge`, `skippedBinary`, `skippedOutsideRoot`, `skippedRelativizeFailed`, `skippedWalkErrors`
 - `skippedBudgetMaxFiles`: non-zero when the scan stopped early due to the `maxFiles` budget
 - `skippedBudgetMaxTotalBytes`: skipped due to `maxTotalBytes` (reading would exceed the total bytes budget)
 - `skippedBucketTruncated`: detector guardrail; fingerprint buckets were truncated to cap worst-case cost (results may miss some matches)
@@ -86,7 +86,7 @@ dup-code-check --stats . >result.txt 2>stats.txt
 
 `--strict` is intended for CI and answers “was the scan complete?”:
 
-- exits `1` on `PermissionDenied`, traversal errors, or budget abort (`maxFiles` / `maxTotalBytes`)
+- exits `1` on `PermissionDenied`, `relativize_failed`, traversal errors, or budget abort (`maxFiles` / `maxTotalBytes`)
 - does **not** fail on `NotFound`, `TooLarge`, `Binary`, or `BucketTruncated`
 
 When `--json` is enabled and `--stats` is not, `--strict` still prints stats to stderr on failure (so you can see why).

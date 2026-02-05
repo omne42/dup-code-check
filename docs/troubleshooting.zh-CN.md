@@ -67,6 +67,7 @@ cargo build --release -p dup-code-check
 
 - `permission_denied`
 - `outside_root`
+- `relativize_failed`
 - `walk_errors`
 - `budget_max_files` / `budget_max_total_bytes`
 

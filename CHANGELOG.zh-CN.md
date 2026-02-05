@@ -137,6 +137,9 @@
 - CLI：`--version` 现在会尊重 `--`（`--` 之后的 `--version` 会被当作 root 而不是参数）。
 - 扫描流程：流式模式下 `git ls-files` 非 0 退出时回退到 walker（fail closed）。
 - 扫描流程：Git 快路径流式枚举遇到 `Interrupted` 会重试（stdout 读取 / kill / wait），并确保终止时总能回收 `git` 子进程；其它 stdout / kill / wait I/O 错误则回退到 walker（fail closed）。
+- 扫描流程：Git 快路径回退到 walker 时，已访问路径去重改为记录归一化的相对路径，减少内存与分配。
+- 扫描流程：若 `git` 子进程意外未提供 stdout pipe（异常情况），回退前会执行 kill/wait 回收，避免留下僵尸进程。
+- Report：AST 子树 hash 计算不再为每个 node 分配/排序 children 列表（children 已按 token 顺序记录）。
 - 扫描流程：在非 Unix 平台上，流式模式遇到 `git ls-files` 输出非 UTF-8 路径时回退到 walker（包括扫描已开始的情况）。
 - npm 构建：当 `bin/dup-code-check.mjs` wrapper 缺失时，提前失败并输出更清晰的错误信息。
 - npm 构建：Cargo 构建失败时输出更友好的诊断信息。

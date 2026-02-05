@@ -382,6 +382,63 @@ fn git_streaming_metadata_error_is_counted_and_skipped() -> io::Result<()> {
 }
 
 #[test]
+fn git_fast_path_fallback_does_not_rescan_files() -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        const FILES: usize = 32;
+
+        let root = temp_dir("git_fast_path_fallback_does_not_rescan_files");
+        let git_dir = root.join(".git");
+        fs::create_dir_all(&git_dir)?;
+
+        let mut output = String::new();
+        for idx in 0..FILES {
+            let name = format!("f{idx:04}.txt");
+            fs::write(root.join(&name), "x")?;
+            output.push_str(&name);
+            output.push_str("\\0");
+        }
+
+        let fake_git_path = git_dir.join("fake_git.sh");
+        fs::write(
+            &fake_git_path,
+            fake_git_script_paths_with_exit(&root, &output, 1),
+        )?;
+        let mut perms = fs::metadata(&fake_git_path)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&fake_git_path, perms)?;
+
+        let repo = Repo {
+            id: 0,
+            root: root.clone(),
+            label: "test".into(),
+        };
+        let options = ScanOptions {
+            max_files: Some(FILES + 10),
+            ..ScanOptions::default()
+        };
+
+        let mut stats = ScanStats::default();
+        let mut visited: Vec<String> = Vec::new();
+        let flow = git::with_test_git_exe(&fake_git_path, || {
+            visit_repo_files(&repo, &options, &mut stats, |_stats, file| {
+                visited.push(make_rel_path(&root, &file.abs_path));
+                Ok(ControlFlow::Continue(()))
+            })
+        })?;
+
+        assert_eq!(flow, ControlFlow::Continue(()));
+        assert_eq!(stats.git_fast_path_fallbacks, 1);
+        assert_eq!(stats.candidate_files, FILES as u64);
+        assert_eq!(visited.len(), FILES);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn read_repo_file_bytes_counts_binary_reads_in_scan_stats() -> io::Result<()> {
     let root = temp_dir("read_repo_file_bytes_binary_counts");
     fs::create_dir_all(&root)?;
@@ -508,6 +565,40 @@ if [ "$repo" = "$target_repo" ]; then
     ls-files)
       printf '{output}'
       exit 0
+      ;;
+  esac
+fi
+
+exit 2
+"#
+    )
+}
+
+fn fake_git_script_paths_with_exit(repo: &Path, output: &str, exit_code: i32) -> String {
+    let repo = sh_single_quote(repo.to_string_lossy().as_ref());
+    format!(
+        r#"#!/bin/sh
+set -eu
+
+repo=""
+if [ "${{1:-}}" = "-C" ]; then
+  repo="${{2:-}}"
+  shift 2
+fi
+
+cmd="${{1:-}}"
+if [ -z "$cmd" ]; then
+  exit 2
+fi
+shift
+
+target_repo={repo}
+
+if [ "$repo" = "$target_repo" ]; then
+  case "$cmd" in
+    ls-files)
+      printf '{output}'
+      exit {exit_code}
       ;;
   esac
 fi

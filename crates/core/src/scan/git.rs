@@ -176,6 +176,9 @@ where
     };
 
     let Some(stdout) = child.stdout.take() else {
+        // Should be impossible with `stdout(Stdio::piped())`, but if it happens, avoid leaving a
+        // zombie `git` process behind.
+        kill_and_wait_retriable(&mut child);
         return Ok(None);
     };
 

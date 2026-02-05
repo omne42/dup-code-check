@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::io;
 use std::ops::ControlFlow;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -20,18 +20,33 @@ pub(crate) fn visit_repo_files<F>(
 where
     F: FnMut(&mut ScanStats, RepoFile) -> io::Result<ControlFlow<()>>,
 {
+    fn normalize_relative_path(rel: &Path) -> PathBuf {
+        let mut out = PathBuf::new();
+        for component in rel.components() {
+            let Component::Normal(name) = component else {
+                continue;
+            };
+            out.push(name);
+        }
+        out
+    }
+
     if options.max_files == Some(0) {
         stats.skipped_budget_max_files = stats.skipped_budget_max_files.saturating_add(1);
         return Ok(ControlFlow::Break(()));
     }
 
-    let mut visited_via_git: Vec<PathBuf> = Vec::new();
+    // Only used when the Git fast path partially scans and then falls back to the walker.
+    // Store relative paths (normalized) to avoid repeating the root prefix for every entry.
+    let mut visited_via_git_rel: Vec<PathBuf> = Vec::new();
 
     if options.respect_gitignore
         && !options.follow_symlinks
         && let Some(flow) = {
             let mut on_git_file = |stats: &mut ScanStats, file: RepoFile| {
-                visited_via_git.push(file.abs_path.clone());
+                if let Ok(rel) = file.abs_path.strip_prefix(&repo.root) {
+                    visited_via_git_rel.push(normalize_relative_path(rel));
+                }
                 on_file_cb(stats, file)
             };
             super::git::try_visit_repo_files_via_git(repo, options, stats, &mut on_git_file)?
@@ -40,8 +55,8 @@ where
         return Ok(flow);
     }
 
-    let visited_via_git: Option<HashSet<PathBuf>> =
-        (!visited_via_git.is_empty()).then(|| visited_via_git.into_iter().collect());
+    let visited_via_git_rel: Option<HashSet<PathBuf>> =
+        (!visited_via_git_rel.is_empty()).then(|| visited_via_git_rel.into_iter().collect());
 
     let ignore_dirs = options.ignore_dirs.clone();
     let follow_symlinks = options.follow_symlinks;
@@ -174,9 +189,9 @@ where
         }
 
         let abs_path = entry.into_path();
-        if visited_via_git
-            .as_ref()
-            .is_some_and(|set| set.contains(&abs_path))
+        if let Some(visited) = visited_via_git_rel.as_ref()
+            && let Ok(rel) = abs_path.strip_prefix(&repo.root)
+            && visited.contains(rel)
         {
             continue;
         }

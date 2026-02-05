@@ -165,13 +165,6 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
                 continue;
             }
 
-            let mut children: Vec<(usize, usize, usize)> = Vec::with_capacity(node.children.len());
-            for &cid in &node.children {
-                let c = &file.blocks[cid];
-                children.push((c.start_token, c.end_token, cid));
-            }
-            children.sort_by_key(|c| c.0);
-
             const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
             const FNV_PRIME: u64 = 0x100000001b3;
             const BASE: u64 = 911382323;
@@ -205,7 +198,18 @@ pub(in crate::report) fn detect_duplicate_ast_subtrees(
             }
 
             let mut idx = start;
-            for (c_start, c_end, cid) in children {
+            // `parse_brace_blocks()` records children in token order, so `node.children` is already
+            // sorted by `start_token`.
+            let mut prev_child_start: Option<usize> = None;
+            for &cid in &node.children {
+                let c = &file.blocks[cid];
+                let c_start = c.start_token;
+                let c_end = c.end_token;
+                if let Some(prev) = prev_child_start {
+                    debug_assert!(c_start >= prev, "children must be in token order");
+                }
+                prev_child_start = Some(c_start);
+
                 while idx < c_start && idx < node.end_token {
                     push_u32(&mut hash1, &mut hash2, &mut repr_len, file.tokens[idx]);
                     idx += 1;

@@ -137,6 +137,9 @@ The format is based on *Keep a Changelog*, and this project adheres to *Semantic
 - CLI: `--version` now respects `--` (treats `--version` after `--` as a root).
 - Scan pipeline: when `git ls-files` exits non-zero during streaming, fall back to the walker (fail closed).
 - Scan pipeline: retry interrupted stdout reads and child kill/wait calls in Git streaming enumeration and always reap the `git` child process; other I/O errors still fall back to the walker (fail closed).
+- Scan pipeline: reduce memory/allocations when the Git fast path falls back to the walker by tracking visited paths as normalized relative paths.
+- Scan pipeline: if the `git` child process starts without a stdout pipe (unexpected), kill/wait it before falling back to avoid leaving zombies behind.
+- Report: AST subtree hashing avoids per-node child list allocation/sort (children are already recorded in token order).
 - Scan pipeline: on non-Unix platforms, when `git ls-files` outputs non-UTF-8 paths in streaming mode, fall back to the walker (even after scanning has started).
 - npm build: fail early with a clear error when `bin/dup-code-check.mjs` wrapper is missing.
 - npm build: improve Cargo build failure diagnostics.
